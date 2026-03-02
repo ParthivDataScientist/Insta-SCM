@@ -1,0 +1,64 @@
+{
+    "output": {
+        "completeTrackResults": [
+            {
+                "trackResults": [
+                    {
+                        "latestStatusDetail": {
+                            "statusByLocale": "On FedEx vehicle for delivery"
+                        },
+                        "scanEvents": [
+                            {
+                                "date": "2026-03-02T10:30:00-05:00",
+                                "eventDescription": "On FedEx vehicle for delivery",
+                                "scanLocation": {
+                                    "city": "Los Angeles",
+                                    "stateOrProvinceCode": "CA"
+                                },
+                                "eventType": "OF"
+                            },
+                            {
+                                "date": "2026-03-01T22:15:00-05:00",
+                                "eventDescription": "Arrived at FedEx location",
+                                "scanLocation": {
+                                    "city": "Los Angeles",
+                                    "stateOrProvinceCode": "CA"
+                                },
+                                "eventType": "AR"
+                            },
+                            {
+                                "date": "2026-02-29T08:00:00-06:00",
+                                "eventDescription": "Picked up",
+                                "scanLocation": {
+                                    "city": "New York",
+                                    "stateOrProvinceCode": "NY"
+                                },
+                                "eventType": "PU"
+                            }
+                        ],
+                        "dateAndTimes": [
+                            {
+                                "type": "ESTIMATED_DELIVERY",
+                                "dateTime": "2026-03-02T20:00:00-08:00"
+                            }
+                        ],
+                        "originLocation": {
+                            "locationContactAndAddress": {
+                                "address": {
+                                    "city": "New York",
+                                    "stateOrProvinceCode": "NY"
+                                }
+                            }
+                        },
+                        "recipientInformation": {
+                            "address": {
+                                "city": "Los Angeles",
+                                "stateOrProvinceCode": "CA"
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

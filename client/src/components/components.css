@@ -1,0 +1,8 @@
+error-banner {
+    background: var(--status-exception-bg);
+    color: var(--status-exception-text);
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    font-size: 13px;
+}

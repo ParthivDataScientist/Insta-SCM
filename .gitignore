@@ -1,0 +1,38 @@
+# ──────────────────────────────────────────────
+# LogiTrack — Git Ignore
+# ──────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Database
+*.db
+*.sqlite3
+
+# Environment
+.env
+
+# Node
+node_modules/
+node-v*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
