@@ -22,6 +22,7 @@ def track_and_save(
     recipient: Optional[str],
     items: Optional[str],
     show_date: Optional[str],
+    exhibition_name: str,
     db: Session,
 ) -> dict:
     """
@@ -60,8 +61,8 @@ def track_and_save(
         shipment = Shipment(
             tracking_number=tracking_number,
             carrier=carrier_name,
-            status=result.get("status", "Unknown"),
             recipient=recipient or "",
+            exhibition_name=exhibition_name,
             show_date=show_date,
             origin=result.get("origin", "Unknown"),
             destination=result.get("destination", "Unknown"),
@@ -80,6 +81,8 @@ def track_and_save(
             shipment.items = items
         if show_date:
             shipment.show_date = show_date
+        if exhibition_name and exhibition_name != "Unknown Exhibition":
+            shipment.exhibition_name = exhibition_name
 
         # Only update fields if the API returned meaningful data
         if result.get("origin") and result.get("origin") != "Unknown":
