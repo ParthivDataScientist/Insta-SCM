@@ -11,6 +11,7 @@ class ShipmentBase(SQLModel):
     origin: Optional[str] = None
     destination: Optional[str] = None
     recipient: Optional[str] = None
+    exhibition_name: Optional[str] = None
     items: Optional[str] = None
     eta: Optional[str] = None
     progress: Optional[int] = Field(default=0)

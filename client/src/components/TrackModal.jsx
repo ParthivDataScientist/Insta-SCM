@@ -5,6 +5,7 @@ import { trackShipment, importExcel } from '../api';
 const TrackModal = ({ onClose, onTracked }) => {
     const [trackingNum, setTrackingNum] = useState('');
     const [shipmentName, setShipmentName] = useState('');
+    const [exhibitionName, setExhibitionName] = useState('');
     const [showDate, setShowDate] = useState('');
     const [loading, setLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
@@ -45,13 +46,18 @@ const TrackModal = ({ onClose, onTracked }) => {
             setError('Please enter a tracking number');
             return;
         }
+        if (!exhibitionName.trim()) {
+            setError('Please enter an Exhibition Name');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
             await trackShipment(
                 trackingNum.trim().toUpperCase(),
                 shipmentName.trim() || null,
-                showDate.trim() || null
+                showDate.trim() || null,
+                exhibitionName.trim()
             );
             onTracked();
             onClose();
@@ -96,6 +102,16 @@ const TrackModal = ({ onClose, onTracked }) => {
                             />
                         </div>
                         <div className="form-group">
+                            <label className="form-label">Exhibition Name</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="e.g. Tech Expo 2026"
+                                value={exhibitionName}
+                                onChange={e => setExhibitionName(e.target.value)}
+                            />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
                             <label className="form-label">Event Date / Extra Info</label>
                             <input
                                 type="text"
