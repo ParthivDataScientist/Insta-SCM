@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Leave empty to run in open/dev mode.
     API_KEY: str = ""
 
+    # JWT settings
+    JWT_SECRET_KEY: str = "super_secret_dev_key_change_in_production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480 # 8 hours
+
     # CORS — set to your frontend production URL in .env
     ALLOWED_ORIGIN: str = "http://localhost:5173"
 

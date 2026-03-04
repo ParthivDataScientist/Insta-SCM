@@ -19,14 +19,24 @@ const TrackModal = ({ onClose, onTracked }) => {
             const result = await importExcel(file);
             onTracked();
             onClose();
-            // Show queued message if backend accepted async
-            if (result?.status === 'queued') {
-                alert('Import queued! Refresh in a moment to see your shipments.');
+
+            // Show detailed alert with success and failure counts
+            if (result?.status === 'completed') {
+                let msg = `Import complete: ${result.success} succeeded, ${result.failed} failed.`;
+                if (result.failed > 0 && result.errors && result.errors.length > 0) {
+                    msg += `\n\nErrors:\n` + result.errors.slice(0, 5).join('\n');
+                    if (result.errors.length > 5) {
+                        msg += `\n...and ${result.errors.length - 5} more.`;
+                    }
+                }
+                alert(msg);
             }
         } catch (err) {
             setError(err.message);
         } finally {
             setImportLoading(false);
+            // reset file input
+            e.target.value = null;
         }
     };
 

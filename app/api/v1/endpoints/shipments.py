@@ -71,16 +71,18 @@ def track_shipment(
 # ---------------------------------------------------------------------------
 
 def _process_excel_import(contents: bytes, db: Session):
-    """Background task: parse Excel rows and track each shipment."""
+    """Parse Excel rows and track each shipment synchronously."""
     df = pd.read_excel(io.BytesIO(contents))
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
 
     if "tracking_number" not in df.columns:
         logger.error("Excel import: missing required 'tracking_number' column")
-        return
+        return {"error": "Missing required 'tracking_number' column", "success": 0, "failed": 0}
 
     success = 0
     failed = 0
+    errors = []
+    
     for _, row in df.iterrows():
         tracking_num = str(row.get("tracking_number", "")).strip()
         if not tracking_num or tracking_num.lower() == "nan":
@@ -110,24 +112,26 @@ def _process_excel_import(contents: bytes, db: Session):
         # tracking_number, recipient, items, show_date, db
         res = track_and_save(tracking_num.upper(), recipient, items_name, show_date, db)
         if "error" in res:
-            logger.warning("Import failed for %s: %s", tracking_num, res["error"])
+            err_msg = res["error"]
+            logger.warning("Import failed for %s: %s", tracking_num, err_msg)
             failed += 1
+            errors.append(f"{tracking_num}: {err_msg}")
         else:
             success += 1
 
     logger.info("Excel import complete: %d succeeded, %d failed", success, failed)
+    return {"success": success, "failed": failed, "errors": errors}
 
 
-@router.post("/import-excel", status_code=202)
+@router.post("/import-excel", status_code=200)
 async def import_excel(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """
     Import shipments from an Excel file (.xlsx/.xls).
-    Processing runs in the background — returns immediately with 202 Accepted.
+    Processing runs synchronously.
     Expected columns: tracking_number, name (optional), show_date (optional)
     """
     if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
@@ -137,10 +141,17 @@ async def import_excel(
     if len(contents) > MAX_EXCEL_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 5 MB.")
 
-    background_tasks.add_task(_process_excel_import, contents, db)
+    result = _process_excel_import(contents, db)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+        
     return {
-        "status": "queued",
-        "message": "Import started in background. Refresh the dashboard in a moment to see results.",
+        "status": "completed",
+        "success": result["success"],
+        "failed": result["failed"],
+        "errors": result["errors"],
+        "message": f"Successfully imported {result['success']} shipments. {result['failed']} failed.",
     }
 
 

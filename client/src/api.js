@@ -1,13 +1,21 @@
 // API client for Insta-Track — all shipment data from real backend
 // API base URL is read from Vite environment variable for dev/prod portability.
-const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:8001"}/api/v1/shipments`;
+const API_BASE = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api/v1/shipments`
+    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? "http://localhost:8001/api/v1/shipments"
+        : "/api/v1/shipments");
 
 /**
  * Returns common headers. Adds X-API-Key if VITE_API_KEY env var is set.
  */
 function authHeaders() {
     const key = import.meta.env.VITE_API_KEY;
-    return key ? { "X-API-Key": key } : {};
+    const token = localStorage.getItem('access_token');
+    const headers = {};
+    if (key) headers["X-API-Key"] = key;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
 }
 
 // --- Shipment API ---

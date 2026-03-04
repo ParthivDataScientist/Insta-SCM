@@ -807,9 +807,9 @@ select {
 /* BOTTOM ROW */
 .bottom-row {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr;
     gap: 14px;
-    align-items: start
+    align-items: start;
 }
 
 /* RECENT SHIPMENTS */

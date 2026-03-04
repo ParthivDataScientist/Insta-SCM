@@ -1,11 +1,15 @@
 import React, { useState, useMemo } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import {
     Package, Truck, CheckCircle, AlertTriangle,
-    Bell, Search, RefreshCw, ChevronRight, Plus, ArrowUpRight, Trash2, FileSpreadsheet
+    Bell, Search, RefreshCw, ChevronRight, Plus, ArrowUpRight, Trash2, FileSpreadsheet, LogOut
 } from 'lucide-react';
 import { useShipments } from './hooks/useShipments';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import TrackModal from './components/TrackModal';
 import ShipmentDetailPanel from './components/ShipmentDetailPanel';
+import Login from './views/Login';
+import Register from './views/Register';
 import './styles.css';
 
 /* ── iNSTa Logo SVG ── */
@@ -46,13 +50,14 @@ const statusLabel = (s = '') => {
 const city = (loc = '') => (loc || '').split(',')[0].trim() || '—';
 
 /* ─────────────────────────────────────────────────────────────
-   APP — Single page: Shipment Tracking (no Dashboard page)
+   DASHBOARD — Main tracking view
 ───────────────────────────────────────────────────────────── */
-export default function App() {
+function Dashboard() {
     const [isDark, setIsDark] = useState(false);
     const [selected, setSelected] = useState(null);
     const [showTrack, setShowTrack] = useState(false);
     const [hdrSearch, setHdrSearch] = useState('');
+    const { user, logout } = useAuth();
 
     const {
         shipments, stats, loading, error, loadData, filteredShipments,
@@ -116,7 +121,7 @@ export default function App() {
                     {/* Header */}
                     <header className="main-header">
                         <div className="header-welcome">
-                            <h1>Welcome, <strong>Operations Manager</strong></h1>
+                            <h1>Welcome, <strong>{user?.full_name || 'Operations Manager'}</strong></h1>
                             <p className="header-role">Insta Exhibition SCM — Shipment Tracking</p>
                         </div>
                         <div className="header-search-bar">
@@ -137,6 +142,9 @@ export default function App() {
                                 </button>
                                 <span className={isDark ? 'ts-label active' : 'ts-label'}>Dark</span>
                             </div>
+                            <button className="icon-btn" onClick={logout} title="Logout" style={{ marginLeft: '1rem', color: '#E53935' }}>
+                                <LogOut size={16} />
+                            </button>
                         </div>
                     </header>
                     <div className="header-accent-bar" />
@@ -255,6 +263,7 @@ export default function App() {
                                                     <tr>
                                                         <th>Tracking ID / Name</th>
                                                         <th>Status</th>
+                                                        <th>Current Status</th>
                                                         <th>Carrier</th>
                                                         <th>Route</th>
                                                         <th>ETA</th>
@@ -274,6 +283,11 @@ export default function App() {
                                                                 </div>
                                                             </td>
                                                             <td><span className={`status-pill ${classify(s.status)}`}>{statusLabel(s.status)}</span></td>
+                                                            <td className="current-status-cell">
+                                                                <div className="cs-text" title={s.history && s.history.length > 0 ? s.history[0].description : s.status}>
+                                                                    {s.history && s.history.length > 0 ? s.history[0].description : s.status}
+                                                                </div>
+                                                            </td>
                                                             <td className="carrier-cell">{s.carrier || '—'}</td>
                                                             <td>
                                                                 {s.origin
@@ -297,59 +311,33 @@ export default function App() {
                                         )}
                             </div>
 
-                            {/* Alerts & Notifications */}
-                            <div className="alerts-card">
-                                <div className="alerts-header">
-                                    <AlertTriangle size={15} className="alerts-icon" />
-                                    <span className="alerts-title">Alerts &amp; Notifications</span>
-                                    <span className="alerts-dots">···</span>
-                                </div>
-                                {alerts.length === 0 && stats.transit === 0 && (
-                                    <div className="alert-item">
-                                        <span className="alert-dot green-dot-sm" />
-                                        <div>
-                                            <div className="alert-msg">All shipments on track</div>
-                                            <div className="alert-time">No exceptions detected</div>
-                                        </div>
-                                    </div>
-                                )}
-                                {alerts.map(s => (
-                                    <div key={s.id} className="alert-item">
-                                        <span className="alert-dot red-dot-sm" />
-                                        <div>
-                                            <div className="alert-msg">
-                                                Shipment <span className="alert-link" onClick={() => setSelected(s)}>
-                                                    {s.items && s.items !== 'Package' ? s.items : (s.recipient || `#${s.tracking_number}`)}
-                                                </span> delayed
-                                            </div>
-                                            <div className="alert-time">{s.eta || 'ETA unknown'}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {stats.transit > 0 && (
-                                    <div className="alert-item">
-                                        <span className="alert-dot orange-dot-sm" />
-                                        <div>
-                                            <div className="alert-msg">{stats.transit} shipment{stats.transit > 1 ? 's' : ''} in transit</div>
-                                            <div className="alert-time">Monitor regularly</div>
-                                        </div>
-                                    </div>
-                                )}
-                                {stats.delivered > 0 && (
-                                    <div className="alert-item">
-                                        <span className="alert-dot green-dot-sm" />
-                                        <div>
-                                            <div className="alert-msg">{stats.delivered} shipment{stats.delivered > 1 ? 's' : ''} delivered</div>
-                                            <div className="alert-time">Successfully completed</div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+
                         </div>
 
                     </div>
                 </main>
             </div>
         </div>
+    );
+}
+
+const ProtectedRoute = ({ children }) => {
+    const { user, loading } = useAuth();
+    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+    if (!user) return <Navigate to="/login" />;
+    return children;
+};
+
+export default function App() {
+    return (
+        <AuthProvider>
+            <BrowserRouter>
+                <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                </Routes>
+            </BrowserRouter>
+        </AuthProvider>
     );
 }
