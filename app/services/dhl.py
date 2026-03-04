@@ -71,7 +71,7 @@ class DHLService(CarrierService):
             elif response.status_code == 404:
                 return {"carrier": "DHL", "error": "Shipment not found"}
             else:
-                logger.warning("DHL API returned %d for %s", response.status_code, tracking_number)
+                logger.warning("DHL API returned %d for %s. Response: %s", response.status_code, tracking_number, response.text)
                 return {"carrier": "DHL", "error": f"DHL API Error: {response.status_code}"}
         except Exception as e:
             logger.error("DHL request failed for %s: %s", tracking_number, e)
