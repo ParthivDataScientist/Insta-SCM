@@ -14,20 +14,7 @@ import './styles.css';
 
 /* ── iNSTa Logo SVG ── */
 const Logo = () => (
-    <svg width="130" height="50" viewBox="0 0 130 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="iNSTa Exhibition">
-        {[9, 24, 31, 38, 50, 57, 70, 77, 91, 98].map(x => (
-            <g key={x}>
-                <line x1={x} y1="0" x2={x} y2="11" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8" />
-                <circle cx={x} cy="0" r="1.1" fill="rgba(255,255,255,0.25)" />
-            </g>
-        ))}
-        <text x="3" y="38" fontFamily="'Montserrat','Inter',sans-serif" fontWeight="900" fontSize="27" fill="#E53935" fontStyle="italic">i</text>
-        <text x="16" y="38" fontFamily="'Montserrat','Inter',sans-serif" fontWeight="900" fontSize="27" fill="#FFFFFF">N</text>
-        <text x="38" y="38" fontFamily="'Montserrat','Inter',sans-serif" fontWeight="900" fontSize="27" fill="#FFFFFF">S</text>
-        <text x="59" y="38" fontFamily="'Montserrat','Inter',sans-serif" fontWeight="900" fontSize="27" fill="#FFFFFF">T</text>
-        <text x="78" y="38" fontFamily="'Montserrat','Inter',sans-serif" fontWeight="900" fontSize="27" fill="#E53935" fontStyle="italic">a</text>
-        <text x="3" y="48" fontFamily="'Inter',sans-serif" fontWeight="600" fontSize="6.5" fill="rgba(255,255,255,0.35)" letterSpacing="1.8">EXHIBITION</text>
-    </svg>
+    <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ width: '130px', height: 'auto' }} />
 );
 
 /* ── Helpers ── */

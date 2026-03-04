@@ -31,7 +31,7 @@ const Login = () => {
         <div className="auth-container">
             <div className="auth-left">
                 <div className="auth-brand">
-                    <ShieldCheck size={32} color="#E53935" />
+                    <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ height: '32px', width: 'auto' }} />
                     <span className="auth-brand-text">Insta-Track Security</span>
                 </div>
                 <div className="auth-illustration">
