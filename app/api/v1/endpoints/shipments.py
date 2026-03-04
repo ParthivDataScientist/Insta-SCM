@@ -27,6 +27,7 @@ class TrackRequest(BaseModel):
     recipient: Optional[str] = None
     shipment_name: Optional[str] = None
     show_date: Optional[str] = None
+    exhibition_name: str
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,7 @@ def track_shipment(
         recipient=body.recipient,
         items=body.shipment_name,
         show_date=body.show_date,
+        exhibition_name=body.exhibition_name,
         db=db,
     )
     if "error" in result:
@@ -108,9 +110,14 @@ def _process_excel_import(contents: bytes, db: Session):
             else None
         )
 
+        # Attempt to get exhibition_name
+        exhibition_name = str(row.get("exhibition_name", "")).strip()
+        if not exhibition_name or exhibition_name.lower() == "nan":
+            exhibition_name = "Unknown Exhibition"
+
         # Call track_and_save with correct positional arguments:
-        # tracking_number, recipient, items, show_date, db
-        res = track_and_save(tracking_num.upper(), recipient, items_name, show_date, db)
+        # tracking_number, recipient, items, show_date, exhibition_name, db
+        res = track_and_save(tracking_num.upper(), recipient, items_name, show_date, exhibition_name, db)
         if "error" in res:
             err_msg = res["error"]
             logger.warning("Import failed for %s: %s", tracking_num, err_msg)

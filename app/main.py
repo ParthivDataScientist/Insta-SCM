@@ -16,10 +16,23 @@ from app.api.v1.api import api_router
 
 limiter = Limiter(key_func=get_remote_address)
 
+from sqlmodel import text
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: create DB tables on startup."""
+    """Application lifespan: create DB tables on startup and safely add new columns."""
     SQLModel.metadata.create_all(engine)
+    
+    # Safe manual migration: Add exhibition_name if missing
+    try:
+        with Session(engine) as session:
+            session.execute(text("ALTER TABLE shipment ADD COLUMN exhibition_name VARCHAR;"))
+            session.commit()
+            print("Successfully safely migrated database schema to include exhibition_name.")
+    except Exception as e:
+        # Expected exception if the column already exists
+        pass
+        
     yield
 
 

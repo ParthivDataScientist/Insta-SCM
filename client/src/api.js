@@ -38,10 +38,11 @@ export async function fetchShipment(id) {
     return await response.json();
 }
 
-export async function trackShipment(trackingNumber, shipmentName = null, showDate = null) {
+export async function trackShipment(trackingNumber, shipmentName = null, showDate = null, exhibitionName = null) {
     const body = {};
     if (shipmentName) body.shipment_name = shipmentName;
     if (showDate) body.show_date = showDate;
+    if (exhibitionName) body.exhibition_name = exhibitionName;
 
     const response = await fetch(`${API_BASE}/track/${trackingNumber}`, {
         method: 'POST',
