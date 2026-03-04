@@ -50,7 +50,7 @@ def track_shipment(
         pattern=r"^[A-Z0-9]+$",
         description="Carrier tracking number (uppercase alphanumeric, 8–50 chars)",
     ),
-    body: TrackRequest = TrackRequest(),
+    body: TrackRequest = ...,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
