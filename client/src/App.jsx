@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useShipments } from './hooks/useShipments';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ShipmentTable from './components/ShipmentTable';
 import TrackModal from './components/TrackModal';
 import ShipmentDetailPanel from './components/ShipmentDetailPanel';
 import Login from './views/Login';
@@ -258,60 +259,12 @@ function Dashboard() {
                                     : filteredShipments.length === 0
                                         ? <div className="empty-row">No shipments found. Click "Add Shipment" to start tracking.</div>
                                         : (
-                                            <table className="tracking-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Tracking ID / Name</th>
-                                                        <th>Exhibition</th>
-                                                        <th>Status</th>
-                                                        <th>Current Status</th>
-                                                        <th>Carrier</th>
-                                                        <th>Route</th>
-                                                        <th>ETA</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {filteredShipments.map(s => (
-                                                        <tr key={s.id} onClick={() => setSelected(s)}>
-                                                            <td>
-                                                                <div className="tid-cell">
-                                                                    <div className="tid-icon"><Package size={14} /></div>
-                                                                    <div>
-                                                                        <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
-                                                                        <div className="tid-num">{s.tracking_number}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
-                                                                {s.exhibition_name || 'N/A'}
-                                                            </td>
-                                                            <td><span className={`status-pill ${classify(s.status)}`}>{statusLabel(s.status)}</span></td>
-                                                            <td className="current-status-cell">
-                                                                <div className="cs-text" title={s.history && s.history.length > 0 ? s.history[0].description : s.status}>
-                                                                    {s.history && s.history.length > 0 ? s.history[0].description : s.status}
-                                                                </div>
-                                                            </td>
-                                                            <td className="carrier-cell">{s.carrier || '—'}</td>
-                                                            <td>
-                                                                {s.origin
-                                                                    ? <div className="route-mini">
-                                                                        <span className="rm-label">FROM </span>{city(s.origin)}<br />
-                                                                        <span className="rm-label">TO </span>{city(s.destination)}
-                                                                    </div>
-                                                                    : '—'}
-                                                            </td>
-                                                            <td className="eta-cell">{s.eta || '—'}</td>
-                                                            <td className="action-cell" onClick={e => e.stopPropagation()}>
-                                                                <button className="track-btn" onClick={() => setSelected(s)}>Track</button>
-                                                                <button className="delete-btn" onClick={e => handleDelete(e, s.id)} title="Delete shipment">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                            <ShipmentTable
+                                                shipments={filteredShipments}
+                                                loading={loading}
+                                                onSelectShipment={setSelected}
+                                                onDeleteShipment={(id) => handleDelete(new Event('click'), id)}
+                                            />
                                         )}
                             </div>
 
