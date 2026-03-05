@@ -188,7 +188,7 @@ const ShipmentRow = ({ shipment: s, onClick }) => {
                 </div>
             </td>
             <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
-                {s.exhibition_name || '—'}
+                {s.exhibition_name || 'N/A'}
             </td>
             <td>
                 <StatusBadge status={s.status} />
