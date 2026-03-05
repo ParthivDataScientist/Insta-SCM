@@ -61,6 +61,7 @@ def track_and_save(
         shipment = Shipment(
             tracking_number=tracking_number,
             carrier=carrier_name,
+            status=result.get("status", "Unknown"),
             recipient=recipient or "",
             exhibition_name=exhibition_name,
             show_date=show_date,
