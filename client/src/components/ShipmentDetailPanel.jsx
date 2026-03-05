@@ -29,12 +29,12 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => 
     const handleTrackChild = async (tn) => {
         setTrackingAssociated(tn);
         try {
-            await trackShipment({
-                tracking_number: tn,
-                exhibition_name: shipment.exhibition_name || '',
-                recipient: shipment.recipient || '',
-                items: "Child Box"
-            });
+            await trackShipment(
+                tn,                                          // trackingNumber
+                'Child Box',                                 // shipmentName
+                null,                                        // showDate
+                shipment.exhibition_name || 'Unknown Exhibition' // exhibitionName
+            );
             onDeleted(); // Re-fetch the main list
             alert(`Child package ${tn} tracked successfully! Close this panel to find it in the list.`);
         } catch (err) {
