@@ -18,17 +18,25 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Application lifespan: create DB tables on startup and safely add new columns."""
     SQLModel.metadata.create_all(engine)
-    
-    # Safe manual migration: Add exhibition_name if missing
-    try:
-        with Session(engine) as session:
-            session.execute(text("ALTER TABLE shipment ADD COLUMN exhibition_name VARCHAR;"))
-            session.commit()
-            print("Successfully safely migrated database schema to include exhibition_name.")
-    except Exception as e:
-        # Expected exception if the column already exists
-        pass
-        
+
+    # Safe manual migrations — each ALTER TABLE is wrapped individually so one failure
+    # (column already exists) doesn't block the others.
+    migration_stmts = [
+        ("exhibition_name",         "ALTER TABLE shipment ADD COLUMN exhibition_name VARCHAR;"),
+        ("master_tracking_number",  "ALTER TABLE shipment ADD COLUMN master_tracking_number VARCHAR;"),
+        ("is_master",               "ALTER TABLE shipment ADD COLUMN is_master BOOLEAN DEFAULT FALSE;"),
+        ("child_tracking_numbers",  "ALTER TABLE shipment ADD COLUMN child_tracking_numbers JSON;"),
+    ]
+
+    with Session(engine) as session:
+        for col_name, stmt in migration_stmts:
+            try:
+                session.execute(text(stmt))
+                session.commit()
+                print(f"[migration] Added column: {col_name}")
+            except Exception:
+                session.rollback()   # column already exists — ignore
+
     yield
 
 

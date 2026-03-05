@@ -49,8 +49,15 @@ export async function trackShipment(trackingNumber, shipmentName = null, showDat
     });
 
     if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || `API error: ${response.status}`);
+        let detail = `API error: ${response.status}`;
+        try {
+            const err = await response.json();
+            detail = err.detail || detail;
+        } catch (_) {
+            const txt = await response.text().catch(() => '');
+            if (txt) detail = txt.slice(0, 200);
+        }
+        throw new Error(detail);
     }
     return await response.json();
 }
@@ -75,8 +82,15 @@ export async function importExcel(file) {
     });
 
     if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || `API error: ${response.status}`);
+        let detail = `API error: ${response.status}`;
+        try {
+            const err = await response.json();
+            detail = err.detail || detail;
+        } catch (_) {
+            const txt = await response.text().catch(() => '');
+            if (txt) detail = txt.slice(0, 200);
+        }
+        throw new Error(detail);
     }
     return await response.json();
 }
