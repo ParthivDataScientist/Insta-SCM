@@ -95,6 +95,7 @@ export function useShipments() {
                 (item.tracking_number || '').toLowerCase().includes(q) ||
                 (item.carrier || '').toLowerCase().includes(q) ||
                 (item.recipient || '').toLowerCase().includes(q) ||
+                (item.exhibition_name || '').toLowerCase().includes(q) ||
                 (item.items || '').toLowerCase().includes(q) ||
                 (item.status || '').toLowerCase().includes(q);
 

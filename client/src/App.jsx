@@ -113,7 +113,7 @@ function Dashboard() {
                         </div>
                         <div className="header-search-bar">
                             <Search size={14} className="search-icon" />
-                            <input className="header-search-input" placeholder="Search Shipment, Tracking ID..."
+                            <input className="header-search-input" placeholder="Search Exhibition, ID, Recipient..."
                                 value={hdrSearch} onChange={e => setHdrSearch(e.target.value)} />
                         </div>
                         <div className="header-right">
@@ -217,7 +217,7 @@ function Dashboard() {
                             </div>
                             <div className="toolbar-search">
                                 <Search size={14} className="ts-icon" />
-                                <input className="ts-input" placeholder="Search tracking ID, name, carrier…"
+                                <input className="ts-input" placeholder="Search Exhibition, ID, Recipient..."
                                     onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                             <div className="toolbar-selects">
@@ -249,6 +249,7 @@ function Dashboard() {
                                                 <thead>
                                                     <tr>
                                                         <th>Tracking ID / Name</th>
+                                                        <th>Exhibition</th>
                                                         <th>Status</th>
                                                         <th>Current Status</th>
                                                         <th>Carrier</th>
@@ -268,6 +269,9 @@ function Dashboard() {
                                                                         <div className="tid-num">{s.tracking_number}</div>
                                                                     </div>
                                                                 </div>
+                                                            </td>
+                                                            <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
+                                                                {s.exhibition_name || 'N/A'}
                                                             </td>
                                                             <td><span className={`status-pill ${classify(s.status)}`}>{statusLabel(s.status)}</span></td>
                                                             <td className="current-status-cell">

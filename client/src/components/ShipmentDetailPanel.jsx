@@ -106,6 +106,10 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
                                 <div className="detail-cell-value"><Calendar size={14} /> {s.eta || 'TBD'}</div>
                             </div>
                             <div className="detail-cell full">
+                                <div className="detail-cell-label">Exhibition Name</div>
+                                <div className="detail-cell-value"><Package size={14} /> {s.exhibition_name || 'N/A'}</div>
+                            </div>
+                            <div className="detail-cell full">
                                 <div className="detail-cell-label">Show Date</div>
                                 <div className="detail-cell-value"><Calendar size={14} /> {s.show_date || '—'}</div>
                             </div>
