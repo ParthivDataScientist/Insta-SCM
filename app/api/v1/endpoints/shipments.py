@@ -8,6 +8,7 @@ from typing import List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Path, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -35,10 +36,6 @@ class TrackRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/", response_model=List[Shipment])
-def get_shipments(db: Session = Depends(get_session)):
-    """List all shipments tracked in DB."""
-    return db.exec(select(Shipment)).all()
 
 
 @router.post("/track/{tracking_number}", status_code=201)
@@ -138,7 +135,7 @@ async def import_excel(
 ):
     """
     Import shipments from an Excel file (.xlsx/.xls).
-    Processing runs synchronously.
+    Processing runs in a threadpool to prevent blocking the async event loop.
     Expected columns: tracking_number, name (optional), show_date (optional)
     """
     if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
@@ -148,7 +145,7 @@ async def import_excel(
     if len(contents) > MAX_EXCEL_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 5 MB.")
 
-    result = _process_excel_import(contents, db)
+    result = await run_in_threadpool(_process_excel_import, contents, db)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

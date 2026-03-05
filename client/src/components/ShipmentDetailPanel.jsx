@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Truck, Calendar, Box, Clock, AlertTriangle, Trash2 } from 'lucide-react';
+import { X, Truck, Calendar, Box, Clock, AlertTriangle, Trash2, Package } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
 import ConfirmDialog from './ConfirmDialog';

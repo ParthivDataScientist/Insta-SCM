@@ -1,4 +1,5 @@
 import os
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 # Resolve .env from project root (one level above app/)
@@ -24,6 +25,13 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite:///./sql_app.db"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: str | None) -> str:
+        if isinstance(v, str) and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v or "sqlite:///./sql_app.db"
 
     # Carrier Credentials
     FEDEX_CLIENT_ID: str = ""

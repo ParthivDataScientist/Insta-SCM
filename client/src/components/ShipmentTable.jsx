@@ -52,11 +52,12 @@ const FilterPopover = ({ title, isActive, onClear, children }) => {
 const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment }) => {
     // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
-    const [exhibitionSearch, setExhibitionSearch] = useState('');
+    const [exhibitionFilter, setExhibitionFilter] = useState([]);
     const [statusFilter, setStatusFilter] = useState([]);
     const [carrierFilter, setCarrierFilter] = useState([]);
 
     // Derived unique options for multi-selects based on ALL data
+    const allExhibitions = [...new Set(shipments.map(s => s.exhibition_name))].filter(Boolean);
     const allStatuses = [...new Set(shipments.map(s => s.status))].filter(Boolean);
     const allCarriers = [...new Set(shipments.map(s => s.carrier))].filter(Boolean);
 
@@ -66,9 +67,9 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
         const searchTarget = `${s.tracking_number} ${s.items} ${s.recipient}`.toLowerCase();
         if (idSearch && !searchTarget.includes(idSearch.toLowerCase())) return false;
 
-        // 2. Exhibition Name Search
-        const exName = (s.exhibition_name || '').toLowerCase();
-        if (exhibitionSearch && !exName.includes(exhibitionSearch.toLowerCase())) return false;
+        // 2. Exhibition Name Multi-select
+        const exName = s.exhibition_name || 'N/A';
+        if (exhibitionFilter.length > 0 && !exhibitionFilter.includes(exName) && !exhibitionFilter.includes(s.exhibition_name)) return false;
 
         // 3. Status Multi-select
         if (statusFilter.length > 0 && !statusFilter.includes(s.status)) return false;
@@ -94,9 +95,9 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
                 <span style={{ fontSize: 13, color: 'var(--tx2)', fontWeight: 500 }}>
                     Showing {filteredShipments.length} of {shipments.length} shipments
                 </span>
-                {(idSearch || exhibitionSearch || statusFilter.length || carrierFilter.length) ? (
+                {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
                     <button className="btn-outline-sm" onClick={() => {
-                        setIdSearch(''); setExhibitionSearch(''); setStatusFilter([]); setCarrierFilter([]);
+                        setIdSearch(''); setExhibitionFilter([]); setStatusFilter([]); setCarrierFilter([]);
                     }}>Clear All Filters</button>
                 ) : null}
             </div>
@@ -118,10 +119,17 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
                                     </div>
                                 </FilterPopover>
 
-                                <FilterPopover title="Exhibition" isActive={!!exhibitionSearch} onClear={() => setExhibitionSearch('')}>
-                                    <div className="fp-search">
-                                        <Search size={14} className="fps-icon" />
-                                        <input autoFocus placeholder="Search Exhibition Name..." value={exhibitionSearch} onChange={e => setExhibitionSearch(e.target.value)} />
+                                <FilterPopover title="Exhibition Name" isActive={exhibitionFilter.length > 0} onClear={() => setExhibitionFilter([])}>
+                                    <div className="fp-check-list">
+                                        {allExhibitions.length === 0 ? <div className="fp-empty">No data</div> : allExhibitions.map(ex => (
+                                            <label key={ex} className="fp-check-item">
+                                                <div className={`custom-checkbox ${exhibitionFilter.includes(ex) ? 'checked' : ''}`}>
+                                                    {exhibitionFilter.includes(ex) && <Check size={10} />}
+                                                </div>
+                                                <input type="checkbox" style={{ display: 'none' }} checked={exhibitionFilter.includes(ex)} onChange={() => toggleArrayItem(exhibitionFilter, setExhibitionFilter, ex)} />
+                                                <span className="fp-label">{ex}</span>
+                                            </label>
+                                        ))}
                                     </div>
                                 </FilterPopover>
 
@@ -139,6 +147,8 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
                                     </div>
                                 </FilterPopover>
 
+                                <th>Current Status</th>
+
                                 <FilterPopover title="Carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
                                     <div className="fp-check-list">
                                         {allCarriers.length === 0 ? <div className="fp-empty">No data</div> : allCarriers.map(cr => (
@@ -153,8 +163,6 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
                                     </div>
                                 </FilterPopover>
 
-                                <th>Current Status</th>
-                                <th>Carrier</th>
                                 <th>Route</th>
                                 <th>ETA</th>
                                 <th>Actions</th>
