@@ -1,0 +1,84 @@
+{
+    "output": {
+        "completeTrackResults": [
+            {
+                "trackResults": [
+                    {
+                        "latestStatusDetail": {
+                            "statusByLocale": "On FedEx vehicle for delivery"
+                        },
+                        "scanEvents": [
+                            {
+                                "date": "2026-03-02T10:30:00-05:00",
+                                "eventDescription": "On FedEx vehicle for delivery",
+                                "scanLocation": {
+                                    "city": "Dubai",
+                                    "stateOrProvinceCode": "DXB"
+                                },
+                                "eventType": "OF"
+                            },
+                            {
+                                "date": "2026-03-01T22:15:00-05:00",
+                                "eventDescription": "Arrived at FedEx location",
+                                "scanLocation": {
+                                    "city": "Dubai",
+                                    "stateOrProvinceCode": "DXB"
+                                },
+                                "eventType": "AR"
+                            }
+                        ],
+                        "dateAndTimes": [
+                            {
+                                "type": "ESTIMATED_DELIVERY",
+                                "dateTime": "2026-03-02T20:00:00+04:00"
+                            }
+                        ],
+                        "originLocation": {
+                            "locationContactAndAddress": {
+                                "address": {
+                                    "city": "Shanghai",
+                                    "stateOrProvinceCode": "SH"
+                                }
+                            }
+                        },
+                        "recipientInformation": {
+                            "address": {
+                                "city": "Dubai",
+                                "stateOrProvinceCode": "DXB"
+                            }
+                        },
+                        "associatedShipments": [
+                            {
+                                "type": "CHILD",
+                                "trackingNumberInfo": {
+                                    "trackingNumber": "888000000001"
+                                },
+                                "latestStatusDetail": {
+                                    "statusByLocale": "On FedEx vehicle for delivery"
+                                }
+                            },
+                            {
+                                "type": "CHILD",
+                                "trackingNumberInfo": {
+                                    "trackingNumber": "888000000002"
+                                },
+                                "latestStatusDetail": {
+                                    "statusByLocale": "Delay — clearance in progress"
+                                }
+                            },
+                            {
+                                "type": "CHILD",
+                                "trackingNumberInfo": {
+                                    "trackingNumber": "888000000003"
+                                },
+                                "latestStatusDetail": {
+                                    "statusByLocale": "Delivered"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

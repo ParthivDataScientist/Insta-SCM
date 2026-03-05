@@ -25,7 +25,10 @@ async def lifespan(app: FastAPI):
         ("exhibition_name",         "ALTER TABLE shipment ADD COLUMN exhibition_name VARCHAR;"),
         ("master_tracking_number",  "ALTER TABLE shipment ADD COLUMN master_tracking_number VARCHAR;"),
         ("is_master",               "ALTER TABLE shipment ADD COLUMN is_master BOOLEAN DEFAULT FALSE;"),
+        # Kept for backward compat — old DB rows still have this column (ignored by the new model)
         ("child_tracking_numbers",  "ALTER TABLE shipment ADD COLUMN child_tracking_numbers JSON;"),
+        # New: stores [{tracking_number, status, raw_status}, ...] per MPS child
+        ("child_parcels",           "ALTER TABLE shipment ADD COLUMN child_parcels JSON;"),
     ]
 
     with Session(engine) as session:

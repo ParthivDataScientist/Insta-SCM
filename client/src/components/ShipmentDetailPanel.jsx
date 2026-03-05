@@ -172,34 +172,68 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => 
                         )}
 
                         {/* Associated/Child Shipments Section */}
-                        {s.child_tracking_numbers && s.child_tracking_numbers.length > 0 && (
-                            <div style={{ marginTop: 24 }}>
-                                <h3 className="timeline-title"><Package size={16} /> Related Packages (Multi-Piece Shipment)</h3>
-                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
-                                    {s.child_tracking_numbers.map(tn => {
-                                        const isStored = trackingList && trackingList.some(ts => ts.tracking_number === tn);
-                                        const isTracking = trackingAssociated === tn;
-                                        return (
-                                            <div key={tn} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <Box size={14} style={{ color: 'var(--color-primary)' }} />
-                                                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--tx)' }}>{tn}</span>
-                                                    {isStored && <span style={{ fontSize: 10, background: '#e6fffa', color: '#047857', padding: '2px 6px', borderRadius: 10 }}>Tracked</span>}
+                        {(() => {
+                            // Prefer rich child_parcels objects (new DB rows).
+                            // Fall back to bare child_tracking_numbers for old rows.
+                            const parcels = (s.child_parcels && s.child_parcels.length > 0)
+                                ? s.child_parcels
+                                : (s.child_tracking_numbers || []).map(tn => ({ tracking_number: tn, status: 'Unknown', raw_status: '' }));
+
+                            if (!parcels.length) return null;
+
+                            const hasException = parcels.some(p => p.status === 'Exception');
+
+                            return (
+                                <div style={{ marginTop: 24 }}>
+                                    <h3 className="timeline-title"><Package size={16} /> Related Packages ({parcels.length}-Piece Shipment)</h3>
+
+                                    {hasException && (
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: 8,
+                                            background: 'var(--status-exception-bg)',
+                                            color: 'var(--status-exception-text)',
+                                            border: '1px solid var(--status-exception-text)',
+                                            borderRadius: 8, padding: '8px 12px',
+                                            marginBottom: 10, fontSize: 13,
+                                        }}>
+                                            <AlertTriangle size={14} />
+                                            One or more child parcels has an exception. Review individually.
+                                        </div>
+                                    )}
+
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                                        {parcels.map(parcel => {
+                                            const { tracking_number: tn, status: childStatus } = parcel;
+                                            const isStored = trackingList && trackingList.some(ts => ts.tracking_number === tn);
+                                            const isTracking = trackingAssociated === tn;
+                                            return (
+                                                <div key={tn} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <Box size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                                                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--tx)' }}>{tn}</span>
+                                                        {/* Per-child live status badge */}
+                                                        {childStatus && childStatus !== 'Unknown' && (
+                                                            <StatusBadge status={childStatus} />
+                                                        )}
+                                                        {isStored && (
+                                                            <span style={{ fontSize: 10, background: '#e6fffa', color: '#047857', padding: '2px 6px', borderRadius: 10 }}>Tracked</span>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        className="btn-outline-sm"
+                                                        style={{ padding: '4px 8px', fontSize: 11 }}
+                                                        onClick={() => handleTrackChild(tn)}
+                                                        disabled={isTracking}
+                                                    >
+                                                        {isTracking ? 'Tracking...' : (isStored ? 'Refresh' : 'Track Box')}
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    className="btn-outline-sm"
-                                                    style={{ padding: '4px 8px', fontSize: 11 }}
-                                                    onClick={() => handleTrackChild(tn)}
-                                                    disabled={isTracking}
-                                                >
-                                                    {isTracking ? 'Tracking...' : (isStored ? 'Refresh / Auto-Track' : 'Track This Box')}
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Support Section */}
                         <div className="help-section">

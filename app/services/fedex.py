@@ -210,21 +210,42 @@ class FedExService(CarrierService):
             progress = progress_map.get(mapped_status, 0)
 
             # Extract MPS / Associated Shipments
+            # Each child parcel gets its own status object so we can show
+            # per-box statuses in the UI — not just bare tracking numbers.
             associated_shipments = output.get("associatedShipments", [])
-            child_tracking_numbers = []
+            child_parcels: list = []          # [{tracking_number, status, raw_status}]
             master_tracking_number = None
             is_master = False
 
-            for shipment in associated_shipments:
-                rel_type = shipment.get("type", "").upper()
-                tn = shipment.get("trackingNumberInfo", {}).get("trackingNumber")
+            for assoc in associated_shipments:
+                rel_type = assoc.get("type", "").upper()
+                tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
                 if not tn:
                     continue
+
                 if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT"):
-                    child_tracking_numbers.append(tn)
+                    # Pull the child's own latest status if FedEx returns it
+                    child_raw_status = (
+                        assoc.get("latestStatusDetail", {})
+                             .get("statusByLocale", "")
+                    )
+                    child_status = (
+                        map_fedex_status(child_raw_status)
+                        if child_raw_status
+                        else "Unknown"
+                    )
+                    child_parcels.append({
+                        "tracking_number": tn,
+                        "status": child_status,
+                        "raw_status": child_raw_status,
+                    })
                     is_master = True
+
                 elif rel_type == "MASTER":
                     master_tracking_number = tn
+
+            # Backward-compat: flat list of tracking numbers
+            child_tracking_numbers = [p["tracking_number"] for p in child_parcels]
 
             return {
                 "carrier": "FedEx",
@@ -237,6 +258,8 @@ class FedExService(CarrierService):
                 "history": history,
                 "master_tracking_number": master_tracking_number,
                 "is_master": is_master,
+                "child_parcels": child_parcels,
+                # Keep old key for any callers that haven't migrated yet
                 "child_tracking_numbers": child_tracking_numbers,
             }
 

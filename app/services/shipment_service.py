@@ -73,7 +73,7 @@ def track_and_save(
             history=result.get("history", []),
             master_tracking_number=result.get("master_tracking_number"),
             is_master=result.get("is_master", False),
-            child_tracking_numbers=result.get("child_tracking_numbers", []),
+            child_parcels=result.get("child_parcels", []),
         )
         logger.info("Created new shipment record for %s (%s)", tracking_number, carrier_name)
     else:
@@ -105,8 +105,8 @@ def track_and_save(
             shipment.master_tracking_number = result["master_tracking_number"]
         if "is_master" in result:
             shipment.is_master = result["is_master"]
-        if result.get("child_tracking_numbers"):
-            shipment.child_tracking_numbers = result["child_tracking_numbers"]
+        if result.get("child_parcels") is not None:
+            shipment.child_parcels = result["child_parcels"]
 
         logger.info("Updated shipment record for %s", tracking_number)
 

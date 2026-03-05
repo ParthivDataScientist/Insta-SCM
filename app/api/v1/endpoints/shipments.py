@@ -15,6 +15,7 @@ from sqlmodel import Session, select
 from app.core.security import verify_api_key
 from app.db.session import get_session
 from app.models.shipment import Shipment
+from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
 from app.services.shipment_service import get_stats, track_and_save
 
 logger = logging.getLogger(__name__)
@@ -173,7 +174,7 @@ def shipment_stats(db: Session = Depends(get_session)):
 # List & detail
 # ---------------------------------------------------------------------------
 
-@router.get("/", response_model=List[Shipment])
+@router.get("/", response_model=List[ShipmentResponse])
 def list_shipments(
     skip: int = 0,
     limit: int = 100,
@@ -182,7 +183,28 @@ def list_shipments(
     return db.exec(select(Shipment).offset(skip).limit(limit)).all()
 
 
-@router.get("/{shipment_id}", response_model=Shipment)
+@router.get("/mps/{shipment_id}", response_model=MPSDetailResponse)
+def get_mps_detail(
+    shipment_id: int,
+    db: Session = Depends(get_session),
+):
+    """
+    Return full MPS detail for a master shipment: its own fields plus an
+    aggregated summary of all child parcels and their individual statuses.
+    Returns 404 if not found, 400 if the shipment is not an MPS master.
+    """
+    shipment = db.get(Shipment, shipment_id)
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if not shipment.is_master:
+        raise HTTPException(
+            status_code=400,
+            detail="This shipment is not a Multi-Piece Shipment master.",
+        )
+    return MPSDetailResponse.from_shipment(shipment)
+
+
+@router.get("/{shipment_id}", response_model=ShipmentResponse)
 def get_shipment(shipment_id: int, db: Session = Depends(get_session)):
     shipment = db.get(Shipment, shipment_id)
     if not shipment:
