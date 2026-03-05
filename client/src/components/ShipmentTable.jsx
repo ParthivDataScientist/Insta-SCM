@@ -194,7 +194,14 @@ const ShipmentRow = ({ shipment: s, onClick, onDeleteShipment }) => {
                     <div className="tid-icon"><Package size={14} /></div>
                     <div>
                         <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
-                        <div className="tid-num">{s.tracking_number}</div>
+                        <div className="tid-num">
+                            {s.tracking_number}
+                            {s.child_tracking_numbers && s.child_tracking_numbers.length > 0 && (
+                                <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
+                                    📦 +{s.child_tracking_numbers.length} Child
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </td>

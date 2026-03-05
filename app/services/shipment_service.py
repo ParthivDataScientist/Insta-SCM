@@ -71,6 +71,9 @@ def track_and_save(
             progress=result.get("progress", 0),
             items=items or "Package",
             history=result.get("history", []),
+            master_tracking_number=result.get("master_tracking_number"),
+            is_master=result.get("is_master", False),
+            child_tracking_numbers=result.get("child_tracking_numbers", []),
         )
         logger.info("Created new shipment record for %s (%s)", tracking_number, carrier_name)
     else:
@@ -96,6 +99,14 @@ def track_and_save(
             shipment.progress = result["progress"]
         if result.get("history"):
             shipment.history = result["history"]
+            
+        # MPS updates
+        if result.get("master_tracking_number"):
+            shipment.master_tracking_number = result["master_tracking_number"]
+        if "is_master" in result:
+            shipment.is_master = result["is_master"]
+        if result.get("child_tracking_numbers"):
+            shipment.child_tracking_numbers = result["child_tracking_numbers"]
 
         logger.info("Updated shipment record for %s", tracking_number)
 

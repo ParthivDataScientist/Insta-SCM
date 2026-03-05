@@ -74,7 +74,7 @@ function Dashboard() {
 
                 {/* Modals */}
                 {showTrack && <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} />}
-                {selected && <ShipmentDetailPanel shipment={selected} onClose={() => setSelected(null)} onDeleted={loadData} />}
+                {selected && <ShipmentDetailPanel shipment={selected} onClose={() => setSelected(null)} onDeleted={loadData} trackingList={shipments} />}
 
                 {/* Hidden file input for Excel import */}
                 <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"

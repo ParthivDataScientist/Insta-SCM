@@ -17,6 +17,9 @@ class ShipmentBase(SQLModel):
     progress: Optional[int] = Field(default=0)
     show_date: Optional[str] = None
     history: List[dict] = Field(default=[], sa_column=Column(JSON))
+    master_tracking_number: Optional[str] = None
+    is_master: bool = Field(default=False)
+    child_tracking_numbers: List[str] = Field(default=[], sa_column=Column(JSON))
 
 
 class Shipment(ShipmentBase, table=True):

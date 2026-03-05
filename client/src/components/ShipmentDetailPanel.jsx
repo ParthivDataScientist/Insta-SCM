@@ -3,12 +3,13 @@ import { X, Truck, Calendar, Box, Clock, AlertTriangle, Trash2, Package } from '
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
 import ConfirmDialog from './ConfirmDialog';
-import { deleteShipment } from '../api';
+import { deleteShipment, trackShipment } from '../api';
 
-const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
+const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [trackingAssociated, setTrackingAssociated] = useState(null);
 
     const handleDelete = async () => {
         setDeleting(true);
@@ -22,6 +23,24 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
             setDeleteError(`Failed to delete: ${err.message}`);
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleTrackChild = async (tn) => {
+        setTrackingAssociated(tn);
+        try {
+            await trackShipment({
+                tracking_number: tn,
+                exhibition_name: shipment.exhibition_name || '',
+                recipient: shipment.recipient || '',
+                items: "Child Box"
+            });
+            onDeleted(); // Re-fetch the main list
+            alert(`Child package ${tn} tracked successfully! Close this panel to find it in the list.`);
+        } catch (err) {
+            alert(`Error tracking child package: ${err.message}`);
+        } finally {
+            setTrackingAssociated(null);
         }
     };
 
@@ -148,6 +167,36 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
                                             <div className="timeline-desc">{ev.description}</div>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Associated/Child Shipments Section */}
+                        {s.child_tracking_numbers && s.child_tracking_numbers.length > 0 && (
+                            <div style={{ marginTop: 24 }}>
+                                <h3 className="timeline-title"><Package size={16} /> Related Packages (Multi-Piece Shipment)</h3>
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                                    {s.child_tracking_numbers.map(tn => {
+                                        const isStored = trackingList && trackingList.some(ts => ts.tracking_number === tn);
+                                        const isTracking = trackingAssociated === tn;
+                                        return (
+                                            <div key={tn} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <Box size={14} style={{ color: 'var(--color-primary)' }} />
+                                                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--tx)' }}>{tn}</span>
+                                                    {isStored && <span style={{ fontSize: 10, background: '#e6fffa', color: '#047857', padding: '2px 6px', borderRadius: 10 }}>Tracked</span>}
+                                                </div>
+                                                <button
+                                                    className="btn-outline-sm"
+                                                    style={{ padding: '4px 8px', fontSize: 11 }}
+                                                    onClick={() => handleTrackChild(tn)}
+                                                    disabled={isTracking}
+                                                >
+                                                    {isTracking ? 'Tracking...' : (isStored ? 'Refresh / Auto-Track' : 'Track This Box')}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}

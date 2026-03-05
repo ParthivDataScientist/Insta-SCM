@@ -209,6 +209,23 @@ class FedExService(CarrierService):
             }
             progress = progress_map.get(mapped_status, 0)
 
+            # Extract MPS / Associated Shipments
+            associated_shipments = output.get("associatedShipments", [])
+            child_tracking_numbers = []
+            master_tracking_number = None
+            is_master = False
+
+            for shipment in associated_shipments:
+                rel_type = shipment.get("type", "").upper()
+                tn = shipment.get("trackingNumberInfo", {}).get("trackingNumber")
+                if not tn:
+                    continue
+                if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT"):
+                    child_tracking_numbers.append(tn)
+                    is_master = True
+                elif rel_type == "MASTER":
+                    master_tracking_number = tn
+
             return {
                 "carrier": "FedEx",
                 "status": mapped_status,
@@ -218,6 +235,9 @@ class FedExService(CarrierService):
                 "eta": eta,
                 "progress": progress,
                 "history": history,
+                "master_tracking_number": master_tracking_number,
+                "is_master": is_master,
+                "child_tracking_numbers": child_tracking_numbers,
             }
 
         except (KeyError, IndexError) as e:
