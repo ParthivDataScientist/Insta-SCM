@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Package, Filter, Search, ChevronDown, Check } from 'lucide-react';
+import { Package, Filter, Search, ChevronDown, Check, Trash2 } from 'lucide-react';
 import { Loader } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
@@ -49,7 +49,7 @@ const FilterPopover = ({ title, isActive, onClear, children }) => {
     );
 };
 
-const ShipmentTable = ({ shipments, loading, onSelectShipment }) => {
+const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment }) => {
     // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionSearch, setExhibitionSearch] = useState('');
@@ -153,13 +153,16 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment }) => {
                                     </div>
                                 </FilterPopover>
 
+                                <th>Current Status</th>
+                                <th>Carrier</th>
                                 <th>Route</th>
                                 <th>ETA</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredShipments.map(s => (
-                                <ShipmentRow key={s.id} shipment={s} onClick={() => onSelectShipment(s)} />
+                                <ShipmentRow key={s.id} shipment={s} onClick={() => onSelectShipment(s)} onDeleteShipment={onDeleteShipment} />
                             ))}
                         </tbody>
                     </table>
@@ -175,7 +178,7 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment }) => {
     );
 };
 
-const ShipmentRow = ({ shipment: s, onClick }) => {
+const ShipmentRow = ({ shipment: s, onClick, onDeleteShipment }) => {
     return (
         <tr onClick={onClick} style={{ cursor: 'pointer' }}>
             <td>
@@ -196,7 +199,12 @@ const ShipmentRow = ({ shipment: s, onClick }) => {
                     <ProgressBar percentage={s.progress} status={s.status} mini />
                 )}
             </td>
-            <td className="carrier-cell">{s.carrier}</td>
+            <td className="current-status-cell">
+                <div className="cs-text" title={s.history && s.history.length > 0 ? s.history[0].description : s.status}>
+                    {s.history && s.history.length > 0 ? s.history[0].description : s.status}
+                </div>
+            </td>
+            <td className="carrier-cell">{s.carrier || '—'}</td>
             <td>
                 {s.origin ? (
                     <div className="route-mini">
@@ -206,6 +214,12 @@ const ShipmentRow = ({ shipment: s, onClick }) => {
                 ) : '—'}
             </td>
             <td className="eta-cell">{s.eta || 'TBD'}</td>
+            <td className="action-cell" onClick={e => e.stopPropagation()}>
+                <button className="track-btn" onClick={onClick}>Track</button>
+                <button className="delete-btn" onClick={e => { e.stopPropagation(); onDeleteShipment(s.id); }} title="Delete shipment">
+                    <Trash2 size={14} />
+                </button>
+            </td>
         </tr>
     );
 };
