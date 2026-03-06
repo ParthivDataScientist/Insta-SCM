@@ -125,16 +125,32 @@ class FedExService(CarrierService):
                 associated_results = []
                 
                 # Check if this tracking number acts as a MASTER in any trackResult
+                master_tn = None
+                is_master = False
                 try:
                     output = raw_data["output"]["completeTrackResults"][0]["trackResults"][0]
                     associated_shipments = output.get("associatedShipments", [])
-                    
-                    is_master = False
+
+                    # 1. Check associatedShipments array
                     for assoc in associated_shipments:
                         rel_type = assoc.get("type", "").upper()
                         if rel_type == "CHILD" or rel_type == "ASSOCIATED":
                             is_master = True
                             break
+                        elif rel_type == "MASTER":
+                            master_tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
+
+                    # 2. Check packageIdentifiers for STANDARD_MPS
+                    if not is_master:
+                        package_identifiers = output.get("additionalTrackingInfo", {}).get("packageIdentifiers", [])
+                        for pkg in package_identifiers:
+                            if pkg.get("type") == "STANDARD_MPS":
+                                values = pkg.get("values", [])
+                                if values:
+                                    master_tn = values[0]
+                                    if master_tn == tracking_number:
+                                        is_master = True
+                                break
 
                     # If this is a master, make a second request to get full child objects
                     if is_master:
@@ -156,7 +172,7 @@ class FedExService(CarrierService):
                 except (KeyError, IndexError) as e:
                     logger.error(f"Error inspecting MPS raw data for {tracking_number}: {e}")
 
-                return self._standardize_response(raw_data, associated_results)
+                return self._standardize_response(raw_data, associated_results, master_tn, is_master)
             else:
                 logger.warning("FedEx API returned %d for %s", resp.status_code, tracking_number)
                 return {"error": f"FedEx API Error: {resp.status_code} — {resp.text[:200]}"}
@@ -164,7 +180,7 @@ class FedExService(CarrierService):
             logger.error("FedEx request failed for %s: %s", tracking_number, e)
             return {"error": f"Request Failed: {str(e)}"}
 
-    def _standardize_response(self, raw_data: Dict, associated_results: list = None) -> Dict[str, Any]:
+    def _standardize_response(self, raw_data: Dict, associated_results: list = None, master_tn: str = None, is_master: bool = False) -> Dict[str, Any]:
         if associated_results is None:
             associated_results = []
         
@@ -255,8 +271,8 @@ class FedExService(CarrierService):
             # per-box statuses in the UI — not just bare tracking numbers.
             associated_shipments = output.get("associatedShipments", [])
             child_parcels: list = []          # [{tracking_number, status, raw_status}]
-            master_tracking_number = None
-            is_master = False
+            master_tracking_number = master_tn
+            # is_master is passed in, might be True or False
 
             # We use the associated_results fetched from /track/v1/associatedshipments if available
             if associated_results:
@@ -307,7 +323,8 @@ class FedExService(CarrierService):
                         is_master = True
 
                     elif rel_type == "MASTER":
-                        master_tracking_number = tn
+                        if not master_tracking_number:
+                            master_tracking_number = tn
 
             # Backward-compat: flat list of tracking numbers
             child_tracking_numbers = [p["tracking_number"] for p in child_parcels]
