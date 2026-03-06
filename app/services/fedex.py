@@ -118,7 +118,45 @@ class FedExService(CarrierService):
         try:
             resp = requests.post(track_url, headers=headers, json=body, timeout=15)
             if resp.status_code == 200:
-                return self._standardize_response(resp.json())
+                raw_data = resp.json()
+
+                # --- NEW CODE: MPS Check ---
+                # Default associated payload
+                associated_results = []
+                
+                # Check if this tracking number acts as a MASTER in any trackResult
+                try:
+                    output = raw_data["output"]["completeTrackResults"][0]["trackResults"][0]
+                    associated_shipments = output.get("associatedShipments", [])
+                    
+                    is_master = False
+                    for assoc in associated_shipments:
+                        rel_type = assoc.get("type", "").upper()
+                        if rel_type == "CHILD" or rel_type == "ASSOCIATED":
+                            is_master = True
+                            break
+
+                    # If this is a master, make a second request to get full child objects
+                    if is_master:
+                        assoc_url = f"{self.base_url}/track/v1/associatedshipments"
+                        assoc_body = {
+                            "masterTrackingNumberInfo": {
+                                "trackingNumber": tracking_number
+                            },
+                            "associatedType": "STANDARD_MPS",
+                            "associatedReturnReferenceIndicator": "false"
+                        }
+                        assoc_resp = requests.post(assoc_url, headers=headers, json=assoc_body, timeout=20)
+                        
+                        if assoc_resp.status_code == 200:
+                            assoc_data = assoc_resp.json()
+                            associated_results = assoc_data.get("output", {}).get("completeTrackResults", [])
+                        else:
+                            logger.warning(f"Failed to fetch associated shipments for MPS {tracking_number}: {assoc_resp.status_code}")
+                except (KeyError, IndexError) as e:
+                    logger.error(f"Error inspecting MPS raw data for {tracking_number}: {e}")
+
+                return self._standardize_response(raw_data, associated_results)
             else:
                 logger.warning("FedEx API returned %d for %s", resp.status_code, tracking_number)
                 return {"error": f"FedEx API Error: {resp.status_code} — {resp.text[:200]}"}
@@ -126,7 +164,10 @@ class FedExService(CarrierService):
             logger.error("FedEx request failed for %s: %s", tracking_number, e)
             return {"error": f"Request Failed: {str(e)}"}
 
-    def _standardize_response(self, raw_data: Dict) -> Dict[str, Any]:
+    def _standardize_response(self, raw_data: Dict, associated_results: list = None) -> Dict[str, Any]:
+        if associated_results is None:
+            associated_results = []
+        
         try:
             output = raw_data["output"]["completeTrackResults"][0]["trackResults"][0]
             scan_events = output.get("scanEvents", [])
@@ -217,32 +258,56 @@ class FedExService(CarrierService):
             master_tracking_number = None
             is_master = False
 
-            for assoc in associated_shipments:
-                rel_type = assoc.get("type", "").upper()
-                tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
-                if not tn:
-                    continue
+            # We use the associated_results fetched from /track/v1/associatedshipments if available
+            if associated_results:
+                is_master = True
+                for c_res in associated_results:
+                    c_tn = c_res.get("trackingNumber")
+                    
+                    if not c_tn or c_tn == tracking_number:
+                        continue # Skip self
 
-                if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT"):
-                    # Pull the child's own latest status if FedEx returns it
-                    child_raw_status = (
-                        assoc.get("latestStatusDetail", {})
-                             .get("statusByLocale", "")
-                    )
-                    child_status = (
-                        map_fedex_status(child_raw_status)
-                        if child_raw_status
-                        else "Unknown"
-                    )
+                    # The child's latest status object
+                    child_res_list = c_res.get("trackResults", [])
+                    if child_res_list:
+                        c_raw_status = child_res_list[0].get("latestStatusDetail", {}).get("statusByLocale", "Unknown")
+                    else:
+                        c_raw_status = "Unknown"
+                        
+                    child_status = map_fedex_status(c_raw_status)
                     child_parcels.append({
-                        "tracking_number": tn,
+                        "tracking_number": c_tn,
                         "status": child_status,
-                        "raw_status": child_raw_status,
+                        "raw_status": c_raw_status,
                     })
-                    is_master = True
+            else:
+                # Fallback to the rudimentary associatedShipments array on the main track object
+                for assoc in associated_shipments:
+                    rel_type = assoc.get("type", "").upper()
+                    tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
+                    if not tn:
+                        continue
 
-                elif rel_type == "MASTER":
-                    master_tracking_number = tn
+                    if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT"):
+                        # Pull the child's own latest status if FedEx returns it
+                        child_raw_status = (
+                            assoc.get("latestStatusDetail", {})
+                                 .get("statusByLocale", "")
+                        )
+                        child_status = (
+                            map_fedex_status(child_raw_status)
+                            if child_raw_status
+                            else "Unknown"
+                        )
+                        child_parcels.append({
+                            "tracking_number": tn,
+                            "status": child_status,
+                            "raw_status": child_raw_status,
+                        })
+                        is_master = True
+
+                    elif rel_type == "MASTER":
+                        master_tracking_number = tn
 
             # Backward-compat: flat list of tracking numbers
             child_tracking_numbers = [p["tracking_number"] for p in child_parcels]

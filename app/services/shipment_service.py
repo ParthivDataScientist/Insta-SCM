@@ -106,7 +106,8 @@ def track_and_save(
         if "is_master" in result:
             shipment.is_master = result["is_master"]
         if result.get("child_parcels") is not None:
-            shipment.child_parcels = result["child_parcels"]
+            # Reassigning the list so SQLModel detects the JSON change
+            shipment.child_parcels = list(result["child_parcels"])
 
         logger.info("Updated shipment record for %s", tracking_number)
 
