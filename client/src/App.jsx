@@ -204,7 +204,7 @@ function Dashboard() {
                             </div>
                         </div>
 
-                        {error && <div className="error-banner">⚠️ {error}. Make sure backend is running on port 8001.</div>}
+                        {error && <div className="error-banner">⚠️ {error}</div>}
 
                         {/* ── Filters Toolbar ── */}
                         <div className="tracking-toolbar">
