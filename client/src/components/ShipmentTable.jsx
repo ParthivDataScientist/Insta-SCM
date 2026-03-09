@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Package, Filter, Search, ChevronDown, Check, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, Fragment } from 'react';
+import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2 } from 'lucide-react';
 import { Loader } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
+import { previewTrackShipment } from '../api';
 
 // Custom Hook for clicking outside popovers
 function useOnClickOutside(ref, handler) {
@@ -49,7 +50,7 @@ const FilterPopover = ({ title, isActive, onClear, children }) => {
     );
 };
 
-const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment }) => {
+const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onDeleteShipment, onTracked }) => {
     // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
@@ -170,7 +171,14 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
                         </thead>
                         <tbody>
                             {filteredShipments.map(s => (
-                                <ShipmentRow key={s.id} shipment={s} onClick={() => onSelectShipment(s)} onDeleteShipment={onDeleteShipment} />
+                                <ShipmentRowGroup 
+                                    key={s.id} 
+                                    shipment={s} 
+                                    allShipments={allShipments}
+                                    onSelectShipment={onSelectShipment} 
+                                    onDeleteShipment={onDeleteShipment} 
+                                    onTracked={onTracked}
+                                />
                             ))}
                         </tbody>
                     </table>
@@ -186,56 +194,156 @@ const ShipmentTable = ({ shipments, loading, onSelectShipment, onDeleteShipment 
     );
 };
 
-const ShipmentRow = ({ shipment: s, onClick, onDeleteShipment }) => {
+const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDeleteShipment, onTracked }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [loadingChild, setLoadingChild] = useState(null);
+    const hasChildren = s.child_parcels && s.child_parcels.length > 0;
+
+    const handleTrackChild = async (child) => {
+        setLoadingChild(child.tracking_number);
+        try {
+            const data = await previewTrackShipment(child.tracking_number);
+            // Build a full shipment-shaped object from the live API response
+            const progress_map = { 'Delivered': 100, 'Out for Delivery': 80, 'In Transit': 40, 'Exception': 10 };
+            const syntheticShipment = {
+                id: null,
+                tracking_number: child.tracking_number,
+                items: 'Child Piece',
+                carrier: data.carrier || s.carrier,
+                status: data.status || child.status || 'Unknown',
+                raw_status: data.raw_status || child.raw_status || '',
+                origin: data.origin || child.origin || s.origin,
+                destination: data.destination || child.destination || s.destination,
+                eta: data.eta || child.eta || s.eta,
+                exhibition_name: s.exhibition_name,
+                show_date: s.show_date,
+                recipient: s.recipient,
+                progress: progress_map[data.status] ?? (progress_map[child.status] ?? 0),
+                history: data.history || [],
+                child_parcels: [],
+                child_tracking_numbers: [],
+                is_master: false,
+                master_tracking_number: s.tracking_number,
+                created_at: s.created_at,
+            };
+            onSelectShipment(syntheticShipment);
+        } catch (err) {
+            alert(`Could not load details: ${err.message}`);
+        } finally {
+            setLoadingChild(null);
+        }
+    };
+
     return (
-        <tr onClick={onClick} style={{ cursor: 'pointer' }}>
-            <td>
-                <div className="tid-cell">
-                    <div className="tid-icon"><Package size={14} /></div>
-                    <div>
-                        <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
-                        <div className="tid-num">
-                            {s.tracking_number}
-                            {s.child_tracking_numbers && s.child_tracking_numbers.length > 0 && (
-                                <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
-                                    📦 +{s.child_tracking_numbers.length} Child
-                                </span>
-                            )}
+        <Fragment>
+            <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }}>
+                <td>
+                    <div className="tid-cell">
+                        {hasChildren && (
+                            <div 
+                                className="child-nav" 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setIsExpanded(!isExpanded); 
+                                }}
+                            >
+                                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </div>
+                        )}
+                        <div className="tid-icon"><Package size={14} /></div>
+                        <div>
+                            <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
+                            <div className="tid-num">
+                                {s.tracking_number}
+                                {hasChildren && (
+                                    <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
+                                        📦 +{s.child_parcels.length} Child
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            </td>
-            <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
-                {s.exhibition_name || 'N/A'}
-            </td>
-            <td>
-                <StatusBadge status={s.status} />
-                {s.status !== 'Delivered' && s.progress != null && (
-                    <ProgressBar percentage={s.progress} status={s.status} mini />
-                )}
-            </td>
-            <td className="current-status-cell">
-                <div className="cs-text" title={s.history && s.history.length > 0 ? s.history[0].description : s.status}>
-                    {s.history && s.history.length > 0 ? s.history[0].description : s.status}
-                </div>
-            </td>
-            <td className="carrier-cell">{s.carrier || '—'}</td>
-            <td>
-                {s.origin ? (
-                    <div className="route-mini">
-                        <span className="rm-label">FROM </span>{s.origin.split(',')[0]}<br />
-                        <span className="rm-label">TO </span>{s.destination.split(',')[0]}
+                </td>
+                <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
+                    {s.exhibition_name || 'N/A'}
+                </td>
+                <td>
+                    <StatusBadge status={s.status} />
+                    {s.status !== 'Delivered' && s.progress != null && (
+                        <ProgressBar percentage={s.progress} status={s.status} mini />
+                    )}
+                </td>
+                <td className="current-status-cell">
+                    <div className="cs-text" title={s.history && s.history.length > 0 ? s.history[0].description : s.status}>
+                        {s.history && s.history.length > 0 ? s.history[0].description : s.status}
                     </div>
-                ) : '—'}
-            </td>
-            <td className="eta-cell">{s.eta || 'TBD'}</td>
-            <td className="action-cell" onClick={e => e.stopPropagation()}>
-                <button className="track-btn" onClick={onClick}>Track</button>
-                <button className="delete-btn" onClick={e => { e.stopPropagation(); onDeleteShipment(s.id); }} title="Delete shipment">
-                    <Trash2 size={14} />
-                </button>
-            </td>
-        </tr>
+                </td>
+                <td className="carrier-cell">{s.carrier || '—'}</td>
+                <td>
+                    {s.origin ? (
+                        <div className="route-mini">
+                            <span className="rm-label">FROM </span>{s.origin.split(',')[0]}<br />
+                            <span className="rm-label">TO </span>{s.destination.split(',')[0]}
+                        </div>
+                    ) : '—'}
+                </td>
+                <td className="eta-cell">{s.eta || 'TBD'}</td>
+                <td className="action-cell" onClick={e => e.stopPropagation()}>
+                    <button className="track-btn" onClick={() => onSelectShipment(s)}>Track</button>
+                    <button className="delete-btn" onClick={e => { e.stopPropagation(); onDeleteShipment(s.id); }} title="Delete shipment">
+                        <Trash2 size={14} />
+                    </button>
+                </td>
+            </tr>
+            {isExpanded && hasChildren && s.child_parcels.map((child, idx) => (
+                <tr key={`${s.id}-child-${idx}`} className="child-row">
+                    <td>
+                        <div className="child-indicator">
+                            <div className="tid-num" style={{ fontWeight: 600 }}>
+                                ↳ {child.tracking_number}
+                            </div>
+                        </div>
+                    </td>
+                    <td style={{ fontWeight: 600, color: 'var(--tx)', opacity: 0.7 }}>
+                        {s.exhibition_name || 'N/A'}
+                    </td>
+                    <td>
+                        <StatusBadge status={child.status} />
+                    </td>
+                    <td className="current-status-cell">
+                        <div className="cs-text" title={child.raw_status}>
+                            {child.raw_status || child.status}
+                        </div>
+                    </td>
+                    <td className="carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
+                    <td style={{ opacity: 0.7 }}>
+                        {child.origin ? (
+                            <div className="route-mini">
+                                <span className="rm-label">FROM </span>{child.origin.split(',')[0]}<br />
+                                <span className="rm-label">TO </span>{child.destination.split(',')[0]}
+                            </div>
+                        ) : (
+                            <div className="route-mini" style={{ opacity: 0.5 }}>
+                                <span className="rm-label">FROM </span>{(s.origin || '').split(',')[0]}<br />
+                                <span className="rm-label">TO </span>{(s.destination || '').split(',')[0]}
+                                <div style={{ fontSize: 9 }}>(Inherited)</div>
+                            </div>
+                        )}
+                    </td>
+                    <td className="eta-cell" style={{ opacity: 0.7 }}>{child.eta || s.eta || 'TBD'}</td>
+                    <td className="action-cell">
+                        <button 
+                            className="track-btn piece-btn" 
+                            disabled={loadingChild === child.tracking_number}
+                            onClick={() => handleTrackChild(child)}
+                            style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--red)', color: '#fff', minWidth: 52 }}
+                        >
+                            {loadingChild === child.tracking_number ? '...' : 'Track'}
+                        </button>
+                    </td>
+                </tr>
+            ))}
+        </Fragment>
     );
 };
 

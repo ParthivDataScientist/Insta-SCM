@@ -157,22 +157,26 @@ class FedExService(CarrierService):
                         assoc_url = f"{self.base_url}/track/v1/associatedshipments"
                         assoc_body = {
                             "masterTrackingNumberInfo": {
-                                "trackingNumber": tracking_number
+                                "trackingNumberInfo": {
+                                    "trackingNumber": tracking_number
+                                }
                             },
-                            "associatedType": "STANDARD_MPS",
-                            "associatedReturnReferenceIndicator": "false"
+                            "associatedType": "STANDARD_MPS"
                         }
                         assoc_resp = requests.post(assoc_url, headers=headers, json=assoc_body, timeout=20)
                         
                         if assoc_resp.status_code == 200:
                             assoc_data = assoc_resp.json()
-                            associated_results = assoc_data.get("output", {}).get("completeTrackResults", [])
+                            try:
+                                associated_results = assoc_data["output"]["completeTrackResults"][0]["trackResults"]
+                            except (KeyError, IndexError):
+                                associated_results = []
                         else:
                             logger.warning(f"Failed to fetch associated shipments for MPS {tracking_number}: {assoc_resp.status_code}")
                 except (KeyError, IndexError) as e:
                     logger.error(f"Error inspecting MPS raw data for {tracking_number}: {e}")
 
-                return self._standardize_response(raw_data, associated_results, master_tn, is_master)
+                return self._standardize_response(raw_data, tracking_number, associated_results, master_tn, is_master)
             else:
                 logger.warning("FedEx API returned %d for %s", resp.status_code, tracking_number)
                 return {"error": f"FedEx API Error: {resp.status_code} — {resp.text[:200]}"}
@@ -180,124 +184,120 @@ class FedExService(CarrierService):
             logger.error("FedEx request failed for %s: %s", tracking_number, e)
             return {"error": f"Request Failed: {str(e)}"}
 
-    def _standardize_response(self, raw_data: Dict, associated_results: list = None, master_tn: str = None, is_master: bool = False) -> Dict[str, Any]:
+    def _extract_piece_data(self, piece_output: Dict[str, Any]) -> Dict[str, Any]:
+        """Helper to extract common fields from a single piece output (master or child)."""
+        scan_events = piece_output.get("scanEvents", [])
+        raw_status = piece_output.get("latestStatusDetail", {}).get("statusByLocale", "Unknown")
+        mapped_status = map_fedex_status(raw_status)
+
+        # Extract History
+        history = []
+        for event in scan_events:
+            desc = event.get("eventDescription", "")
+            city = event.get("scanLocation", {}).get("city", "")
+            state = event.get("scanLocation", {}).get("stateOrProvinceCode", "")
+            location = f"{city}, {state}".strip(", ")
+            timestamp = event.get("date", "")
+
+            raw_event_type = event.get("eventType", "")
+            event_label = HISTORY_STATUS_MAP.get(raw_event_type, raw_event_type)
+
+            history.append({
+                "description": desc,
+                "location": location,
+                "status": event_label,
+                "date": timestamp,
+            })
+        history.sort(key=lambda x: x["date"], reverse=True)
+
+        # Extract Origin
+        origin = "Unknown"
+        origin_loc = piece_output.get("originLocation", {}).get("locationContactAndAddress", {}).get("address", {})
+        if not origin_loc:
+            origin_loc = piece_output.get("shipperInformation", {}).get("address", {})
+        if origin_loc and origin_loc.get("city"):
+            origin = f"{origin_loc.get('city')}, {origin_loc.get('stateOrProvinceCode', '')}".strip(", ")
+        elif history:
+            for event in reversed(history):
+                if event["location"].strip():
+                    origin = event["location"]
+                    break
+
+        # Extract Destination
+        destination = "Unknown"
+        dest_loc = piece_output.get("recipientInformation", {}).get("address", {})
+        if dest_loc and dest_loc.get("city"):
+            destination = f"{dest_loc.get('city')}, {dest_loc.get('stateOrProvinceCode', '')}".strip(", ")
+        elif "deliver" in raw_status.lower() and history:
+            destination = history[0]["location"]
+
+        # Extract ETA
+        eta = "Unknown"
+        date_times = piece_output.get("dateAndTimes", [])
+        actual_delivery = next((dt.get("dateTime") for dt in date_times if dt.get("type") == "ACTUAL_DELIVERY"), None)
+        if actual_delivery:
+            eta = actual_delivery[:10]
+        if eta == "Unknown":
+            estimated_delivery = next((dt.get("dateTime") for dt in date_times if dt.get("type") == "ESTIMATED_DELIVERY"), None)
+            if estimated_delivery:
+                eta = estimated_delivery[:10]
+        if eta == "Unknown":
+            window = piece_output.get("estimatedDeliveryTimeWindow", {}).get("window", {})
+            if window.get("ends"):
+                eta = window["ends"][:10]
+            elif window.get("begins"):
+                eta = window["begins"][:10]
+
+        # Calculate Progress
+        progress_map = {
+            "Delivered": 100,
+            "Out for Delivery": 80,
+            "In Transit": 40,
+            "Exception": 10,
+        }
+        progress = progress_map.get(mapped_status, 0)
+
+        return {
+            "status": mapped_status,
+            "raw_status": raw_status,
+            "origin": origin,
+            "destination": destination,
+            "eta": eta,
+            "progress": progress,
+            "history": history,
+        }
+
+    def _standardize_response(self, raw_data: Dict, tracking_number: str, associated_results: list = None, master_tn: str = None, is_master: bool = False) -> Dict[str, Any]:
         if associated_results is None:
             associated_results = []
         
         try:
             output = raw_data["output"]["completeTrackResults"][0]["trackResults"][0]
-            scan_events = output.get("scanEvents", [])
-            raw_status = output.get("latestStatusDetail", {}).get("statusByLocale", "Unknown")
-
-            # Extract Events (History)
-            history = []
-            for event in scan_events:
-                desc = event.get("eventDescription", "")
-                city = event.get("scanLocation", {}).get("city", "")
-                state = event.get("scanLocation", {}).get("stateOrProvinceCode", "")
-                location = f"{city}, {state}".strip(", ")
-                timestamp = event.get("date", "")
-
-                raw_event_type = event.get("eventType", "")
-                event_label = HISTORY_STATUS_MAP.get(raw_event_type, raw_event_type)
-
-                history.append({
-                    "description": desc,
-                    "location": location,
-                    "status": event_label,
-                    "date": timestamp,
-                })
-
-            # Sort history by date descending (newest first)
-            history.sort(key=lambda x: x["date"], reverse=True)
-
-            # Extract Origin
-            origin = "Unknown"
-            origin_loc = output.get("originLocation", {}).get("locationContactAndAddress", {}).get("address", {})
-            if not origin_loc:
-                origin_loc = output.get("shipperInformation", {}).get("address", {})
-            if origin_loc and origin_loc.get("city"):
-                origin = f"{origin_loc.get('city')}, {origin_loc.get('stateOrProvinceCode', '')}".strip(", ")
-            elif history:
-                for event in reversed(history):
-                    if event["location"].strip():
-                        origin = event["location"]
-                        break
-
-            # Extract Destination
-            destination = "Unknown"
-            dest_loc = output.get("recipientInformation", {}).get("address", {})
-            if dest_loc and dest_loc.get("city"):
-                destination = f"{dest_loc.get('city')}, {dest_loc.get('stateOrProvinceCode', '')}".strip(", ")
-            elif "deliver" in raw_status.lower() and history:
-                destination = history[0]["location"]
-
-            # Extract ETA
-            eta = "Unknown"
-            date_times = output.get("dateAndTimes", [])
-
-            actual_delivery = next(
-                (dt.get("dateTime") for dt in date_times if dt.get("type") == "ACTUAL_DELIVERY"), None
-            )
-            if actual_delivery:
-                eta = actual_delivery[:10]
-
-            if eta == "Unknown":
-                estimated_delivery = next(
-                    (dt.get("dateTime") for dt in date_times if dt.get("type") == "ESTIMATED_DELIVERY"), None
-                )
-                if estimated_delivery:
-                    eta = estimated_delivery[:10]
-
-            if eta == "Unknown":
-                window = output.get("estimatedDeliveryTimeWindow", {}).get("window", {})
-                if window.get("ends"):
-                    eta = window["ends"][:10]
-                elif window.get("begins"):
-                    eta = window["begins"][:10]
-
-            # Calculate Progress
-            mapped_status = map_fedex_status(raw_status)
-            progress_map = {
-                "Delivered": 100,
-                "Out for Delivery": 80,
-                "In Transit": 40,
-                "Exception": 10,
-            }
-            progress = progress_map.get(mapped_status, 0)
-
+            master_data = self._extract_piece_data(output)
             # Extract MPS / Associated Shipments
-            # Each child parcel gets its own status object so we can show
-            # per-box statuses in the UI — not just bare tracking numbers.
             associated_shipments = output.get("associatedShipments", [])
-            child_parcels: list = []          # [{tracking_number, status, raw_status}]
+            child_parcels: list = []
             master_tracking_number = master_tn
-            # is_master is passed in, might be True or False
 
-            # We use the associated_results fetched from /track/v1/associatedshipments if available
             if associated_results:
                 is_master = True
                 for c_res in associated_results:
-                    c_tn = c_res.get("trackingNumber")
-                    
+                    c_tn = c_res.get("trackingNumberInfo", {}).get("trackingNumber")
                     if not c_tn or c_tn == tracking_number:
-                        continue # Skip self
-
-                    # The child's latest status object
-                    child_res_list = c_res.get("trackResults", [])
-                    if child_res_list:
-                        c_raw_status = child_res_list[0].get("latestStatusDetail", {}).get("statusByLocale", "Unknown")
-                    else:
-                        c_raw_status = "Unknown"
-                        
-                    child_status = map_fedex_status(c_raw_status)
+                        continue
+                    
+                    # Extract full details for child parcel
+                    child_data = self._extract_piece_data(c_res)
                     child_parcels.append({
                         "tracking_number": c_tn,
-                        "status": child_status,
-                        "raw_status": c_raw_status,
+                        "status": child_data["status"],
+                        "raw_status": child_data["raw_status"],
+                        "origin": child_data["origin"],
+                        "destination": child_data["destination"],
+                        "eta": child_data["eta"],
+                        "carrier": "FedEx",
                     })
             else:
-                # Fallback to the rudimentary associatedShipments array on the main track object
                 for assoc in associated_shipments:
                     rel_type = assoc.get("type", "").upper()
                     tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
@@ -305,23 +305,17 @@ class FedExService(CarrierService):
                         continue
 
                     if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT"):
-                        # Pull the child's own latest status if FedEx returns it
-                        child_raw_status = (
-                            assoc.get("latestStatusDetail", {})
-                                 .get("statusByLocale", "")
-                        )
-                        child_status = (
-                            map_fedex_status(child_raw_status)
-                            if child_raw_status
-                            else "Unknown"
-                        )
+                        child_data = self._extract_piece_data(assoc)
                         child_parcels.append({
                             "tracking_number": tn,
-                            "status": child_status,
-                            "raw_status": child_raw_status,
+                            "status": child_data["status"],
+                            "raw_status": child_data["raw_status"],
+                            "origin": child_data["origin"],
+                            "destination": child_data["destination"],
+                            "eta": child_data["eta"],
+                            "carrier": "FedEx",
                         })
                         is_master = True
-
                     elif rel_type == "MASTER":
                         if not master_tracking_number:
                             master_tracking_number = tn
@@ -331,19 +325,13 @@ class FedExService(CarrierService):
 
             return {
                 "carrier": "FedEx",
-                "status": mapped_status,
-                "raw_status": raw_status,
-                "origin": origin,
-                "destination": destination,
-                "eta": eta,
-                "progress": progress,
-                "history": history,
+                **master_data,
                 "master_tracking_number": master_tracking_number,
                 "is_master": is_master,
                 "child_parcels": child_parcels,
-                # Keep old key for any callers that haven't migrated yet
                 "child_tracking_numbers": child_tracking_numbers,
             }
+   
 
         except (KeyError, IndexError) as e:
             logger.error("Error parsing FedEx response: %s", e)

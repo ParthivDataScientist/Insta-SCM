@@ -143,3 +143,30 @@ def get_stats(db: Session) -> dict:
         "transit": result.transit or 0,
         "exceptions": result.exceptions or 0,
     }
+
+
+def preview_track(tracking_number: str) -> dict:
+    """
+    Fetch live tracking data from the carrier API WITHOUT saving to the DB.
+    Returns the full result dict (including history, origin, destination, eta).
+    On error, the dict will contain an 'error' key.
+    """
+    carrier_name = detect_carrier(tracking_number)
+
+    if carrier_name == "DHL":
+        service = DHLService()
+    elif carrier_name == "FedEx":
+        service = FedExService()
+    elif carrier_name == "UPS":
+        return {"error": "UPS tracking is not yet supported."}
+    else:
+        return {"error": f"Could not detect carrier for '{tracking_number}'."}
+
+    result = service.track(tracking_number)
+    if "error" in result:
+        return result
+
+    # Attach metadata the frontend needs
+    result["tracking_number"] = tracking_number
+    result["carrier"] = carrier_name
+    return result

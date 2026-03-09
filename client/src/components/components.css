@@ -1,8 +1,72 @@
-error-banner {
+/* Error Banner */
+.error-banner {
     background: var(--status-exception-bg);
     color: var(--status-exception-text);
     padding: 12px 18px;
     border-radius: var(--radius-md);
     margin-bottom: 16px;
     font-size: 13px;
+}
+
+/* Master/Child Rows (MPS) */
+.child-row {
+    background: var(--bg-ralt) !important;
+    border-top: none !important;
+}
+
+.dark .child-row {
+    background: rgba(255, 255, 255, 0.015) !important;
+}
+
+.child-row td {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    color: var(--tx2) !important;
+}
+
+.child-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 24px;   /* Indent children */
+    position: relative;
+}
+
+.child-indicator::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: -12px;
+    bottom: 50%;
+    width: 2px;
+    background: var(--bd-in);
+    border-bottom-left-radius: 4px;
+}
+
+.child-indicator::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    width: 10px;
+    height: 2px;
+    background: var(--bd-in);
+}
+
+.child-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--tx3);
+    margin-right: 6px;
+    transition: all 0.2s;
+}
+
+.child-nav:hover {
+    background: var(--red-ghost);
+    color: var(--red-v);
 }

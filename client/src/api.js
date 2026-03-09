@@ -19,20 +19,35 @@ function authHeaders() {
 // --- Shipment API ---
 
 export async function fetchShipments() {
-    const response = await fetch(API_BASE);
+    const response = await fetch(API_BASE, { headers: authHeaders() });
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     return await response.json();
 }
 
 export async function fetchStats() {
-    const response = await fetch(`${API_BASE}/stats`);
+    const response = await fetch(`${API_BASE}/stats`, { headers: authHeaders() });
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     return await response.json();
 }
 
 export async function fetchShipment(id) {
-    const response = await fetch(`${API_BASE}/${id}`);
+    const response = await fetch(`${API_BASE}/${id}`, { headers: authHeaders() });
     if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.json();
+}
+
+export async function previewTrackShipment(trackingNumber) {
+    const response = await fetch(`${API_BASE}/track/${trackingNumber}/preview`, {
+        headers: authHeaders(),
+    });
+    if (!response.ok) {
+        let detail = `API error: ${response.status}`;
+        try {
+            const err = await response.json();
+            detail = err.detail || detail;
+        } catch (_) {}
+        throw new Error(detail);
+    }
     return await response.json();
 }
 

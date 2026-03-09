@@ -16,7 +16,7 @@ from app.core.security import verify_api_key
 from app.db.session import get_session
 from app.models.shipment import Shipment
 from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
-from app.services.shipment_service import get_stats, track_and_save
+from app.services.shipment_service import get_stats, track_and_save, preview_track
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,6 +37,23 @@ class TrackRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+
+
+@router.get("/track/{tracking_number}/preview")
+def preview_shipment(
+    tracking_number: str = Path(
+        ...,
+        min_length=8,
+        max_length=50,
+        description="Carrier tracking number to preview (no DB save)",
+    ),
+    _key: str = Depends(verify_api_key),
+):
+    """Fetch live tracking data for a tracking number WITHOUT saving to the database."""
+    result = preview_track(tracking_number.upper())
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 @router.post("/track/{tracking_number}", status_code=201)

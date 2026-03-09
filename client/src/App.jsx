@@ -74,7 +74,7 @@ function Dashboard() {
 
                 {/* Modals */}
                 {showTrack && <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} />}
-                {selected && <ShipmentDetailPanel shipment={selected} onClose={() => setSelected(null)} onDeleted={loadData} trackingList={shipments} />}
+                {selected && <ShipmentDetailPanel shipment={selected} onClose={() => setSelected(null)} onDeleted={loadData} />}
 
                 {/* Hidden file input for Excel import */}
                 <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"
@@ -248,9 +248,11 @@ function Dashboard() {
                                         : (
                                             <ShipmentTable
                                                 shipments={filteredShipments}
+                                                allShipments={shipments}
                                                 loading={loading}
                                                 onSelectShipment={setSelected}
                                                 onDeleteShipment={(id) => handleDelete(new Event('click'), id)}
+                                                onTracked={loadData}
                                             />
                                         )}
                             </div>

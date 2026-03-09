@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { X, Truck, Calendar, Box, Clock, AlertTriangle, Trash2, Package } from 'lucide-react';
+import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
 import ConfirmDialog from './ConfirmDialog';
-import { deleteShipment, trackShipment } from '../api';
+import { deleteShipment } from '../api';
 
-const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => {
+const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [deleting, setDeleting] = useState(false);
-    const [trackingAssociated, setTrackingAssociated] = useState(null);
 
     const handleDelete = async () => {
         setDeleting(true);
@@ -26,23 +25,6 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => 
         }
     };
 
-    const handleTrackChild = async (tn) => {
-        setTrackingAssociated(tn);
-        try {
-            await trackShipment(
-                tn,                                          // trackingNumber
-                'Child Box',                                 // shipmentName
-                null,                                        // showDate
-                shipment.exhibition_name || 'Unknown Exhibition' // exhibitionName
-            );
-            onDeleted(); // Re-fetch the main list
-            alert(`Child package ${tn} tracked successfully! Close this panel to find it in the list.`);
-        } catch (err) {
-            alert(`Error tracking child package: ${err.message}`);
-        } finally {
-            setTrackingAssociated(null);
-        }
-    };
 
     const s = shipment;
     const originCity = (s.origin || 'N/A').split(',')[0];
@@ -134,7 +116,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => 
                             </div>
                             <div className="detail-cell full">
                                 <div className="detail-cell-label">Recipient</div>
-                                <div className="detail-cell-value"><Box size={14} /> {s.recipient || '—'}</div>
+                                <div className="detail-cell-value"><Package size={14} /> {s.recipient || '—'}</div>
                             </div>
                         </div>
 
@@ -171,69 +153,6 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, trackingList }) => 
                             </div>
                         )}
 
-                        {/* Associated/Child Shipments Section */}
-                        {(() => {
-                            // Prefer rich child_parcels objects (new DB rows).
-                            // Fall back to bare child_tracking_numbers for old rows.
-                            const parcels = (s.child_parcels && s.child_parcels.length > 0)
-                                ? s.child_parcels
-                                : (s.child_tracking_numbers || []).map(tn => ({ tracking_number: tn, status: 'Unknown', raw_status: '' }));
-
-                            if (!parcels.length) return null;
-
-                            const hasException = parcels.some(p => p.status === 'Exception');
-
-                            return (
-                                <div style={{ marginTop: 24 }}>
-                                    <h3 className="timeline-title"><Package size={16} /> Related Packages ({parcels.length}-Piece Shipment)</h3>
-
-                                    {hasException && (
-                                        <div style={{
-                                            display: 'flex', alignItems: 'center', gap: 8,
-                                            background: 'var(--status-exception-bg)',
-                                            color: 'var(--status-exception-text)',
-                                            border: '1px solid var(--status-exception-text)',
-                                            borderRadius: 8, padding: '8px 12px',
-                                            marginBottom: 10, fontSize: 13,
-                                        }}>
-                                            <AlertTriangle size={14} />
-                                            One or more child parcels has an exception. Review individually.
-                                        </div>
-                                    )}
-
-                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
-                                        {parcels.map(parcel => {
-                                            const { tracking_number: tn, status: childStatus } = parcel;
-                                            const isStored = trackingList && trackingList.some(ts => ts.tracking_number === tn);
-                                            const isTracking = trackingAssociated === tn;
-                                            return (
-                                                <div key={tn} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                        <Box size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-                                                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--tx)' }}>{tn}</span>
-                                                        {/* Per-child live status badge */}
-                                                        {childStatus && childStatus !== 'Unknown' && (
-                                                            <StatusBadge status={childStatus} />
-                                                        )}
-                                                        {isStored && (
-                                                            <span style={{ fontSize: 10, background: '#e6fffa', color: '#047857', padding: '2px 6px', borderRadius: 10 }}>Tracked</span>
-                                                        )}
-                                                    </div>
-                                                    <button
-                                                        className="btn-outline-sm"
-                                                        style={{ padding: '4px 8px', fontSize: 11 }}
-                                                        onClick={() => handleTrackChild(tn)}
-                                                        disabled={isTracking}
-                                                    >
-                                                        {isTracking ? 'Tracking...' : (isStored ? 'Refresh' : 'Track Box')}
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })()}
 
                         {/* Support Section */}
                         <div className="help-section">

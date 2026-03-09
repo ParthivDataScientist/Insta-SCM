@@ -8,7 +8,7 @@ These are separate from the SQLModel `Shipment` table model so that:
 """
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 
 
 class ChildParcel(BaseModel):
@@ -21,6 +21,10 @@ class ChildParcel(BaseModel):
     tracking_number: str
     status: str = "Unknown"
     raw_status: str = ""
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    eta: Optional[str] = None
+    carrier: Optional[str] = None
 
 
 class ShipmentResponse(BaseModel):
@@ -55,6 +59,11 @@ class ShipmentResponse(BaseModel):
     child_parcels: List[ChildParcel] = []
     # Flat list of child tracking numbers (derived for backward compat)
     child_tracking_numbers: List[str] = []
+
+    @field_validator("child_parcels", "child_tracking_numbers", "history", mode="before")
+    @classmethod
+    def default_to_empty_list(cls, v):
+        return v if v is not None else []
 
     @model_validator(mode="after")
     def derive_child_tracking_numbers(self) -> "ShipmentResponse":
