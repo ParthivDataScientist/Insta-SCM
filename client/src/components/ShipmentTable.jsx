@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, Fragment } from 'react';
-import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2 } from 'lucide-react';
+import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2, FolderInput } from 'lucide-react';
 import { Loader } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
@@ -20,6 +20,22 @@ function useOnClickOutside(ref, handler) {
         };
     }, [ref, handler]);
 }
+
+/* ── Helpers ── */
+const formatDateTime = (dateStr) => {
+    if (!dateStr || dateStr === 'TBD' || dateStr === '—') return dateStr;
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        // Feb 11, 2026
+        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        // 01:54 PM
+        const timePart = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return { datePart, timePart };
+    } catch (e) {
+        return dateStr;
+    }
+};
 
 const FilterPopover = ({ title, isActive, onClear, children }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -50,7 +66,7 @@ const FilterPopover = ({ title, isActive, onClear, children }) => {
     );
 };
 
-const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onDeleteShipment, onTracked }) => {
+const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onDeleteShipment, onArchiveShipment, onTracked }) => {
     // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
@@ -92,10 +108,7 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
 
     return (
         <div className="table-container">
-            <div style={{ padding: '0 16px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: 'var(--tx2)', fontWeight: 500 }}>
-                    Showing {filteredShipments.length} of {shipments.length} shipments
-                </span>
+            <div style={{ padding: '0 16px', marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
                     <button className="btn-outline-sm" onClick={() => {
                         setIdSearch(''); setExhibitionFilter([]); setStatusFilter([]); setCarrierFilter([]);
@@ -177,6 +190,7 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
                                     allShipments={allShipments}
                                     onSelectShipment={onSelectShipment} 
                                     onDeleteShipment={onDeleteShipment} 
+                                    onArchiveShipment={onArchiveShipment}
                                     onTracked={onTracked}
                                 />
                             ))}
@@ -194,7 +208,7 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
     );
 };
 
-const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDeleteShipment, onTracked }) => {
+const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDeleteShipment, onArchiveShipment, onTracked }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [loadingChild, setLoadingChild] = useState(null);
     const hasChildren = s.child_parcels && s.child_parcels.length > 0;
@@ -287,9 +301,27 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
                         </div>
                     ) : '—'}
                 </td>
-                <td className="eta-cell">{s.eta || 'TBD'}</td>
+                <td className="eta-cell">
+                    {(() => {
+                        const formatted = formatDateTime(s.eta);
+                        if (typeof formatted === 'object') {
+                            return (
+                                <div style={{ lineAlpha: 1.2 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--tx)' }}>{formatted.datePart}</div>
+                                    <div style={{ fontSize: 11, opacity: 0.8 }}>{formatted.timePart}</div>
+                                </div>
+                            );
+                        }
+                        return formatted || 'TBD';
+                    })()}
+                </td>
                 <td className="action-cell" onClick={e => e.stopPropagation()}>
                     <button className="track-btn" onClick={() => onSelectShipment(s)}>Track</button>
+                    {onArchiveShipment && (
+                        <button className="archive-btn" onClick={e => { e.stopPropagation(); onArchiveShipment(s.id); }} title={s.is_archived ? "Restore to Dashboard" : "Move to Storage"}>
+                            {s.is_archived ? "Restore" : "Move"}
+                        </button>
+                    )}
                     <button className="delete-btn" onClick={e => { e.stopPropagation(); onDeleteShipment(s.id); }} title="Delete shipment">
                         <Trash2 size={14} />
                     </button>
@@ -330,7 +362,20 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
                             </div>
                         )}
                     </td>
-                    <td className="eta-cell" style={{ opacity: 0.7 }}>{child.eta || s.eta || 'TBD'}</td>
+                    <td className="eta-cell" style={{ opacity: 0.7 }}>
+                        {(() => {
+                            const formatted = formatDateTime(child.eta || s.eta);
+                            if (typeof formatted === 'object') {
+                                return (
+                                    <div style={{ lineAlpha: 1.2 }}>
+                                        <div style={{ fontWeight: 600, color: 'var(--tx)' }}>{formatted.datePart}</div>
+                                        <div style={{ fontSize: 11 }}>{formatted.timePart}</div>
+                                    </div>
+                                );
+                            }
+                            return formatted || 'TBD';
+                        })()}
+                    </td>
                     <td className="action-cell">
                         <button 
                             className="track-btn piece-btn" 

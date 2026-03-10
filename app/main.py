@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
         ("child_tracking_numbers",  "ALTER TABLE shipment ADD COLUMN child_tracking_numbers JSON;"),
         # New: stores [{tracking_number, status, raw_status}, ...] per MPS child
         ("child_parcels",           "ALTER TABLE shipment ADD COLUMN child_parcels JSON;"),
+        ("is_archived",             "ALTER TABLE shipment ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;"),
     ]
 
     with Session(engine) as session:
@@ -55,9 +56,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # CORS — tightly scoped; configure ALLOWED_ORIGIN in .env for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.ALLOWED_ORIGIN, "http://127.0.0.1:5173"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_origins=[settings.ALLOWED_ORIGIN, "http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 

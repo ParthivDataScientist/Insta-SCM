@@ -30,8 +30,8 @@
     --bg-rhov: #FFF5F5;
     --bg-thead: #18191C;
     --tx: #111827;
-    --tx2: #4B5563;
-    --tx3: #9CA3AF;
+    --tx2: #374151;
+    --tx3: #6B7280;
     --tx-inv: #fff;
     --bd: #E0E3EC;
     --bd-l: #ECEEF3;
@@ -180,7 +180,7 @@ select {
 .sidebar-tagline {
     font-size: 10px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.30);
+    color: rgba(255, 255, 255, 0.45);
     padding: 0 18px 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     letter-spacing: 0.2px;
@@ -203,14 +203,15 @@ select {
     border-radius: var(--r-md);
     font-size: 13.5px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.75);
     text-align: left;
+    text-decoration: none;
     transition: all .15s;
     position: relative;
 }
 
 .sidebar-item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.08);
     color: #fff
 }
 
@@ -459,6 +460,11 @@ select {
     height: 3px;
     background: linear-gradient(90deg, var(--red), var(--red-v), transparent);
     flex-shrink: 0
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
 }
 
 /* ── DASHBOARD BODY ── */
@@ -964,6 +970,26 @@ select {
     background: var(--exc-bg);
     border-color: var(--exc-bd);
     color: var(--exc-tx);
+}
+
+.archive-btn {
+    padding: 6px 14px;
+    border-radius: var(--r-md);
+    background: transparent;
+    border: 1.5px solid var(--trn-bd);
+    color: var(--trn-tx);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .14s;
+    margin-left: 6px;
+}
+
+.archive-btn:hover {
+    background: var(--trn-bg);
+    border-color: var(--trn-bd);
+    color: var(--trn-tx);
+    transform: translateY(-1px);
 }
 
 /* Outline button small */

@@ -120,28 +120,57 @@ def track_and_save(
 
 def get_stats(db: Session) -> dict:
     """
-    Return shipment counts aggregated in SQL (not Python) for performance.
+    Return counts for main shipments and total child parcels.
+    A 'main' shipment is either an MPS master or a standalone parcel.
     """
-    result = db.exec(
-        select(
-            func.count().label("total"),
-            func.sum(
-                case((Shipment.status == "Delivered", 1), else_=0)
-            ).label("delivered"),
-            func.sum(
-                case((Shipment.status.in_(["In Transit", "Out for Delivery"]), 1), else_=0)
-            ).label("transit"),
-            func.sum(
-                case((Shipment.status == "Exception", 1), else_=0)
-            ).label("exceptions"),
-        )
-    ).one()
+    # Main shipment counts (where it's not a child of another record in DB)
+    main_query = select(
+        func.count().label("total"),
+        func.sum(case((Shipment.status == "Delivered", 1), else_=0)).label("delivered"),
+        func.sum(case((Shipment.status.in_(["In Transit", "Out for Delivery"]), 1), else_=0)).label("transit"),
+        func.sum(case((Shipment.status == "Exception", 1), else_=0)).label("exceptions"),
+    ).where(
+        ((Shipment.is_master == True) | (Shipment.master_tracking_number == None)) &
+        (Shipment.is_archived == False)
+    )
+    main_result = db.exec(main_query).one()
+
+    # Child parcel counts (summing the JSON arrays from master records)
+    # We use a simple select and sum in Python here for JSON compatibility across DBs,
+    # or we can try to use SQL func if we're sure about the JSON structure.
+    # Given the small scale, fetching masters and summing is safer.
+    masters = db.exec(select(Shipment).where(
+        (Shipment.is_master == True) & (Shipment.is_archived == False)
+    )).all()
+    
+    child_total = 0
+    child_delivered = 0
+    child_transit = 0
+    child_exceptions = 0
+    
+    for m in masters:
+        parcels = m.child_parcels or []
+        child_total += len(parcels)
+        for p in parcels:
+            status = p.get("status")
+            if status == "Delivered":
+                child_delivered += 1
+            elif status in ("In Transit", "Out for Delivery"):
+                child_transit += 1
+            elif status == "Exception":
+                child_exceptions += 1
 
     return {
-        "total": result.total or 0,
-        "delivered": result.delivered or 0,
-        "transit": result.transit or 0,
-        "exceptions": result.exceptions or 0,
+        "total": main_result.total or 0,
+        "delivered": main_result.delivered or 0,
+        "transit": main_result.transit or 0,
+        "exceptions": main_result.exceptions or 0,
+        "child_stats": {
+            "total": child_total,
+            "delivered": child_delivered,
+            "transit": child_transit,
+            "exceptions": child_exceptions
+        }
     }
 
 
@@ -170,3 +199,19 @@ def preview_track(tracking_number: str) -> dict:
     result["tracking_number"] = tracking_number
     result["carrier"] = carrier_name
     return result
+
+
+def toggle_archive(shipment_id: int, db: Session) -> Optional[Shipment]:
+    """
+    Toggle the is_archived flag for a shipment.
+    Returns the updated shipment or None if not found.
+    """
+    shipment = db.get(Shipment, shipment_id)
+    if not shipment:
+        return None
+    
+    shipment.is_archived = not shipment.is_archived
+    db.add(shipment)
+    db.commit()
+    db.refresh(shipment)
+    return shipment

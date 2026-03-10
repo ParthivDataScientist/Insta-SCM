@@ -2,6 +2,8 @@ import requests
 import logging
 from typing import Dict, Any
 from .carrier_base import CarrierService, HISTORY_STATUS_MAP
+from typing import List, Any
+from typing import List, Any
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -49,25 +51,29 @@ def map_dhl_status(status_str: str) -> str:
 
 class DHLService(CarrierService):
     def __init__(self):
-        self.base_url = "https://api-eu.dhl.com/express/v1"
+        # Unified Tracking API
+        self.base_url = "https://api-eu.dhl.com/track/shipments"
         self.api_key = settings.DHL_API_KEY
-        self.api_secret = settings.DHL_API_SECRET
 
     def track(self, tracking_number: str) -> Dict[str, Any]:
-        """Track a shipment using DHL Express API."""
-        track_url = f"{self.base_url}/shipments"
+        """Track a shipment using DHL Unified Tracking API."""
         params = {"trackingNumber": tracking_number, "language": "en"}
+        headers = {
+            "DHL-API-Key": self.api_key,
+            "Accept": "application/json"
+        }
 
         try:
             response = requests.get(
-                track_url,
+                self.base_url,
                 params=params,
-                auth=(self.api_key, self.api_secret),
+                headers=headers,
                 timeout=10,
             )
 
             if response.status_code == 200:
-                return self._standardize_response(response.json())
+                raw_data = response.json()
+                return self._standardize_response(raw_data, tracking_number)
             elif response.status_code == 404:
                 return {"carrier": "DHL", "error": "Shipment not found"}
             else:
@@ -77,71 +83,149 @@ class DHLService(CarrierService):
             logger.error("DHL request failed for %s: %s", tracking_number, e)
             return {"error": f"DHL Request Failed: {str(e)}"}
 
-    def _standardize_response(self, raw_data: Dict) -> Dict[str, Any]:
+    def _extract_piece_data(self, shipment: Dict[str, Any]) -> Dict[str, Any]:
+        """Helper to extract common fields from a single shipment/piece object."""
+        events = shipment.get("events", [])
+        
+        # --- Status (shipment-level) ---
+        status_obj = shipment.get("status", {})
+        raw_status = status_obj.get("status", "Unknown")
+        shipment_status = map_dhl_status(raw_status)
+
+        # --- Origin & Destination ---
+        origin_obj = shipment.get("origin", {}).get("address", {})
+        origin = f"{origin_obj.get('addressLocality', '')}, {origin_obj.get('countryCode', '')}".strip(", ")
+        if not origin and events:
+            # Fallback to first event location
+            last_event = events[-1]
+            loc_obj = last_event.get("location", {}).get("address", {})
+            origin = f"{loc_obj.get('addressLocality', '')}, {loc_obj.get('countryCode', '')}".strip(", ")
+
+        dest_obj = shipment.get("destination", {}).get("address", {})
+        destination = f"{dest_obj.get('addressLocality', '')}, {dest_obj.get('countryCode', '')}".strip(", ")
+
+        # --- ETA ---
+        eta = shipment.get("estimatedDeliveryDate", "Unknown")
+        if eta != "Unknown":
+            eta = eta.split("T")[0] if "T" in eta else eta[:10]
+
+        # --- History ---
+        history = []
+        for event in events:
+            desc = event.get("description", "")
+            location_obj = event.get("location", {}).get("address", {})
+            loc = f"{location_obj.get('addressLocality', '')}, {location_obj.get('countryCode', '')}".strip(", ")
+            
+            # Unified API might have 'timestamp' or 'date' + 'time'
+            timestamp = event.get("timestamp")
+            if not timestamp:
+                timestamp = (event.get("date", "") + " " + event.get("time", "")).strip()
+
+            type_code = event.get("typeCode", "")
+            event_status = HISTORY_STATUS_MAP.get(type_code, type_code)
+
+            history.append({
+                "description": desc,
+                "location": loc,
+                "status": event_status,
+                "date": timestamp,
+            })
+        
+        # Ensure newest first
+        history.sort(key=lambda x: x["date"], reverse=True)
+
+        # --- Progress ---
+        progress_map = {
+            "Delivered": 100,
+            "Out for Delivery": 80,
+            "In Transit": 40,
+            "Exception": 10,
+        }
+        progress = progress_map.get(shipment_status, 0)
+
+        return {
+            "status": shipment_status,
+            "raw_status": raw_status,
+            "origin": origin,
+            "destination": destination,
+            "eta": eta,
+            "progress": progress,
+            "history": history,
+        }
+
+    def _standardize_response(self, raw_data: Dict, tracking_number: str) -> Dict[str, Any]:
         try:
             shipments = raw_data.get("shipments", [])
             if not shipments:
                 return {"error": "No shipment data found in DHL response"}
 
-            shipment = shipments[0]
-            events = shipment.get("events", [])
+            # If multiple shipments are returned for a single tracking number, it's an MPS
+            # Alternatively, if there's only one but it references multiple pieces, we handle that.
+            
+            main_shipment = shipments[0]
+            data = self._extract_piece_data(main_shipment)
+            
+            child_parcels = []
+            is_master = False
+            master_tracking_number = None
 
-            # --- Status (shipment-level) ---
-            status_obj = shipment.get("status", {})
-            raw_status = status_obj.get("status", "Unknown")
-            shipment_status = map_dhl_status(raw_status)  # renamed: was mapped_status (caused shadowing)
+            # DHL Unified API returns all related shipments in the 'shipments' array
+            # if the tracking number is a master or if they are linked.
+            if len(shipments) > 1:
+                is_master = True
+                for i, s in enumerate(shipments):
+                    s_tn = s.get("id") or s.get("trackingNumber")
+                    if s_tn == tracking_number:
+                        # This is the one we queried, it's the "master" for our purposes
+                        continue
+                    
+                    p_data = self._extract_piece_data(s)
+                    child_parcels.append({
+                        "tracking_number": s_tn,
+                        "status": p_data["status"],
+                        "raw_status": p_data["raw_status"],
+                        "origin": p_data["origin"],
+                        "destination": p_data["destination"],
+                        "eta": p_data["eta"],
+                        "carrier": "DHL",
+                    })
+            
+            # Check for explicit piece information if only one shipment entry but multiple pieces
+            # Some DHL services return piece level details inside a single shipment object
+            pieces = main_shipment.get("pieces", [])
+            if not child_parcels and pieces:
+                # If there are multiple pieces and we haven't already filled child_parcels
+                if len(pieces) > 1:
+                    is_master = True
+                    for p in pieces:
+                        p_tn = p.get("trackingNumber") or p.get("id")
+                        if not p_tn or p_tn == tracking_number:
+                            continue
+                        
+                        # Note: Piece objects might have less info than full Shipment objects
+                        # We try to use piece info if available, otherwise fallback to master info
+                        p_raw_status = p.get("status", {}).get("status") or data["raw_status"]
+                        child_parcels.append({
+                            "tracking_number": p_tn,
+                            "status": map_dhl_status(p_raw_status),
+                            "raw_status": p_raw_status,
+                            "origin": data["origin"],
+                            "destination": data["destination"],
+                            "eta": data["eta"],
+                            "carrier": "DHL",
+                        })
 
-            # --- Origin & Destination ---
-            origin_obj = shipment.get("origin", {}).get("address", {})
-            origin = f"{origin_obj.get('addressLocality', '')}, {origin_obj.get('countryCode', '')}".strip(", ")
-
-            dest_obj = shipment.get("destination", {}).get("address", {})
-            destination = f"{dest_obj.get('addressLocality', '')}, {dest_obj.get('countryCode', '')}".strip(", ")
-
-            # --- ETA ---
-            eta = shipment.get("estimatedDeliveryDate", "Unknown")
-            if eta != "Unknown":
-                eta = eta.split("T")[0] if "T" in eta else eta[:10]
-
-            # --- History ---
-            history = []
-            for event in events:
-                desc = event.get("description", "")
-                location_obj = event.get("location", {}).get("address", {})
-                loc = f"{location_obj.get('addressLocality', '')}, {location_obj.get('countryCode', '')}".strip(", ")
-                timestamp = (event.get("date", "") + " " + event.get("time", "")).strip()
-
-                raw_type_code = event.get("typeCode", "")
-                # Use a distinct variable name to avoid shadowing the shipment-level status
-                event_type_label = HISTORY_STATUS_MAP.get(raw_type_code, raw_type_code)
-
-                history.append({
-                    "description": desc,
-                    "location": loc,
-                    "status": event_type_label,
-                    "date": timestamp,
-                })
-
-            # --- Progress (uses shipment_status, NOT the last event's type) ---
-            progress_map = {
-                "Delivered": 100,
-                "Out for Delivery": 80,
-                "In Transit": 40,
-                "Exception": 10,
-            }
-            progress = progress_map.get(shipment_status, 0)
+            child_tracking_numbers = [p["tracking_number"] for p in child_parcels]
 
             return {
                 "carrier": "DHL",
-                "status": shipment_status,
-                "raw_status": raw_status,
-                "origin": origin,
-                "destination": destination,
-                "eta": eta,
-                "progress": progress,
-                "history": history,
+                **data,
+                "is_master": is_master,
+                "master_tracking_number": master_tracking_number,
+                "child_parcels": child_parcels,
+                "child_tracking_numbers": child_tracking_numbers,
             }
 
         except Exception as e:
             logger.error("Error parsing DHL response: %s", e)
-            return {"error": f"Failed to parse DHL response: {str(e)}"}
+            return {"error": f"Failed to parse DHL response: {str(e)}"}

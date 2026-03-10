@@ -19,13 +19,19 @@ function authHeaders() {
 // --- Shipment API ---
 
 export async function fetchShipments() {
-    const response = await fetch(API_BASE, { headers: authHeaders() });
+    const response = await fetch(`${API_BASE}/`, { headers: authHeaders() });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.json();
+}
+
+export async function fetchArchivedShipments() {
+    const response = await fetch(`${API_BASE}/archived/`, { headers: authHeaders() });
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     return await response.json();
 }
 
 export async function fetchStats() {
-    const response = await fetch(`${API_BASE}/stats`, { headers: authHeaders() });
+    const response = await fetch(`${API_BASE}/stats/`, { headers: authHeaders() });
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     return await response.json();
 }
@@ -86,6 +92,15 @@ export async function deleteShipment(id) {
     return await response.json();
 }
 
+export async function archiveShipment(id) {
+    const response = await fetch(`${API_BASE}/${id}/archive`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.json();
+}
+
 export async function importExcel(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -108,4 +123,11 @@ export async function importExcel(file) {
         throw new Error(detail);
     }
     return await response.json();
+}
+export async function exportExcel() {
+    const response = await fetch(`${API_BASE}/export-excel`, {
+        headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.blob();
 }

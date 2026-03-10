@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 
-const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:8001"}/api/v1/auth`;
+const API_BASE = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1/auth`
+    : "/api/v1/auth";
 
 const AuthContext = createContext(null);
 

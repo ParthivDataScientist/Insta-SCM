@@ -19,6 +19,7 @@ class ShipmentBase(SQLModel):
     history: List[dict] = Field(default=[], sa_column=Column(JSON))
     master_tracking_number: Optional[str] = None
     is_master: bool = Field(default=False)
+    is_archived: bool = Field(default=False)
     # Stores [{"tracking_number": str, "status": str, "raw_status": str}, ...]
     child_parcels: List[dict] = Field(default=[], sa_column=Column(JSON))
 

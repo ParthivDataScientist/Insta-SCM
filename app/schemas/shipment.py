@@ -54,6 +54,7 @@ class ShipmentResponse(BaseModel):
 
     # MPS fields
     is_master: bool = False
+    is_archived: bool = False
     master_tracking_number: Optional[str] = None
     # Rich child-parcel objects (preferred)
     child_parcels: List[ChildParcel] = []

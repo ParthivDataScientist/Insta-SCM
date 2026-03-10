@@ -8,6 +8,7 @@ from typing import List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Path, UploadFile
+from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -177,6 +178,55 @@ async def import_excel(
     }
 
 
+@router.get("/export-excel")
+def export_shipments(
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """Export non-archived shipments to Excel with requested formatting."""
+    # Fetch all non-archived shipments
+    shipments = db.exec(select(Shipment).where(Shipment.is_archived == False)).all()
+    
+    data = []
+    for s in shipments:
+        # Format Child AWB listing
+        child_awbs = ", ".join([c.get("tracking_number", "") for c in s.child_parcels]) if s.child_parcels else ""
+        
+        # Show City - using exhibition_name as the primary source
+        show_city = s.exhibition_name or (s.destination.split(',')[0].strip() if s.destination else "—")
+        
+        row = {
+            "Ship to location": s.destination or "—",
+            "Client Name": s.recipient or "—",
+            "Booking dt": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "—",
+            "Show date": s.show_date or "—",
+            "Show City": show_city,
+            "Courier": s.carrier or "—",
+            "Master AWB": s.tracking_number,
+            "Child AWB": child_awbs,
+            "Delivery Update": s.status or "Unknown",
+        }
+        data.append(row)
+    
+    df = pd.DataFrame(data)
+    
+    # Create the Excel file in-memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Shipments')
+    
+    output.seek(0)
+    
+    headers = {
+        'Content-Disposition': 'attachment; filename="shipments_export.xlsx"'
+    }
+    return StreamingResponse(
+        output,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers=headers
+    )
+
+
 # ---------------------------------------------------------------------------
 # Stats card counts
 # ---------------------------------------------------------------------------
@@ -197,7 +247,33 @@ def list_shipments(
     limit: int = 100,
     db: Session = Depends(get_session),
 ):
-    return db.exec(select(Shipment).offset(skip).limit(limit)).all()
+    """List active (non-archived) shipments."""
+    return db.exec(select(Shipment).where(Shipment.is_archived == False).offset(skip).limit(limit)).all()
+
+
+@router.get("/archived", response_model=List[ShipmentResponse])
+def list_archived_shipments(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """List archived shipments (Storage)."""
+    return db.exec(select(Shipment).where(Shipment.is_archived == True).offset(skip).limit(limit)).all()
+
+
+@router.patch("/{shipment_id}/archive", response_model=ShipmentResponse)
+def archive_shipment(
+    shipment_id: int,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """Toggle the archive status of a shipment."""
+    from app.services.shipment_service import toggle_archive
+    updated = toggle_archive(shipment_id, db)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    return updated
 
 
 @router.get("/mps/{shipment_id}", response_model=MPSDetailResponse)

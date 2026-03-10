@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
     fetchShipments,
+    fetchArchivedShipments,
     fetchStats,
     deleteShipment as deleteShipmentApi,
+    archiveShipment as archiveShipmentApi,
     importExcel as importExcelApi,
+    exportExcel as exportExcelApi,
 } from '../api';
 
 /**
@@ -21,12 +24,12 @@ export function useShipments() {
     const [carrierFilter, setCarrierFilter] = useState('All');
     const [dateFilter, setDateFilter] = useState('All');
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (includeArchived = false) => {
         setLoading(true);
         setError(null);
         try {
             const [shipmentsData, statsData] = await Promise.all([
-                fetchShipments(),
+                includeArchived ? fetchArchivedShipments() : fetchShipments(),
                 fetchStats(),
             ]);
             setShipments(shipmentsData);
@@ -40,6 +43,16 @@ export function useShipments() {
     }, []);
 
     useEffect(() => { loadData(); }, [loadData]);
+
+    const archiveShipment = useCallback(async (id) => {
+        try {
+            await archiveShipmentApi(id);
+            await loadData();
+        } catch (err) {
+            setError(err.message);
+            console.error('Failed to archive shipment:', err);
+        }
+    }, [loadData]);
 
     const deleteShipment = useCallback(async (id) => {
         try {
@@ -103,6 +116,25 @@ export function useShipments() {
         });
     }, [filter, carrierFilter, dateFilter, searchQuery, shipments]);
 
+    const exportExcel = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const blob = await exportExcelApi();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `shipments_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         shipments,
         stats,
@@ -115,6 +147,8 @@ export function useShipments() {
         carrierFilter, setCarrierFilter,
         dateFilter, setDateFilter,
         deleteShipment,
+        archiveShipment,
         importExcel,
+        exportExcel,
     };
 }

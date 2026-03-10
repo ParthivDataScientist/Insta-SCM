@@ -5,6 +5,19 @@ import ProgressBar from './ProgressBar';
 import ConfirmDialog from './ConfirmDialog';
 import { deleteShipment } from '../api';
 
+const formatHistoryDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        // Feb 11, 2026 • 01:54 PM
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + 
+               ' • ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } catch (e) {
+        return dateStr;
+    }
+};
+
 const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [deleteError, setDeleteError] = useState('');
@@ -143,7 +156,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
                                     {s.history.map((ev, i) => (
                                         <div key={i} className="timeline-event">
                                             <div className={`timeline-dot ${i === 0 ? 'active' : 'inactive'}`} />
-                                            <div className="timeline-date">{ev.date}</div>
+                                            <div className="timeline-date">{formatHistoryDate(ev.date)}</div>
                                             <div className="timeline-status">{ev.status}</div>
                                             <div className="timeline-location">{ev.location}</div>
                                             <div className="timeline-desc">{ev.description}</div>
