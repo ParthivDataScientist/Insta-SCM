@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, Truck, Loader, ArrowUpRight } from 'lucide-react';
-import { trackShipment, importExcel } from '../api';
+import shipmentsService from '../api/shipments';
 
 const TrackModal = ({ onClose, onTracked }) => {
     const [trackingNum, setTrackingNum] = useState('');
     const [shipmentName, setShipmentName] = useState('');
     const [exhibitionName, setExhibitionName] = useState('');
     const [showDate, setShowDate] = useState('');
+    const [cs, setCs] = useState('');
+    const [noOfBox, setNoOfBox] = useState('');
     const [loading, setLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
     const [error, setError] = useState('');
@@ -17,7 +19,7 @@ const TrackModal = ({ onClose, onTracked }) => {
         setImportLoading(true);
         setError('');
         try {
-            const result = await importExcel(file);
+            const result = await shipmentsService.importExcel(file);
             onTracked();
             onClose();
 
@@ -53,11 +55,13 @@ const TrackModal = ({ onClose, onTracked }) => {
         setLoading(true);
         setError('');
         try {
-            await trackShipment(
+            await shipmentsService.trackShipment(
                 trackingNum.trim().toUpperCase(),
                 shipmentName.trim() || null,
                 showDate.trim() || null,
-                exhibitionName.trim()
+                exhibitionName.trim(),
+                cs.trim() || null,
+                noOfBox.trim() || null
             );
             onTracked();
             onClose();
@@ -109,6 +113,26 @@ const TrackModal = ({ onClose, onTracked }) => {
                                 placeholder="e.g. Tech Expo 2026"
                                 value={exhibitionName}
                                 onChange={e => setExhibitionName(e.target.value)}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">C/S (e.g. C-DDP)</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="e.g. C-DDP"
+                                value={cs}
+                                onChange={e => setCs(e.target.value)}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">No of Box</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="e.g. 5"
+                                value={noOfBox}
+                                onChange={e => setNoOfBox(e.target.value)}
                             />
                         </div>
                         <div className="form-group" style={{ gridColumn: 'span 2' }}>

@@ -26,11 +26,13 @@ FEDEX_STATUS_MAP = {
     "at local fedex": "Out for Delivery",
     # Exception / Hold
     "exception": "Exception",
+    "clearance delay": "Exception",
+    "delivery delay": "Exception",
     "delay": "Exception",
     "held": "Exception",
-    "customs": "Exception",
-    "clearance": "Exception",
-    "delivery updated": "Exception",
+    "customs": "In Transit",
+    "clearance": "In Transit",
+    "delivery updated": "In Transit",
     # Ready for pickup
     "ready for pickup": "Out for Delivery",
     "ready to pick up": "Out for Delivery",
@@ -161,7 +163,8 @@ class FedExService(CarrierService):
                                     "trackingNumber": tracking_number
                                 }
                             },
-                            "associatedType": "STANDARD_MPS"
+                            "associatedType": "STANDARD_MPS",
+                            "includeDetailedScans": True
                         }
                         assoc_resp = requests.post(assoc_url, headers=headers, json=assoc_body, timeout=20)
                         
@@ -196,7 +199,8 @@ class FedExService(CarrierService):
             desc = event.get("eventDescription", "")
             city = event.get("scanLocation", {}).get("city", "")
             state = event.get("scanLocation", {}).get("stateOrProvinceCode", "")
-            location = f"{city}, {state}".strip(", ")
+            country = event.get("scanLocation", {}).get("countryCode", "")
+            location = f"{city}, {state}, {country}".strip(", ")
             timestamp = event.get("date", "")
 
             raw_event_type = event.get("eventType", "")
@@ -210,24 +214,28 @@ class FedExService(CarrierService):
             })
         history.sort(key=lambda x: x["date"], reverse=True)
 
+        # Use history description for display if raw status is generic
+        if history and (raw_status.lower() in ["unknown", "delivery updated", "shipment exception", "clearance delay"]):
+            raw_status = history[0]["description"]
+
         # Extract Origin
         origin = "Unknown"
         origin_loc = piece_output.get("originLocation", {}).get("locationContactAndAddress", {}).get("address", {})
         if not origin_loc:
             origin_loc = piece_output.get("shipperInformation", {}).get("address", {})
         if origin_loc and origin_loc.get("city"):
-            origin = f"{origin_loc.get('city')}, {origin_loc.get('stateOrProvinceCode', '')}".strip(", ")
+            origin = f"{origin_loc.get('city')}, {origin_loc.get('stateOrProvinceCode', '')}, {origin_loc.get('countryCode', '')}".strip(", ")
         elif history:
             for event in reversed(history):
                 if event["location"].strip():
                     origin = event["location"]
                     break
 
-        # Extract Destination
         destination = "Unknown"
         dest_loc = piece_output.get("recipientInformation", {}).get("address", {})
+        dest_country = dest_loc.get("countryCode", "")
         if dest_loc and dest_loc.get("city"):
-            destination = f"{dest_loc.get('city')}, {dest_loc.get('stateOrProvinceCode', '')}".strip(", ")
+            destination = f"{dest_loc.get('city')}, {dest_loc.get('stateOrProvinceCode', '')}, {dest_country}".strip(", ")
         elif "deliver" in raw_status.lower() and history:
             destination = history[0]["location"]
 
@@ -238,9 +246,15 @@ class FedExService(CarrierService):
         if actual_delivery:
             eta = actual_delivery[:10]
         if eta == "Unknown":
-            estimated_delivery = next((dt.get("dateTime") for dt in date_times if dt.get("type") == "ESTIMATED_DELIVERY"), None)
+            est_types = ("ESTIMATED_DELIVERY", "ESTIMATED_DELIVERY_COMMITMENT", "ESTIMATED_ARRIVAL_AT_DESTINATION")
+            estimated_delivery = next((dt.get("dateTime") for dt in date_times if dt.get("type") in est_types), None)
             if estimated_delivery:
                 eta = estimated_delivery[:10]
+        if eta == "Unknown":
+            comm_types = ("COMMITMENT", "ESTIMATED_STANDARD_TRANSIT", "APPOINTMENT")
+            commitment = next((dt.get("dateTime") for dt in date_times if dt.get("type") in comm_types), None)
+            if commitment:
+                eta = commitment[:10]
         if eta == "Unknown":
             window = piece_output.get("estimatedDeliveryTimeWindow", {}).get("window", {})
             if window.get("ends"):
@@ -251,11 +265,36 @@ class FedExService(CarrierService):
         # Calculate Progress
         progress_map = {
             "Delivered": 100,
-            "Out for Delivery": 80,
-            "In Transit": 40,
+            "Out for Delivery": 85,
+            "In Transit": 30,
             "Exception": 10,
         }
         progress = progress_map.get(mapped_status, 0)
+        
+        # Smart progress for In Transit
+        if mapped_status == "In Transit" and history:
+            current_country = history[0].get("location", "").split(",")[-1].strip()
+            if dest_country and current_country == dest_country:
+                progress = 60  # Reached destination country
+            elif len(history) > 2:
+                progress = 45  # Documented movement
+            else:
+                progress = 25  # Just started
+
+        last_date = ""
+        last_location = ""
+        if history:
+            last_date = history[0].get("date", "")
+            last_location = history[0].get("location", "")
+        
+        # Fallback for location if history is empty
+        if not last_location:
+            loc_detail = piece_output.get("latestStatusDetail", {}).get("scanLocation", {})
+            if loc_detail:
+                c = loc_detail.get("city", "")
+                s = loc_detail.get("stateOrProvinceCode", "")
+                cy = loc_detail.get("countryCode", "")
+                last_location = f"{c}, {s}, {cy}".strip(", ")
 
         return {
             "status": mapped_status,
@@ -265,6 +304,8 @@ class FedExService(CarrierService):
             "eta": eta,
             "progress": progress,
             "history": history,
+            "last_date": last_date,
+            "last_location": last_location,
         }
 
     def _standardize_response(self, raw_data: Dict, tracking_number: str, associated_results: list = None, master_tn: str = None, is_master: bool = False) -> Dict[str, Any]:
@@ -295,6 +336,8 @@ class FedExService(CarrierService):
                         "origin": child_data["origin"],
                         "destination": child_data["destination"],
                         "eta": child_data["eta"],
+                        "last_date": child_data["last_date"],
+                        "last_location": child_data["last_location"],
                         "carrier": "FedEx",
                     })
             else:
@@ -313,6 +356,8 @@ class FedExService(CarrierService):
                             "origin": child_data["origin"],
                             "destination": child_data["destination"],
                             "eta": child_data["eta"],
+                            "last_date": child_data["last_date"],
+                            "last_location": child_data["last_location"],
                             "carrier": "FedEx",
                         })
                         is_master = True

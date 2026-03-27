@@ -12,6 +12,9 @@ from app.core.config import settings
 from app.db.session import engine
 from app.api.v1.api import api_router
 
+# Import models so SQLModel can discover them
+from app.models.dashboard_project import DashboardProject
+
 limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
@@ -30,6 +33,8 @@ async def lifespan(app: FastAPI):
         # New: stores [{tracking_number, status, raw_status}, ...] per MPS child
         ("child_parcels",           "ALTER TABLE shipment ADD COLUMN child_parcels JSON;"),
         ("is_archived",             "ALTER TABLE shipment ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;"),
+        ("cs",                      "ALTER TABLE shipment ADD COLUMN cs VARCHAR;"),
+        ("no_of_box",               "ALTER TABLE shipment ADD COLUMN no_of_box VARCHAR;"),
     ]
 
     with Session(engine) as session:
@@ -58,7 +63,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.ALLOWED_ORIGIN, "http://127.0.0.1:5173", "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 

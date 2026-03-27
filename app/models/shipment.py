@@ -16,6 +16,8 @@ class ShipmentBase(SQLModel):
     eta: Optional[str] = None
     progress: Optional[int] = Field(default=0)
     show_date: Optional[str] = None
+    cs: Optional[str] = None
+    no_of_box: Optional[str] = None
     history: List[dict] = Field(default=[], sa_column=Column(JSON))
     master_tracking_number: Optional[str] = None
     is_master: bool = Field(default=False)

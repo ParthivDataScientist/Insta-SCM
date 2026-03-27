@@ -3,7 +3,7 @@ import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package } from 'lucid
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
 import ConfirmDialog from './ConfirmDialog';
-import { deleteShipment } from '../api';
+import shipmentsService from '../api/shipments';
 
 const formatHistoryDate = (dateStr) => {
     if (!dateStr) return '';
@@ -27,7 +27,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
         setDeleting(true);
         setDeleteError('');
         try {
-            await deleteShipment(shipment.id);
+            await shipmentsService.deleteShipment(shipment.id);
             setConfirmOpen(false);
             onDeleted();
             onClose();

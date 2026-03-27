@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Mail, KeyRound, Eye, EyeOff, LoaderCircle, ShieldCheck } from 'lucide-react';
 import '../styles.css';
+
+const QUOTES = [
+    { title: "Empower Your Logistics", text: "Streamlining exhibitions and tracking with precision and efficiency." },
+    { title: "Data-Driven Decisions", text: "Real-time monitoring for your most critical business assets." },
+    { title: "Seamless Operations", text: "Connecting teams, shipments, and projects across the globe." },
+    { title: "Excellence in Execution", text: "Delivering flawless exhibition experiences through robust tracking." },
+];
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -10,8 +17,16 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [quoteIndex, setQuoteIndex] = useState(0);
     const { login } = useAuth();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setQuoteIndex((prev) => (prev + 1) % QUOTES.length);
+        }, 7000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -32,11 +47,11 @@ const Login = () => {
             <div className="auth-left">
                 <div className="auth-brand">
                     <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ height: '32px', width: 'auto' }} />
-                    <span className="auth-brand-text">Insta-Track Security</span>
+                    <span className="auth-brand-text">Insta-Exhibition-Dashboards</span>
                 </div>
                 <div className="auth-illustration">
-                    <h2>Secure Access</h2>
-                    <p>Enter your credentials to manage and monitor tracking systems.</p>
+                    <h2 key={`title-${quoteIndex}`} className="fade-text">{QUOTES[quoteIndex].title}</h2>
+                    <p key={`text-${quoteIndex}`} className="fade-text">{QUOTES[quoteIndex].text}</p>
                 </div>
             </div>
             <div className="auth-right">

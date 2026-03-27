@@ -1,99 +1,81 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL
-    ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1/auth`
-    : "/api/v1/auth";
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import authService from '../api/authService';
 
 const AuthContext = createContext(null);
 
+/**
+ * AuthProvider Component
+ * Manages global authentication state using secure HTTP-only cookies.
+ */
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchUser = async () => {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/me`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setUser(data);
-                } else {
-                    localStorage.removeItem('access_token');
-                }
-            } catch (err) {
-                localStorage.removeItem('access_token');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchUser();
+    // Verify session on mount
+    const verifySession = useCallback(async () => {
+        setLoading(true);
+        try {
+            const userData = await authService.getCurrentUser();
+            setUser(userData);
+        } catch (err) {
+            // If verification fails, clear local user state
+            // we don't need to clear localStorage anymore as we've moved to cookies
+            setUser(null);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
+    useEffect(() => {
+        verifySession();
+    }, [verifySession]);
+
+    /**
+     * Login handler
+     */
     const login = async (email, password) => {
-        const formData = new URLSearchParams();
-        formData.append('username', email); // OAuth2
-        formData.append('password', password);
-
-        const response = await fetch(`${API_BASE}/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString()
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Login failed");
-        }
-
-        const data = await response.json();
-        if (data.access_token) {
-            localStorage.setItem('access_token', data.access_token);
-            // Fetch user info
-            const userRes = await fetch(`${API_BASE}/me`, {
-                headers: { 'Authorization': `Bearer ${data.access_token}` }
-            });
-            if (userRes.ok) {
-                const userData = await userRes.json();
-                setUser(userData);
-                return userData;
+        try {
+            const data = await authService.login(email, password);
+            // The token is now in a secure cookie, but we might still get it in response
+            // for hybrid flows or if the user specifically asked for localStorage removal.
+            if (data.access_token) {
+                localStorage.setItem('access_token', data.access_token);
             }
+            
+            // Re-fetch user data to ensure session is valid
+            const userData = await authService.getCurrentUser();
+            setUser(userData);
+            return userData;
+        } catch (err) {
+            const message = err.response?.data?.detail || "Login failed. Please check your credentials.";
+            throw new Error(message);
         }
-        throw new Error("Login completed but failed to retrieve user data.");
     };
 
+    /**
+     * Registration handler
+     */
     const register = async (userData) => {
-        const response = await fetch(`${API_BASE}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userData)
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Registration failed");
+        try {
+            return await authService.register(userData);
+        } catch (err) {
+            const message = err.response?.data?.detail || "Registration failed.";
+            throw new Error(message);
         }
-        return await response.json();
     };
 
+    /**
+     * Logout handler
+     */
     const logout = async () => {
         try {
-            await fetch(`${API_BASE}/logout`, { method: 'POST' });
+            await authService.logout();
         } catch (e) {
-            // Ignore error on logout
+            console.error("Logout API error:", e);
+        } finally {
+            localStorage.removeItem('access_token');
+            setUser(null);
         }
-        localStorage.removeItem('access_token');
-        setUser(null);
     };
 
     return (
@@ -103,4 +85,10 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+};

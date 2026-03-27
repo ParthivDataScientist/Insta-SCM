@@ -31,6 +31,14 @@ class TrackRequest(BaseModel):
     shipment_name: Optional[str] = None
     show_date: Optional[str] = None
     exhibition_name: str
+    cs: Optional[str] = None
+    no_of_box: Optional[str] = None
+
+
+class BatchRequest(BaseModel):
+    """Request body for batch operations."""
+    shipment_ids: List[int]
+    archive: Optional[bool] = None
 
 
 # ---------------------------------------------------------------------------
@@ -131,9 +139,20 @@ def _process_excel_import(contents: bytes, db: Session):
         if not exhibition_name or exhibition_name.lower() == "nan":
             exhibition_name = "Unknown Exhibition"
 
-        # Call track_and_save with correct positional arguments:
-        # tracking_number, recipient, items, show_date, exhibition_name, db
-        res = track_and_save(tracking_num.upper(), recipient, items_name, show_date, exhibition_name, db)
+        cs = str(row.get("cs") or row.get("c/s") or "").strip() if pd.notna(row.get("cs")) or pd.notna(row.get("c/s")) else None
+        no_of_box = str(row.get("no_of_box") or row.get("boxes") or "").strip() if pd.notna(row.get("no_of_box")) or pd.notna(row.get("boxes")) else None
+
+        # Call track_and_save with correct arguments
+        res = track_and_save(
+            tracking_number=tracking_num.upper(),
+            recipient=recipient,
+            items=items_name,
+            show_date=show_date,
+            exhibition_name=exhibition_name,
+            db=db,
+            cs=cs,
+            no_of_box=no_of_box
+        )
         if "error" in res:
             err_msg = res["error"]
             logger.warning("Import failed for %s: %s", tracking_num, err_msg)
@@ -184,41 +203,164 @@ def export_shipments(
     _key: str = Depends(verify_api_key),
 ):
     """Export non-archived shipments to Excel with requested formatting."""
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from datetime import datetime
+
     # Fetch all non-archived shipments
     shipments = db.exec(select(Shipment).where(Shipment.is_archived == False)).all()
     
-    data = []
+    # Create Workbook
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Shipments"
+
+    today_str = datetime.now().strftime("%d.%m.%Y")
+    
+    headers = [
+        "Ship to location", "Client Name", "Booking dt.", "Show date", 
+        "Show City", "C/S", "No of Box", "Courier", "Master AWB", 
+        "Child AWB #", today_str
+    ]
+    
+    # Styles
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    alignment_center = Alignment(horizontal="center", vertical="center")
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = alignment_center
+
+    current_row = 2
     for s in shipments:
-        # Format Child AWB listing
-        child_awbs = ", ".join([c.get("tracking_number", "") for c in s.child_parcels]) if s.child_parcels else ""
+        # Latest Update logic
+        if s.history:
+            latest = s.history[0]
+            h_date = ""
+            try:
+                dt = datetime.fromisoformat(latest["date"].replace("Z", "+00:00"))
+                h_date = dt.strftime("%d.%m.%Y")
+            except:
+                h_date = latest.get("date", "")[:10]
+            
+            loc = f" {latest.get('location', '')}" if latest.get('location') else ""
+            eta_str = f" ETA : {s.eta}" if s.eta and s.eta not in ("Unknown", "TBD", "Pending") else ""
+            latest_status = f"{h_date} : {latest.get('description', '')}{loc}{eta_str}"
+        else:
+            eta_str = f" ETA : {s.eta}" if s.eta and s.eta not in ("Unknown", "TBD", "Pending") else ""
+            latest_status = f"{s.status}{eta_str}"
+
+        # Master Row
+        row_data = [
+            s.destination or "—",
+            s.recipient or "—",
+            s.created_at.strftime("%d.%m.%Y") if s.created_at else "—",
+            s.show_date or "—",
+            s.exhibition_name or "—",
+            s.cs or "—",
+            s.no_of_box or "—",
+            s.carrier.upper() if s.carrier else "—",
+            s.tracking_number,
+            "",  # Child AWB is empty on master row
+            latest_status
+        ]
         
-        # Show City - using exhibition_name as the primary source
-        show_city = s.exhibition_name or (s.destination.split(',')[0].strip() if s.destination else "—")
-        
-        row = {
-            "Ship to location": s.destination or "—",
-            "Client Name": s.recipient or "—",
-            "Booking dt": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "—",
-            "Show date": s.show_date or "—",
-            "Show City": show_city,
-            "Courier": s.carrier or "—",
-            "Master AWB": s.tracking_number,
-            "Child AWB": child_awbs,
-            "Delivery Update": s.status or "Unknown",
-        }
-        data.append(row)
-    
-    df = pd.DataFrame(data)
-    
-    # Create the Excel file in-memory
+        for col, val in enumerate(row_data, 1):
+            cell = ws.cell(row=current_row, column=col, value=val)
+            cell.border = border
+            if headers[col-1] == "Show date":
+                cell.fill = yellow_fill
+            if col in [3, 8]: # Booking dt. and Courier center aligned
+                cell.alignment = alignment_center
+            if col == 9: # Master AWB bold
+                cell.font = Font(bold=True)
+
+        current_row += 1
+
+        # Child Rows
+        if s.child_parcels:
+            for c in s.child_parcels:
+                # Latest Update for child
+                # Event Date: use last_date if available (newly added), otherwise fallback to booking date
+                c_date = ""
+                if c.get("last_date"):
+                    try:
+                        dt = datetime.fromisoformat(c["last_date"].replace("Z", "+00:00"))
+                        c_date = dt.strftime("%d.%m.%Y")
+                    except:
+                        c_date = c["last_date"][:10]
+                else:
+                    c_date = s.created_at.strftime('%d.%m.%Y') if s.created_at else ''
+
+                # Status Fallback: If child status is generic, try to use master's current detail if dates match
+                c_status = c.get("raw_status") or c.get("status") or "Unknown"
+                c_loc = c.get("last_location") or ""
+                
+                if (not c_loc or c_status.lower() in ("unknown", "delivery updated", "in transit")) and s.history:
+                    # If child info is sparse, use master's latest info as it's likely moving together
+                    master_latest = s.history[0]
+                    c_status = master_latest.get("description", c_status)
+                    c_loc = master_latest.get("location", c_loc)
+
+                c_loc_str = f" {c_loc}" if c_loc else ""
+                
+                # ETA: Use child's own ETA, fallback to master ETA
+                c_eta = c.get("eta")
+                if not c_eta or c_eta in ("Unknown", "TBD", "Pending"):
+                    c_eta = s.eta
+                
+                eta_str = f" ETA : {c_eta}" if c_eta and c_eta not in ("Unknown", "TBD", "Pending") else ""
+                c_latest = f"{c_date} : {c_status}{c_loc_str}{eta_str}"
+                
+                
+                child_data = [
+                    s.destination or "—",
+                    s.recipient or "—",
+                    s.created_at.strftime("%d.%m.%Y") if s.created_at else "—",
+                    s.show_date or "—",
+                    s.exhibition_name or "—",
+                    s.cs or "—",
+                    "",  # No of Box empty for child
+                    s.carrier.upper() if s.carrier else "—",
+                    "",  # Master AWB empty for child
+                    c.get("tracking_number"),
+                    c_latest
+                ]
+                for col, val in enumerate(child_data, 1):
+                    cell = ws.cell(row=current_row, column=col, value=val)
+                    cell.border = border
+                    if headers[col-1] == "Show date":
+                        cell.fill = yellow_fill
+                    if col in [3, 8]:
+                        cell.alignment = alignment_center
+                current_row += 1
+
+    # Adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws.column_dimensions[column].width = min(max_length + 2, 40)
+
+    # Save to buffer
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Shipments')
-    
+    wb.save(output)
     output.seek(0)
     
     headers = {
-        'Content-Disposition': 'attachment; filename="shipments_export.xlsx"'
+        'Content-Disposition': f'attachment; filename="shipments_export_{today_str}.xlsx"'
     }
     return StreamingResponse(
         output,
@@ -322,3 +464,31 @@ def delete_shipment(
     db.commit()
     logger.info("Deleted shipment id=%d", shipment_id)
     return {"message": "Shipment deleted successfully", "deleted_id": shipment_id}
+
+
+# ---------------------------------------------------------------------------
+# Batch Operations
+# ---------------------------------------------------------------------------
+
+@router.post("/batch/archive", status_code=200)
+def batch_archive_shipments(
+    body: BatchRequest,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """Batch update archive status for multiple shipments."""
+    from app.services.shipment_service import batch_update_archive
+    if body.archive is None:
+        raise HTTPException(status_code=400, detail="Missing 'archive' boolean in request body")
+    return batch_update_archive(body.shipment_ids, body.archive, db)
+
+
+@router.post("/batch/delete", status_code=200)
+def batch_delete_shipments(
+    body: BatchRequest,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """Batch delete multiple shipments."""
+    from app.services.shipment_service import batch_delete
+    return batch_delete(body.shipment_ids, db)

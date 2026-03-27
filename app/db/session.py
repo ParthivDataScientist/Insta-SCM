@@ -8,4 +8,4 @@ engine = create_engine(settings.DATABASE_URL, echo=False, connect_args=connect_a
 
 def get_session():
     with Session(engine) as session:
-        yield session
+        yield session 

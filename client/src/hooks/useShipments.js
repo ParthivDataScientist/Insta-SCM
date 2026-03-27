@@ -1,16 +1,9 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import {
-    fetchShipments,
-    fetchArchivedShipments,
-    fetchStats,
-    deleteShipment as deleteShipmentApi,
-    archiveShipment as archiveShipmentApi,
-    importExcel as importExcelApi,
-    exportExcel as exportExcelApi,
-} from '../api';
+import shipmentsService from '../api/shipments';
 
 /**
  * Custom hook encapsulating all shipment data-fetching, filtering, and state.
+ * Updated to use shipmentsService (Axios-based).
  */
 export function useShipments() {
     const [shipments, setShipments] = useState([]);
@@ -23,14 +16,18 @@ export function useShipments() {
     const [searchQuery, setSearchQuery] = useState('');
     const [carrierFilter, setCarrierFilter] = useState('All');
     const [dateFilter, setDateFilter] = useState('All');
+    const [isArchivedView, setIsArchivedView] = useState(false);
 
-    const loadData = useCallback(async (includeArchived = false) => {
+    const loadData = useCallback(async (includeArchived = null) => {
+        const archivedState = includeArchived !== null ? includeArchived : isArchivedView;
+        if (includeArchived !== null) setIsArchivedView(includeArchived);
+        
         setLoading(true);
         setError(null);
         try {
             const [shipmentsData, statsData] = await Promise.all([
-                includeArchived ? fetchArchivedShipments() : fetchShipments(),
-                fetchStats(),
+                archivedState ? shipmentsService.fetchArchivedShipments() : shipmentsService.fetchShipments(),
+                shipmentsService.fetchStats(),
             ]);
             setShipments(shipmentsData);
             setStats(statsData);
@@ -40,27 +37,58 @@ export function useShipments() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [isArchivedView]);
 
-    useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => { loadData(false); }, [loadData]); // Initial load default to dashboard
 
     const archiveShipment = useCallback(async (id) => {
+        // Optimistic Update
+        setShipments(prev => prev.filter(s => s.id !== id));
         try {
-            await archiveShipmentApi(id);
-            await loadData();
+            await shipmentsService.archiveShipment(id);
+            // Refresh stats in background
+            shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
             setError(err.message);
             console.error('Failed to archive shipment:', err);
+            loadData(); // Rollback on error
         }
     }, [loadData]);
 
     const deleteShipment = useCallback(async (id) => {
+        // Optimistic Update
+        setShipments(prev => prev.filter(s => s.id !== id));
         try {
-            await deleteShipmentApi(id);
-            await loadData();
+            await shipmentsService.deleteShipment(id);
+            shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
             setError(err.message);
             console.error('Failed to delete shipment:', err);
+            loadData(); // Rollback
+        }
+    }, [loadData]);
+
+    const batchArchive = useCallback(async (ids, archive) => {
+        // Optimistic Update
+        setShipments(prev => prev.filter(s => !ids.includes(s.id)));
+        try {
+            await shipmentsService.batchArchiveShipments(ids, archive);
+            shipmentsService.fetchStats().then(setStats).catch(console.error);
+        } catch (err) {
+            setError(err.message);
+            loadData();
+        }
+    }, [loadData]);
+
+    const batchDelete = useCallback(async (ids) => {
+        // Optimistic Update
+        setShipments(prev => prev.filter(s => !ids.includes(s.id)));
+        try {
+            await shipmentsService.batchDeleteShipments(ids);
+            shipmentsService.fetchStats().then(setStats).catch(console.error);
+        } catch (err) {
+            setError(err.message);
+            loadData();
         }
     }, [loadData]);
 
@@ -68,7 +96,7 @@ export function useShipments() {
         setLoading(true);
         setError(null);
         try {
-            await importExcelApi(file);
+            await shipmentsService.importExcel(file);
             await loadData();
         } catch (err) {
             setError(err.message);
@@ -120,7 +148,7 @@ export function useShipments() {
         setLoading(true);
         setError(null);
         try {
-            const blob = await exportExcelApi();
+            const blob = await shipmentsService.exportExcel();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -128,6 +156,7 @@ export function useShipments() {
             document.body.appendChild(a);
             a.click();
             a.remove();
+            window.URL.revokeObjectURL(url);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -146,8 +175,11 @@ export function useShipments() {
         searchQuery, setSearchQuery,
         carrierFilter, setCarrierFilter,
         dateFilter, setDateFilter,
+        isArchivedView, setIsArchivedView,
         deleteShipment,
         archiveShipment,
+        batchDelete,
+        batchArchive,
         importExcel,
         exportExcel,
     };

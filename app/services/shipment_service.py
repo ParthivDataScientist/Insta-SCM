@@ -24,6 +24,8 @@ def track_and_save(
     show_date: Optional[str],
     exhibition_name: str,
     db: Session,
+    cs: Optional[str] = None,
+    no_of_box: Optional[str] = None,
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -71,6 +73,8 @@ def track_and_save(
             progress=result.get("progress", 0),
             items=items or "Package",
             history=result.get("history", []),
+            cs=cs,
+            no_of_box=no_of_box,
             master_tracking_number=result.get("master_tracking_number"),
             is_master=result.get("is_master", False),
             child_parcels=result.get("child_parcels", []),
@@ -87,6 +91,10 @@ def track_and_save(
             shipment.show_date = show_date
         if exhibition_name and exhibition_name != "Unknown Exhibition":
             shipment.exhibition_name = exhibition_name
+        if cs:
+            shipment.cs = cs
+        if no_of_box:
+            shipment.no_of_box = no_of_box
 
         # Only update fields if the API returned meaningful data
         if result.get("origin") and result.get("origin") != "Unknown":
@@ -215,3 +223,28 @@ def toggle_archive(shipment_id: int, db: Session) -> Optional[Shipment]:
     db.commit()
     db.refresh(shipment)
     return shipment
+
+
+def batch_update_archive(shipment_ids: list[int], archive: bool, db: Session) -> dict:
+    """Batch update the is_archived status for multiple shipments."""
+    statement = select(Shipment).where(Shipment.id.in_(shipment_ids))
+    shipments = db.exec(statement).all()
+    
+    for s in shipments:
+        s.is_archived = archive
+        db.add(s)
+    
+    db.commit()
+    return {"status": "success", "count": len(shipments)}
+
+
+def batch_delete(shipment_ids: list[int], db: Session) -> dict:
+    """Batch delete multiple shipments."""
+    statement = select(Shipment).where(Shipment.id.in_(shipment_ids))
+    shipments = db.exec(statement).all()
+    
+    for s in shipments:
+        db.delete(s)
+    
+    db.commit()
+    return {"status": "success", "count": len(shipments)}

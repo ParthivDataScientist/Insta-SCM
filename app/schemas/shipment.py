@@ -24,6 +24,8 @@ class ChildParcel(BaseModel):
     origin: Optional[str] = None
     destination: Optional[str] = None
     eta: Optional[str] = None
+    last_date: Optional[str] = None
+    last_location: Optional[str] = None
     carrier: Optional[str] = None
 
 
@@ -48,6 +50,8 @@ class ShipmentResponse(BaseModel):
     eta: Optional[str] = None
     progress: Optional[int] = 0
     show_date: Optional[str] = None
+    cs: Optional[str] = None
+    no_of_box: Optional[str] = None
     history: List[dict] = []
     created_at: datetime
     updated_at: datetime

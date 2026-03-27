@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from pydantic import ValidationError
@@ -7,11 +7,26 @@ from app.core.config import settings
 from app.db.session import get_session
 from app.models.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 def get_current_user(
-    db: Session = Depends(get_session), token: str = Depends(oauth2_scheme)
+    request: Request,
+    db: Session = Depends(get_session),
+    token: str = Depends(oauth2_scheme)
 ) -> User:
+    # First, try to get the token from the header (OAuth2 standard)
+    # If that's not present or invalid, check the HTTP-only cookie
+    if not token:
+        token = request.cookies.get("access_token")
+        if token and token.startswith("Bearer "):
+            token = token[len("Bearer "):]
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

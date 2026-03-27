@@ -3,7 +3,7 @@ import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2, Fold
 import { Loader } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
-import { previewTrackShipment } from '../api';
+import shipmentsService from '../api/shipments';
 
 // Custom Hook for clicking outside popovers
 function useOnClickOutside(ref, handler) {
@@ -23,7 +23,7 @@ function useOnClickOutside(ref, handler) {
 
 /* ── Helpers ── */
 const formatDateTime = (dateStr) => {
-    if (!dateStr || dateStr === 'TBD' || dateStr === '—') return dateStr;
+    if (!dateStr || dateStr === 'TBD' || dateStr === '—' || dateStr === 'Unknown' || dateStr === 'Pending') return '—';
     try {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
@@ -66,7 +66,17 @@ const FilterPopover = ({ title, isActive, onClear, children }) => {
     );
 };
 
-const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onDeleteShipment, onArchiveShipment, onTracked }) => {
+const ShipmentTable = ({ 
+    shipments, 
+    allShipments, 
+    loading, 
+    onSelectShipment, 
+    onDeleteShipment, 
+    onArchiveShipment, 
+    onTracked,
+    selectedIds = [],
+    onSelectionChange = () => {}
+}) => {
     // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
@@ -106,6 +116,23 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
         }
     };
 
+    const handleSelectAll = () => {
+        if (selectedIds.length === filteredShipments.length && filteredShipments.length > 0) {
+            onSelectionChange([]);
+        } else {
+            onSelectionChange(filteredShipments.map(s => s.id));
+        }
+    };
+
+    const handleSelectRow = (e, id) => {
+        e.stopPropagation();
+        if (selectedIds.includes(id)) {
+            onSelectionChange(selectedIds.filter(i => i !== id));
+        } else {
+            onSelectionChange([...selectedIds, id]);
+        }
+    };
+
     return (
         <div className="table-container">
             <div style={{ padding: '0 16px', marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -126,6 +153,15 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
                     <table className="tracking-table advanced-table">
                         <thead>
                             <tr>
+                                <th style={{ width: 40, paddingRight: 0 }}>
+                                    <div 
+                                        className={`custom-checkbox ${selectedIds.length === filteredShipments.length && filteredShipments.length > 0 ? 'checked' : ''}`}
+                                        onClick={handleSelectAll}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {selectedIds.length === filteredShipments.length && filteredShipments.length > 0 && <Check size={10} />}
+                                    </div>
+                                </th>
                                 <FilterPopover title="Tracking ID / Items" isActive={!!idSearch} onClear={() => setIdSearch('')}>
                                     <div className="fp-search">
                                         <Search size={14} className="fps-icon" />
@@ -192,6 +228,8 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
                                     onDeleteShipment={onDeleteShipment} 
                                     onArchiveShipment={onArchiveShipment}
                                     onTracked={onTracked}
+                                    isSelected={selectedIds.includes(s.id)}
+                                    onSelectRow={(e) => handleSelectRow(e, s.id)}
                                 />
                             ))}
                         </tbody>
@@ -208,7 +246,16 @@ const ShipmentTable = ({ shipments, allShipments, loading, onSelectShipment, onD
     );
 };
 
-const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDeleteShipment, onArchiveShipment, onTracked }) => {
+const ShipmentRowGroup = ({ 
+    shipment: s, 
+    allShipments, 
+    onSelectShipment, 
+    onDeleteShipment, 
+    onArchiveShipment, 
+    onTracked,
+    isSelected,
+    onSelectRow
+}) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [loadingChild, setLoadingChild] = useState(null);
     const hasChildren = s.child_parcels && s.child_parcels.length > 0;
@@ -216,7 +263,7 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
     const handleTrackChild = async (child) => {
         setLoadingChild(child.tracking_number);
         try {
-            const data = await previewTrackShipment(child.tracking_number);
+            const data = await shipmentsService.previewTrackShipment(child.tracking_number);
             // Build a full shipment-shaped object from the live API response
             const progress_map = { 'Delivered': 100, 'Out for Delivery': 80, 'In Transit': 40, 'Exception': 10 };
             const syntheticShipment = {
@@ -250,7 +297,12 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
 
     return (
         <Fragment>
-            <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }}>
+            <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={isSelected ? 'row-selected' : ''}>
+                <td onClick={onSelectRow}>
+                    <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
+                        {isSelected && <Check size={10} />}
+                    </div>
+                </td>
                 <td>
                     <div className="tid-cell">
                         {hasChildren && (
@@ -328,7 +380,13 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
                 </td>
             </tr>
             {isExpanded && hasChildren && s.child_parcels.map((child, idx) => (
-                <tr key={`${s.id}-child-${idx}`} className="child-row">
+                <tr 
+                    key={`${s.id}-child-${idx}`} 
+                    className={`child-row clickable-row ${isSelected ? 'row-selected' : ''}`}
+                    onClick={() => handleTrackChild(child)}
+                    style={{ cursor: 'pointer' }}
+                >
+                    <td></td> {/* Checkbox placeholder */}
                     <td>
                         <div className="child-indicator">
                             <div className="tid-num" style={{ fontWeight: 600 }}>
@@ -344,7 +402,9 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
                     </td>
                     <td className="current-status-cell">
                         <div className="cs-text" title={child.raw_status}>
-                            {child.raw_status || child.status}
+                            {(child.raw_status && !['Unknown', 'Delivery updated', 'In Transit'].includes(child.raw_status)) 
+                                ? child.raw_status 
+                                : (s.history && s.history.length > 0 ? s.history[0].description : (child.raw_status || child.status))}
                         </div>
                     </td>
                     <td className="carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
@@ -376,7 +436,7 @@ const ShipmentRowGroup = ({ shipment: s, allShipments, onSelectShipment, onDelet
                             return formatted || 'TBD';
                         })()}
                     </td>
-                    <td className="action-cell">
+                    <td className="action-cell" onClick={e => e.stopPropagation()}>
                         <button 
                             className="track-btn piece-btn" 
                             disabled={loadingChild === child.tracking_number}
