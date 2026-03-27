@@ -111,7 +111,8 @@ app.add_middleware(
         settings.ALLOWED_ORIGIN,
         "http://127.0.0.1:5173",
         "http://localhost:5173",
-        "http://192.168.29.50:5173"  # Added network IP for development
+        "http://192.168.29.50:5173",
+        "https://insta-exhibition-scm.vercel.app"  # Added Vercel production origin
     ],
     allow_credentials=True,
     allow_methods=["*"],
