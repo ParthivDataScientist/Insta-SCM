@@ -8,7 +8,9 @@ import math
 # Re-create tables just in case
 SQLModel.metadata.create_all(engine)
 
-file_path = r'd:\Desktop\Insta-Track\Project Pilot sheet.xlsx'
+# Use relative path if possible, or correct absolute path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, 'Project Pilot sheet.xlsx')
 df = pd.read_excel(file_path)
 
 # Fill NaNs with empty string or None
