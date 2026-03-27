@@ -29,6 +29,7 @@ FEDEX_STATUS_MAP = {
     "clearance delay": "Exception",
     "delivery delay": "Exception",
     "delay": "Exception",
+    "delay — clearance in progress": "Exception",
     "held": "Exception",
     "customs": "In Transit",
     "clearance": "In Transit",
@@ -48,6 +49,10 @@ _fedex_token_expiry: float = 0.0
 def map_fedex_status(raw_status: str) -> str:
     """Map a raw FedEx status string to our dashboard status categories."""
     lower = raw_status.lower().strip()
+
+    # High-priority exception keywords
+    if any(k in lower for k in ["delay", "exception", "held"]):
+        return "Exception"
 
     # Direct match first
     if lower in FEDEX_STATUS_MAP:
