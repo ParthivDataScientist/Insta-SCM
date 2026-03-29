@@ -24,7 +24,7 @@ def run_server():
     backend = subprocess.Popen(backend_cmd, cwd=ROOT_DIR)
 
     # 2. Frontend
-    print("    [2/2] Booting Frontend (Port 5173)...")
+    print("    [2/2] Booting Frontend (Port s)...")
     frontend_cmd = "npx vite --host"
     frontend = subprocess.Popen(
         frontend_cmd, cwd=os.path.join(ROOT_DIR, "client"), shell=True

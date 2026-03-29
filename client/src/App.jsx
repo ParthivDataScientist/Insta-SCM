@@ -7,6 +7,7 @@ import Register from './views/Register';
 import Storage from './views/Storage';
 import ProjectsDashboard from './views/ProjectsDashboard';
 import ProjectBoard from './views/ProjectBoard';
+import ManagerTimeline from './views/ManagerTimeline';
 import ShipmentDashboard from './views/ShipmentDashboard';
 import './styles.css';
 
@@ -40,6 +41,7 @@ export default function App() {
                         <Route path="/storage" element={<ProtectedRoute><Storage /></ProtectedRoute>} />
                         <Route path="/projects" element={<ProtectedRoute><ProjectsDashboard /></ProtectedRoute>} />
                         <Route path="/board" element={<ProtectedRoute><ProjectBoard /></ProtectedRoute>} />
+                        <Route path="/timeline" element={<ProtectedRoute><ManagerTimeline /></ProtectedRoute>} />
                         <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboard /></ProtectedRoute>} />
                         <Route path="/*" element={<Navigate to="/projects" replace />} />
                     </Routes>

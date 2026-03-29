@@ -116,9 +116,12 @@ export default function ProjectBoard() {
                         <Link to="/board" className="sidebar-item active">
                             <Layout size={17} /> Project Board
                         </Link>
-                        <Link to="/dashboard" className="sidebar-item">
-                            <Truck size={17} /> Shipment Tracking
+                        <Link to="/timeline" className="sidebar-item">
+                            <RefreshCw size={17} /> Resource Timeline
                         </Link>
+                        {/* <Link to="/dashboard" className="sidebar-item">
+                            <Truck size={17} /> Shipment Tracking
+                        </Link> */}
                     </nav>
                     
                     <div className="sidebar-footer-area">

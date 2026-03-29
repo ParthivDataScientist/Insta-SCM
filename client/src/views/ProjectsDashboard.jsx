@@ -27,7 +27,8 @@ export default function ProjectsDashboard() {
         filterStage, setFilterStage,
         filterBranch, setFilterBranch,
         filterPM, setFilterPM,
-        searchQuery, setSearchQuery
+        searchQuery, setSearchQuery,
+        updateProjectFull
     } = useProjects();
 
     const handleDoubleClick = (project) => {
@@ -89,9 +90,12 @@ export default function ProjectsDashboard() {
                         <Link to="/board" className="sidebar-item">
                             <Layout size={17} /> Project Board
                         </Link>
-                        <Link to="/dashboard" className="sidebar-item">
-                            <Truck size={17} /> Shipment Tracking
+                        <Link to="/timeline" className="sidebar-item">
+                            <RefreshCw size={17} /> Resource Timeline
                         </Link>
+                        {/* <Link to="/dashboard" className="sidebar-item">
+                            <Truck size={17} /> Shipment Tracking
+                        </Link> */}
                     </nav>
                 </aside>
 
@@ -223,6 +227,7 @@ export default function ProjectsDashboard() {
                                         loading={loading} 
                                         selectedProject={selectedProject} 
                                         onSelectProject={setSelectedProject}
+                                        updateProjectFull={updateProjectFull}
                                         onDoubleClickProject={handleDoubleClick}
                                     />
                                 )}

@@ -1,22 +1,23 @@
-from typing import Optional
-from datetime import datetime, timezone
-from sqlmodel import SQLModel, Field
+from typing import Optional, List
+from datetime import datetime, date as py_date, timezone
+from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, DateTime, func, JSON
 
 
 class DashboardProjectBase(SQLModel):
-    date: Optional[str] = None
+    date: Optional[py_date] = None
     project_name: str = Field(index=True)
     client: Optional[str] = None
     city: Optional[str] = None
     event_name: Optional[str] = None
     venue: Optional[str] = None
     area: Optional[str] = None
-    event_start_date: Optional[str] = None
-    material_dispatch_date: Optional[str] = None
-    installation_start_date: Optional[str] = None
-    installation_end_date: Optional[str] = None
-    dismantling_date: Optional[str] = None
+    event_start_date: Optional[py_date] = None
+    event_end_date: Optional[py_date] = None
+    material_dispatch_date: Optional[py_date] = None
+    installation_start_date: Optional[py_date] = None
+    installation_end_date: Optional[py_date] = None
+    dismantling_date: Optional[py_date] = None
     project_manager: Optional[str] = None
     team_type: Optional[str] = None
     stage: Optional[str] = Field(default="Open") # e.g. Open, Confirmed, Lost
@@ -43,3 +44,5 @@ class DashboardProject(DashboardProjectBase, table=True):
             nullable=False,
         ),
     )
+
+    allocations: List["ManagerAllocation"] = Relationship(back_populates="project")

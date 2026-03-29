@@ -2719,3 +2719,224 @@ select {
 .board-canvas::-webkit-scrollbar-thumb:hover {
     background: var(--tx2);
 }
+
+/* ── INLINE EDITING & ACTIONS ── */
+.hover-edit:hover .edit-icon-hover {
+    opacity: 1 !important;
+}
+
+.hover-edit {
+    transition: background 0.2s ease;
+}
+
+.hover-edit:hover {
+    background: var(--bg-rhov) !important;
+}
+
+.table-row:hover {
+    background: var(--bg-ralt);
+}
+
+.table-row.selected-row {
+    background: var(--bg-chip) !important;
+    border-left: 4px solid var(--red-v);
+}
+
+.status-badge.delivered {
+    background: var(--g-bg);
+    color: var(--green);
+    border: 1px solid var(--g-bd);
+}
+
+.status-badge.in-transit {
+    background: var(--b-bg);
+    color: var(--blu);
+    border: 1px solid var(--b-bd);
+}
+
+/* ── CUSTOM CALENDAR PICKER ── */
+.calendar-picker-popover {
+    position: absolute;
+    top: 100%;
+    left: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--bd);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-hov);
+    z-index: 1000;
+    width: 280px;
+    padding: 16px;
+    font-size: 13px;
+    animation: panelPop 0.3s var(--ease);
+}
+
+.cp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.cp-title {
+    font-weight: 800;
+    font-family: var(--font-d);
+    color: var(--tx);
+    font-size: 15px;
+}
+
+.cp-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tx3);
+    transition: all 0.2s;
+}
+
+.cp-btn:hover {
+    background: var(--bg-in);
+    color: var(--org);
+}
+
+.cp-close {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tx3);
+    margin-left: 10px;
+}
+
+.cp-close:hover {
+    background: var(--exc-bg);
+    color: var(--exc-tx);
+}
+
+.cp-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 8px;
+}
+
+.cp-wd {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--tx3);
+    text-transform: uppercase;
+}
+
+.cp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.cp-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s;
+    color: var(--tx2);
+}
+
+.cp-day:hover:not(.empty) {
+    background: var(--org-light);
+    color: var(--org);
+    transform: scale(1.1);
+}
+
+.cp-day.today {
+    background: var(--bg-chip);
+    color: var(--tx);
+    font-weight: 800;
+    border: 1px solid var(--bd-in);
+}
+
+.cp-day.selected {
+    background: var(--org) !important;
+    color: #fff !important;
+    font-weight: 800;
+    box-shadow: 0 4px 10px rgba(234, 88, 12, 0.3);
+}
+
+.cp-year-select {
+    background: transparent;
+    border: none;
+    color: var(--tx2);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.cp-year-select:hover {
+    background: var(--bg-in);
+}
+
+.inline-date-input {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--org);
+    color: var(--tx);
+    font-size: 13px;
+    font-weight: 600;
+    width: 90px;
+    outline: none;
+    padding: 2px 0;
+    text-align: center;
+}
+
+.calendar-picker-popover {
+    position: fixed; /* Explicit override */
+    z-index: 99999;
+}
+
+.cp-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--bd-in);
+}
+
+.cp-action-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cp-action-btn.today {
+    background: var(--bg-in);
+    color: var(--org);
+}
+
+.cp-action-btn.today:hover {
+    background: var(--org);
+    color: #fff;
+}
+
+.cp-action-btn.clear {
+    background: var(--exc-bg);
+    color: var(--exc-tx);
+}
+
+.cp-action-btn.clear:hover {
+    background: var(--red);
+    color: #fff;
+}

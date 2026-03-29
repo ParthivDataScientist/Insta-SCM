@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Clock, User, MessageSquare, Maximize2, Minimize2, Plus, Image as ImageIcon, CheckCircle, Circle, Trash2, Camera } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { sanitize, stripTags } from '../utils/sanitizer';
+import CalendarPicker from './CalendarPicker';
+import { formatDateDisplay } from '../utils/dateUtils';
+import ManagerField from './ManagerField';
 
 export default function ProjectBoardModal({ project, onClose, updateProjectFull }) {
     const { user } = useAuth();
@@ -111,41 +114,98 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
     const renderTabContent = () => {
         switch (activeTab) {
             case 'Details':
+                const DateDetailField = ({ label, field, icon: Icon }) => {
+                    const [rect, setRect] = useState(null);
+                    const [isEditing, setIsEditing] = useState(false);
+                    const value = project[field] || '';
+
+                    return (
+                        <div 
+                            onClick={(e) => {
+                                const r = e.currentTarget.getBoundingClientRect();
+                                setRect(r);
+                                setIsEditing(true);
+                            }}
+                            style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)', cursor: 'pointer', position: 'relative' }}
+                        >
+                            <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {Icon && <Icon size={14} color="var(--tx3)" />}
+                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--tx)' }}>
+                                    {formatDateDisplay(value) || 'Set Date...'}
+                                </div>
+                            </div>
+                            {isEditing && rect && (
+                                <CalendarPicker 
+                                    initialDate={value}
+                                    anchorRect={rect}
+                                    onSelect={(date) => {
+                                        updateProjectFull(project.id, { [field]: date });
+                                        setIsEditing(false);
+                                    }}
+                                    onClose={() => setIsEditing(false)}
+                                />
+                            )}
+                        </div>
+                    );
+                };
+
+                const TextField = ({ label, field, icon: Icon }) => (
+                    <div style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {Icon && <Icon size={14} color="var(--tx3)" />}
+                            <input 
+                                type="text"
+                                defaultValue={project[field] || ''}
+                                onBlur={(e) => updateProjectFull(project.id, { [field]: e.target.value })}
+                                style={{
+                                    flex: 1,
+                                    background: 'transparent',
+                                    border: 'none',
+                                    borderBottom: '1px solid transparent',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: 'var(--tx)',
+                                    outline: 'none',
+                                    paddingBottom: '2px'
+                                }}
+                                onFocus={(e) => e.target.style.borderBottom = '1px solid var(--org)'}
+                            />
+                        </div>
+                    </div>
+                );
+
                 return (
                     <>
                         <div style={{
                             width: '100%', height: '180px', background: '#1a1a1a', borderRadius: 'var(--r-md)',
-                            marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666'
+                            marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666',
+                            position: 'relative', overflow: 'hidden'
                         }}>
-                            <span style={{ fontSize: '14px' }}>[ Exhibition Booth Render ]</span>
+                             <img src="/logo.jpg" alt="Booth Render" style={{ opacity: 0.15, width: '200px' }} />
+                             <div style={{ position: 'absolute', bottom: '12px', right: '12px', fontSize: '10px', color: '#444' }}>[ Exhibition Booth Render Placeholder ]</div>
                         </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                            <div style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '4px' }}>Project Manager</div>
-                                <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <User size={14} /> {project.project_manager || 'Unassigned'}
-                                </div>
-                            </div>
-                            <div style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '4px' }}>Graphics Manager</div>
-                                <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <User size={14} /> {project.team_type || 'Unassigned'}
-                                </div>
-                            </div>
+                            <ManagerField label="Project Manager" field="project_manager" project={project} updateProjectFull={updateProjectFull} icon={User} />
+                            <TextField label="Graphics Manager" field="team_type" icon={User} />
                         </div>
-                        <div style={{ padding: '20px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
-                            <h3 style={{ fontSize: '14px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Clock size={16} color="var(--org)" /> Event Details
+
+                        <div style={{ padding: '24px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
+                            <h3 style={{ fontSize: '15px', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <Clock size={18} color="var(--org)" /> Event & Installation Timeline
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '13px' }}>
-                                <div><strong>Show Name:</strong> <br/>{project.event_name || 'N/A'}</div>
-                                <div><strong>Venue:</strong> <br/>{project.venue || 'N/A'}</div>
-                                <div><strong>Exhibition Date:</strong> <br/>{project.event_start_date || 'N/A'}</div>
-                                <div><strong>Installs Date:</strong> <br/>{project.installation_start_date || 'N/A'}</div>
-                                <div><strong>Material Dispatch:</strong> <br/>{project.material_dispatch_date || 'N/A'}</div>
-                                <div><strong>Dismantling Date:</strong> <br/>{project.dismantling_date || 'N/A'}</div>
-                                <div><strong>Branch:</strong> <br/>{project.branch || 'N/A'}</div>
-                                <div><strong>Stage:</strong> <br/>{project.board_stage || 'TBC'}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <TextField label="Show Name" field="event_name" />
+                                <TextField label="Venue" field="venue" />
+                                <DateDetailField label="Event Start" field="event_start_date" />
+                                <DateDetailField label="Event End" field="event_end_date" />
+                                <DateDetailField label="Installs Start" field="installation_start_date" />
+                                <DateDetailField label="Installs End" field="installation_end_date" />
+                                <DateDetailField label="Material Dispatch" field="material_dispatch_date" />
+                                <DateDetailField label="Dismantling Date" field="dismantling_date" />
+                                <TextField label="Branch" field="branch" />
                             </div>
                         </div>
                     </>

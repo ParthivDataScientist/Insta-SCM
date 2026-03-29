@@ -66,9 +66,9 @@ export default function Storage() {
                     <div className="sidebar-tagline">Excellence in Exhibition Logistics</div>
 
                     <nav className="sidebar-nav">
-                        <Link to="/" className="sidebar-item">
+                        {/* <Link to="/" className="sidebar-item">
                             <Truck size={17} /> Shipment Tracking
-                        </Link>
+                        </Link> */}
                         <button className="sidebar-item active">
                             <Archive size={17} /> Storage
                         </button>
