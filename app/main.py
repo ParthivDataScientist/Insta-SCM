@@ -35,6 +35,21 @@ async def lifespan(app: FastAPI):
         ("is_archived",             "ALTER TABLE shipment ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;"),
         ("cs",                      "ALTER TABLE shipment ADD COLUMN cs VARCHAR;"),
         ("no_of_box",               "ALTER TABLE shipment ADD COLUMN no_of_box VARCHAR;"),
+        
+        # DashboardProject migrations
+        ("event_end_date",          "ALTER TABLE dashboardproject ADD COLUMN event_end_date DATE;"),
+        ("material_dispatch_date",  "ALTER TABLE dashboardproject ADD COLUMN material_dispatch_date DATE;"),
+        ("installation_start_date", "ALTER TABLE dashboardproject ADD COLUMN installation_start_date DATE;"),
+        ("installation_end_date",   "ALTER TABLE dashboardproject ADD COLUMN installation_end_date DATE;"),
+        ("dismantling_date",        "ALTER TABLE dashboardproject ADD COLUMN dismantling_date DATE;"),
+        ("project_manager",         "ALTER TABLE dashboardproject ADD COLUMN project_manager VARCHAR;"),
+        ("team_type",               "ALTER TABLE dashboardproject ADD COLUMN team_type VARCHAR;"),
+        ("branch",                  "ALTER TABLE dashboardproject ADD COLUMN branch VARCHAR;"),
+        ("board_stage",             "ALTER TABLE dashboardproject ADD COLUMN board_stage VARCHAR;"),
+        ("comments",                "ALTER TABLE dashboardproject ADD COLUMN comments JSON;"),
+        ("materials",               "ALTER TABLE dashboardproject ADD COLUMN materials JSON;"),
+        ("photos",                  "ALTER TABLE dashboardproject ADD COLUMN photos JSON;"),
+        ("qc_steps",                "ALTER TABLE dashboardproject ADD COLUMN qc_steps JSON;")
     ]
 
     with Session(engine) as session:
