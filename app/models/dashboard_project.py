@@ -2,6 +2,8 @@ from typing import Optional, List
 from datetime import datetime, date as py_date, timezone
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, DateTime, func, JSON
+from pydantic import field_validator
+import pandas as pd
 
 
 class DashboardProjectBase(SQLModel):
@@ -27,6 +29,28 @@ class DashboardProjectBase(SQLModel):
     materials: Optional[list] = Field(default=[], sa_column=Column(JSON))
     photos: Optional[list] = Field(default=[], sa_column=Column(JSON))
     qc_steps: Optional[list] = Field(default=[], sa_column=Column(JSON))
+
+    @field_validator(
+        "date", "event_start_date", "event_end_date", "material_dispatch_date",
+        "installation_start_date", "installation_end_date", "dismantling_date",
+        mode="before", check_fields=False
+    )
+    @classmethod
+    def robust_date_parser(cls, v):
+        if not v:
+            return None
+        if isinstance(v, py_date) and not isinstance(v, datetime):
+            return v
+        if isinstance(v, datetime):
+            return v.date()
+        if isinstance(v, str):
+            try:
+                dt = pd.to_datetime(v, errors='coerce')
+                if pd.notna(dt):
+                    return dt.date()
+            except:
+                pass
+        return v
 
 
 class DashboardProject(DashboardProjectBase, table=True):
