@@ -14,6 +14,31 @@ from app.services.availability import is_manager_available
 
 router = APIRouter()
 
+
+def _sync_postgres_sequence(session: Session, table_name: str, column_name: str = "id") -> None:
+    """
+    Ensure a PostgreSQL serial/identity sequence is aligned to MAX(id).
+    This prevents duplicate key violations when sequence state drifts.
+    """
+    bind = session.get_bind()
+    if bind is None or bind.dialect.name != "postgresql":
+        return
+
+    seq_stmt = text("SELECT pg_get_serial_sequence(:table_name, :column_name)")
+    sequence_name = session.exec(
+        seq_stmt,
+        {"table_name": table_name, "column_name": column_name},
+    ).one()
+
+    if not sequence_name:
+        return
+
+    # Set nextval to max(id) + 1 (or 1 for empty table).
+    sync_stmt = text(
+        f"SELECT setval('{sequence_name}', COALESCE((SELECT MAX({column_name}) FROM {table_name}), 0) + 1, false)"
+    )
+    session.exec(sync_stmt)
+
 def get_session():
     with Session(engine) as session:
         yield session
@@ -136,6 +161,8 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
     changesFound = any(prev_state[field] != new_state[field] for field in audit_fields)
     
     if changesFound:
+        _sync_postgres_sequence(session, "projectauditlog")
+
         # Create Audit Log Record
         audit_entry = ProjectAuditLog(
             project_id=project.id,
