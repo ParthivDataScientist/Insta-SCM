@@ -46,6 +46,17 @@ _fedex_token: str = ""
 _fedex_token_expiry: float = 0.0
 
 
+def _normalize_fedex_tracking_number(tracking_number: str) -> str:
+    """
+    Normalize tracking numbers coming from Excel/import flows.
+    Common issue: numeric cells become strings like `123456789012.0`.
+    """
+    tn = str(tracking_number or "").strip()
+    if tn.endswith(".0") and tn[:-2].isdigit():
+        tn = tn[:-2]
+    return "".join(ch for ch in tn if ch.isalnum())
+
+
 def map_fedex_status(raw_status: str) -> str:
     """Map a raw FedEx status string to our dashboard status categories."""
     lower = raw_status.lower().strip()
@@ -105,6 +116,14 @@ class FedExService(CarrierService):
             raise
 
     def track(self, tracking_number: str) -> Dict[str, Any]:
+        normalized_tracking_number = _normalize_fedex_tracking_number(tracking_number)
+        if normalized_tracking_number != tracking_number:
+            logger.info(
+                "Normalized FedEx tracking number from '%s' to '%s'",
+                tracking_number,
+                normalized_tracking_number,
+            )
+
         try:
             token = self._get_token()
         except Exception as e:
@@ -117,7 +136,7 @@ class FedExService(CarrierService):
         }
         body = {
             "trackingInfo": [
-                {"trackingNumberInfo": {"trackingNumber": tracking_number}}
+                {"trackingNumberInfo": {"trackingNumber": normalized_tracking_number}}
             ],
             "includeDetailedScans": True,
         }
@@ -155,7 +174,7 @@ class FedExService(CarrierService):
                                 values = pkg.get("values", [])
                                 if values:
                                     master_tn = values[0]
-                                    if master_tn == tracking_number:
+                                    if master_tn == normalized_tracking_number:
                                         is_master = True
                                 break
 
@@ -165,7 +184,7 @@ class FedExService(CarrierService):
                         assoc_body = {
                             "masterTrackingNumberInfo": {
                                 "trackingNumberInfo": {
-                                    "trackingNumber": tracking_number
+                                    "trackingNumber": normalized_tracking_number
                                 }
                             },
                             "associatedType": "STANDARD_MPS",
@@ -180,16 +199,16 @@ class FedExService(CarrierService):
                             except (KeyError, IndexError):
                                 associated_results = []
                         else:
-                            logger.warning(f"Failed to fetch associated shipments for MPS {tracking_number}: {assoc_resp.status_code}")
+                            logger.warning(f"Failed to fetch associated shipments for MPS {normalized_tracking_number}: {assoc_resp.status_code}")
                 except (KeyError, IndexError) as e:
-                    logger.error(f"Error inspecting MPS raw data for {tracking_number}: {e}")
+                    logger.error(f"Error inspecting MPS raw data for {normalized_tracking_number}: {e}")
 
-                return self._standardize_response(raw_data, tracking_number, associated_results, master_tn, is_master)
+                return self._standardize_response(raw_data, normalized_tracking_number, associated_results, master_tn, is_master)
             else:
-                logger.warning("FedEx API returned %d for %s", resp.status_code, tracking_number)
+                logger.warning("FedEx API returned %d for %s", resp.status_code, normalized_tracking_number)
                 return {"error": f"FedEx API Error: {resp.status_code} — {resp.text[:200]}"}
         except Exception as e:
-            logger.error("FedEx request failed for %s: %s", tracking_number, e)
+            logger.error("FedEx request failed for %s: %s", normalized_tracking_number, e)
             return {"error": f"Request Failed: {str(e)}"}
 
     def _extract_piece_data(self, piece_output: Dict[str, Any]) -> Dict[str, Any]:
