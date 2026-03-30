@@ -6,8 +6,9 @@ import React, { useState, useEffect, useRef } from 'react';
  */
 export default function ProjectBar({ 
   allocation, 
-  timelineStart, 
-  cellWidth, 
+  timelineStart,
+  cellWidth,
+  viewMode = 'Day',
   levelIndex = 0, 
   onClick, 
   onDateUpdate 
@@ -47,21 +48,64 @@ export default function ProjectBar({
     return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
   };
 
-  // Internal helper to convert dates to current pixel positions using UTC logic
-  const getProjectLayout = () => {
-    const tS = localToUTC(new Date(timelineStart)).getTime();
-    const pS = strToUTC(allocation.allocation_start_date).getTime();
-    const pE = allocation.allocation_end_date 
-                 ? strToUTC(allocation.allocation_end_date).getTime() 
-                 : localToUTC(new Date()).getTime();
+  const getDaysInMonthUTC = (year, monthIndex) => {
+    return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  };
 
-    const MathRound = Math.round; // to prevent long expressions
-    const dayOffset = MathRound((pS - tS) / (1000 * 60 * 60 * 24));
-    const durationDays = MathRound((pE - pS) / (1000 * 60 * 60 * 24)) + 1;
+  const daysBetweenUTC = (fromDate, toDate) => {
+    return Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getPxPerDayAtDate = (dateObj) => {
+    if (viewMode === 'Day') return cellWidth;
+    if (viewMode === 'Week') return cellWidth / 7;
+
+    // Month mode keeps a fixed width per month, so px/day varies by month length.
+    const daysInMonth = getDaysInMonthUTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth());
+    return cellWidth / daysInMonth;
+  };
+
+  const dateToPx = (dateObj) => {
+    const tS = localToUTC(new Date(timelineStart));
+    if (viewMode !== 'Month') {
+      const dayOffset = daysBetweenUTC(tS, dateObj);
+      const pxPerDay = getPxPerDayAtDate(dateObj);
+      return dayOffset * pxPerDay;
+    }
+
+    // Month mode: sum per-month proportional widths for better alignment.
+    const cursor = new Date(tS.getTime());
+    let px = 0;
+
+    while (cursor.getUTCFullYear() < dateObj.getUTCFullYear() ||
+           (cursor.getUTCFullYear() === dateObj.getUTCFullYear() && cursor.getUTCMonth() < dateObj.getUTCMonth())) {
+      const daysInCursorMonth = getDaysInMonthUTC(cursor.getUTCFullYear(), cursor.getUTCMonth());
+      px += cellWidth;
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
+      if (daysInCursorMonth === 0) break;
+    }
+
+    if (cursor.getUTCFullYear() === dateObj.getUTCFullYear() && cursor.getUTCMonth() === dateObj.getUTCMonth()) {
+      const dayInMonth = dateObj.getUTCDate() - 1;
+      px += dayInMonth * getPxPerDayAtDate(dateObj);
+    }
+
+    return px;
+  };
+
+  // Internal helper to convert dates to current pixel positions
+  const getProjectLayout = () => {
+    const pS = strToUTC(allocation.allocation_start_date);
+    const pE = allocation.allocation_end_date 
+                 ? strToUTC(allocation.allocation_end_date)
+                 : localToUTC(new Date());
+
+    const durationDays = daysBetweenUTC(pS, pE) + 1;
+    const pxPerDay = getPxPerDayAtDate(pS);
 
     return {
-      left: dayOffset * cellWidth,
-      width: durationDays * cellWidth
+      left: dateToPx(pS),
+      width: Math.max(10, durationDays * pxPerDay)
     };
   };
 
@@ -72,7 +116,13 @@ export default function ProjectBar({
       setViewLeft(layout.left);
       setViewWidth(layout.width);
     }
-  }, [allocation.allocation_start_date, allocation.allocation_end_date, cellWidth, timelineStart, isResizing]);
+  }, [allocation.allocation_start_date, allocation.allocation_end_date, cellWidth, timelineStart, isResizing, viewMode]);
+
+  const pxToDeltaDays = (deltaPx) => {
+    if (viewMode === 'Day') return Math.round(deltaPx / cellWidth);
+    if (viewMode === 'Week') return Math.round(deltaPx / (cellWidth / 7));
+    return Math.round(deltaPx / (cellWidth / 30));
+  };
 
   // Handler: User clicks a resize handle
   const onHandleMouseDown = (e, side) => {
@@ -116,8 +166,8 @@ export default function ProjectBar({
     const handleMouseUp = (e) => {
       const state = resizeStateRef.current;
       const deltaX = e.clientX - state.startX;
-      const deltaDays = Math.round(deltaX / cellWidth);
-      const deltaPx = deltaDays * cellWidth;
+      const deltaDays = pxToDeltaDays(deltaX);
+      const deltaPx = deltaDays * (viewMode === 'Day' ? cellWidth : viewMode === 'Week' ? (cellWidth / 7) : (cellWidth / 30));
 
       let finalLeft = state.startLeft;
       let finalWidth = state.startWidth;
@@ -134,8 +184,8 @@ export default function ProjectBar({
       const pxDeltaLeft = finalLeft - state.startLeft;
       const pxDeltaWidth = finalWidth - state.startWidth;
 
-      const deltaDaysLeft = Math.round(pxDeltaLeft / cellWidth);
-      const deltaDaysWidth = Math.round(pxDeltaWidth / cellWidth);
+      const deltaDaysLeft = pxToDeltaDays(pxDeltaLeft);
+      const deltaDaysWidth = pxToDeltaDays(pxDeltaWidth);
 
       // Mutate the original UTC dates directly for absolute precision
       const sDate = strToUTC(allocation.allocation_start_date);
@@ -171,7 +221,7 @@ export default function ProjectBar({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, cellWidth, allocation.id]);
+  }, [isResizing, cellWidth, allocation.id, viewMode]);
 
   const project = allocation.project || allocation;
   const bColor = allocation.allocation_end_date || allocation.dismantling_date ? (allocation.hasConflict ? 'var(--red)' : 'var(--blu)') : 'var(--org)';
@@ -201,7 +251,7 @@ export default function ProjectBar({
         cursor: isResizing ? 'col-resize' : 'grab',
         opacity: isDragging ? 0.5 : 1,
         // Critical: NO CSS transition while actively resizing, otherwise it fights the mouse
-        transition: isResizing ? 'none' : 'left 0.15s ease, width 0.15s ease',
+        transition: isResizing ? 'none' : 'left 0.28s cubic-bezier(.22,1,.36,1), width 0.28s cubic-bezier(.22,1,.36,1), transform 0.2s ease',
         filter: isResizing ? 'drop-shadow(0 0 8px var(--red))' : 'none'
       }}
     >
@@ -215,7 +265,7 @@ export default function ProjectBar({
       />
 
       <div 
-        className="gantt-bar-inner animate-f-in"
+        className="gantt-bar-inner"
         onClick={(e) => { e.stopPropagation(); onClick(project); }}
         style={{
           width: '100%', height: '100%', pointerEvents: 'none',

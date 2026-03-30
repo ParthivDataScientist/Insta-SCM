@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timezone
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, DateTime, func, String
 
 class UserBase(SQLModel):
@@ -25,3 +25,4 @@ class User(UserBase, table=True):
             nullable=False,
         ),
     )
+    managed_allocations: List["ManagerAllocation"] = Relationship(back_populates="manager_user")

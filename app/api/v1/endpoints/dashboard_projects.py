@@ -5,11 +5,29 @@ from app.db.session import engine
 from app.models.dashboard_project import DashboardProject
 from app.models.manager import Manager
 from app.models.manager_allocation import ManagerAllocation
+from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
 from app.services.availability import is_manager_available
 from datetime import date as py_date
 
 router = APIRouter()
+
+def resolve_manager_entities(session: Session, pm_name: Optional[str]):
+    normalized_name = (pm_name or "Unassigned").strip() or "Unassigned"
+
+    manager = session.exec(select(Manager).where(Manager.name == normalized_name)).first()
+    if not manager:
+        manager = Manager(name=normalized_name)
+        session.add(manager)
+        session.commit()
+        session.refresh(manager)
+
+    manager_user = session.exec(
+        select(User).where(
+            (User.full_name == normalized_name) | (User.email == normalized_name)
+        )
+    ).first()
+    return manager, manager_user
 
 def get_session():
     with Session(engine) as session:
@@ -56,13 +74,7 @@ def create_project(project_in: DashboardProjectCreate, session: Session = Depend
     session.refresh(project)
     
     # Mirror into ManagerAllocation
-    pm_name = project.project_manager or "Unassigned"
-    manager = session.exec(select(Manager).where(Manager.name == pm_name)).first()
-    if not manager:
-        manager = Manager(name=pm_name)
-        session.add(manager)
-        session.commit()
-        session.refresh(manager)
+    manager, manager_user = resolve_manager_entities(session, project.project_manager)
         
     start_date = project.material_dispatch_date or project.event_start_date
     if start_date:
@@ -70,6 +82,7 @@ def create_project(project_in: DashboardProjectCreate, session: Session = Depend
         end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
         alloc = ManagerAllocation(
             manager_id=manager.id,
+            manager_user_id=manager_user.id if manager_user else None,
             project_id=project.id,
             allocation_start_date=start_date,
             allocation_end_date=end_date
@@ -97,19 +110,14 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
     session.refresh(project)
     
     # Sync ManagerAllocation
-    pm_name = project.project_manager or "Unassigned"
-    manager = session.exec(select(Manager).where(Manager.name == pm_name)).first()
-    if not manager:
-        manager = Manager(name=pm_name)
-        session.add(manager)
-        session.commit()
-        session.refresh(manager)
+    manager, manager_user = resolve_manager_entities(session, project.project_manager)
 
     start_date = project.material_dispatch_date or project.event_start_date
     existing_alloc = session.exec(select(ManagerAllocation).where(ManagerAllocation.project_id == project.id)).first()
     
     if existing_alloc:
         existing_alloc.manager_id = manager.id
+        existing_alloc.manager_user_id = manager_user.id if manager_user else None
         if start_date:
             import datetime
             existing_alloc.allocation_start_date = start_date
@@ -120,6 +128,7 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
         end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
         new_alloc = ManagerAllocation(
             manager_id=manager.id,
+            manager_user_id=manager_user.id if manager_user else None,
             project_id=project.id,
             allocation_start_date=start_date,
             allocation_end_date=end_date
@@ -190,65 +199,62 @@ def get_timeline_data(session: Session = Depends(get_session)):
     """
     try:
         from collections import defaultdict
-        
-        # 1. Fetch all managers
-        managers = session.exec(select(Manager)).all()
-        # 2. Fetch all projects
+
+        manager_groups = defaultdict(lambda: {"manager": None, "allocations": []})
+
+        allocations = session.exec(select(ManagerAllocation)).all()
+        for alloc in allocations:
+            project = alloc.project or session.get(DashboardProject, alloc.project_id)
+            if not project:
+                continue
+
+            manager_name = (
+                (alloc.manager_user.full_name if alloc.manager_user else None)
+                or (alloc.manager.name if alloc.manager else None)
+                or project.project_manager
+                or "Unassigned"
+            )
+
+            if manager_groups[manager_name]["manager"] is None:
+                manager_groups[manager_name]["manager"] = {
+                    "id": alloc.manager.id if alloc.manager else None,
+                    "name": manager_name
+                }
+
+            manager_groups[manager_name]["allocations"].append({
+                "id": alloc.id,
+                "project_id": alloc.project_id,
+                "manager_id": alloc.manager_id,
+                "manager_user_id": alloc.manager_user_id,
+                "allocation_start_date": alloc.allocation_start_date,
+                "allocation_end_date": alloc.allocation_end_date,
+                "project": project.model_dump()
+            })
+
+        # Include projects that do not yet have explicit managerallocation rows.
         projects = session.exec(select(DashboardProject)).all()
-        
-        # 3. Group projects by PM name
-        manager_groups = defaultdict(list)
-        for p in projects:
-            pm = p.project_manager or "Unassigned"
-            manager_groups[pm].append(p)
-            
-        result = []
-        # Process known managers first
-        for manager in managers:
-            pm_name = manager.name
-            projs = manager_groups.get(pm_name, [])
-            
-            alloc_data = []
-            for p in projs:
-                start = p.material_dispatch_date or p.event_start_date
-                if start:
-                    alloc_data.append({
-                        "id": p.id,
-                        "project_id": p.id,
-                        "manager_id": manager.id,
-                        "allocation_start_date": start,
-                        "allocation_end_date": p.dismantling_date,
-                        "project": p.model_dump()
-                    })
-            result.append({
-                "manager": manager.model_dump(),
-                "allocations": alloc_data
+        projects_with_alloc = {a.project_id for a in allocations}
+        for project in projects:
+            if project.id in projects_with_alloc:
+                continue
+            start = project.material_dispatch_date or project.event_start_date
+            if not start:
+                continue
+            manager_name = project.project_manager or "Unassigned"
+            if manager_groups[manager_name]["manager"] is None:
+                manager_groups[manager_name]["manager"] = {"id": None, "name": manager_name}
+            manager_groups[manager_name]["allocations"].append({
+                "id": f"fallback-{project.id}",
+                "project_id": project.id,
+                "manager_id": None,
+                "manager_user_id": None,
+                "allocation_start_date": start,
+                "allocation_end_date": project.dismantling_date,
+                "project": project.model_dump()
             })
-            
-            # Remove from tracking to catch unassigned
-            if pm_name in manager_groups:
-                del manager_groups[pm_name]
-                
-        # 4. Catch Unassigned or ghost managers
-        for pm_name, projs in manager_groups.items():
-            alloc_data = []
-            for p in projs:
-                start = p.material_dispatch_date or p.event_start_date
-                if start:
-                     alloc_data.append({
-                        "id": p.id,
-                        "project_id": p.id,
-                        "allocation_start_date": start,
-                        "allocation_end_date": p.dismantling_date,
-                        "project": p.model_dump()
-                     })
-            result.append({
-                "manager": {"name": pm_name, "id": None},
-                "allocations": alloc_data
-            })
-        
-        return sorted(result, key=lambda x: str(x["manager"].get("name", "")))
+
+        result = list(manager_groups.values())
+        return sorted(result, key=lambda x: str((x["manager"] or {}).get("name", "")))
     except Exception as e:
         print(f"Timeline generation error: {e}")
         return []
-

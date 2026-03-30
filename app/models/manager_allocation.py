@@ -7,6 +7,7 @@ import pandas as pd
 
 class ManagerAllocationBase(SQLModel):
     manager_id: int = Field(foreign_key="manager.id", index=True)
+    manager_user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
     project_id: int = Field(foreign_key="dashboardproject.id", index=True)
     allocation_start_date: py_date
     allocation_end_date: Optional[py_date] = None
@@ -38,4 +39,5 @@ class ManagerAllocation(ManagerAllocationBase, table=True):
     
     # Relationships
     manager: Optional["Manager"] = Relationship(back_populates="allocations")
+    manager_user: Optional["User"] = Relationship(back_populates="managed_allocations")
     project: Optional["DashboardProject"] = Relationship(back_populates="allocations")

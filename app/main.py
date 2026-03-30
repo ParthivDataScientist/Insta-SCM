@@ -16,6 +16,7 @@ from app.api.v1.api import api_router
 from app.models.dashboard_project import DashboardProject
 from app.models.manager import Manager
 from app.models.manager_allocation import ManagerAllocation
+from app.models.user import User
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -49,7 +50,8 @@ async def lifespan(app: FastAPI):
         ("comments",                "ALTER TABLE dashboardproject ADD COLUMN comments JSON;"),
         ("materials",               "ALTER TABLE dashboardproject ADD COLUMN materials JSON;"),
         ("photos",                  "ALTER TABLE dashboardproject ADD COLUMN photos JSON;"),
-        ("qc_steps",                "ALTER TABLE dashboardproject ADD COLUMN qc_steps JSON;")
+        ("qc_steps",                "ALTER TABLE dashboardproject ADD COLUMN qc_steps JSON;"),
+        ("manager_user_id",         "ALTER TABLE managerallocation ADD COLUMN manager_user_id INTEGER;")
     ]
 
     with Session(engine) as session:
