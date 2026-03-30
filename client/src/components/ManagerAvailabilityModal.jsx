@@ -7,20 +7,21 @@ import { formatDateDisplay } from '../utils/dateUtils';
  * ManagerAvailabilityModal Component
  * Shows manager workload, status, and timeline in a premium UI.
  */
-export default function ManagerAvailabilityModal({ managerName, onClose }) {
+export default function ManagerAvailabilityModal({ managerId, managerName, onClose }) {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const loadManagerData = async () => {
+            if (!managerId) return;
             try {
                 setLoading(true);
-                const data = await projectsService.fetchManagerProjects(managerName);
+                const data = await projectsService.fetchManagerProjects(managerId);
                 // Sort projects by date
                 const sorted = data.sort((a, b) => {
-                    const dateA = new Date(a.material_dispatch_date || '9999-12-31');
-                    const dateB = new Date(b.material_dispatch_date || '9999-12-31');
+                    const dateA = new Date(a.dispatch_date || '9999-12-31');
+                    const dateB = new Date(b.dispatch_date || '9999-12-31');
                     return dateA - dateB;
                 });
                 setProjects(sorted);
@@ -32,10 +33,8 @@ export default function ManagerAvailabilityModal({ managerName, onClose }) {
             }
         };
 
-        if (managerName) {
-            loadManagerData();
-        }
-    }, [managerName]);
+        loadManagerData();
+    }, [managerId]);
 
     // Calculate Current Status
     const availabilityData = useMemo(() => {
@@ -45,7 +44,7 @@ export default function ManagerAvailabilityModal({ managerName, onClose }) {
         now.setHours(0, 0, 0, 0);
 
         const currentProjects = projects.filter(p => {
-            const start = p.material_dispatch_date ? new Date(p.material_dispatch_date) : null;
+            const start = p.dispatch_date ? new Date(p.dispatch_date) : null;
             const end = p.dismantling_date ? new Date(p.dismantling_date) : null;
             
             if (!start) return false;
@@ -72,7 +71,7 @@ export default function ManagerAvailabilityModal({ managerName, onClose }) {
 
         for (let i = 0; i < projects.length - 1; i++) {
             const currentEnd = projects[i].dismantling_date ? new Date(projects[i].dismantling_date) : null;
-            const nextStart = projects[i+1].material_dispatch_date ? new Date(projects[i+1].material_dispatch_date) : null;
+            const nextStart = projects[i+1].dispatch_date ? new Date(projects[i+1].dispatch_date) : null;
 
             if (currentEnd && nextStart) {
                 const diffTime = nextStart - currentEnd;

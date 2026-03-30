@@ -234,7 +234,7 @@ export default function ProjectBar({
       draggable={!isResizing}
       onDragStart={(e) => {
         e.dataTransfer.setData('projectId', project.id);
-        e.dataTransfer.setData('sourcePM', allocation.manager_id || project.project_manager || 'Unassigned');
+        e.dataTransfer.setData('sourcePMId', allocation.manager_id || '0');
         e.dataTransfer.setData('startDragX', e.clientX);
         setIsDragging(true);
       }}
@@ -306,7 +306,7 @@ export default function ProjectBar({
           
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', alignItems: 'center' }}>
              <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Dispatch:</span>
-             <span style={{ fontWeight: 600, color: 'var(--org)' }}>{project.material_dispatch_date || 'TBD'}</span>
+             <span style={{ fontWeight: 600, color: 'var(--org)' }}>{project.dispatch_date || 'TBD'}</span>
 
              <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Show Dates:</span>
              <span style={{ fontWeight: 600, color: 'var(--blu)' }}>{project.event_start_date || 'TBD'} — {project.event_end_date || 'TBD'}</span>

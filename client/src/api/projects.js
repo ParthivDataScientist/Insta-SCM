@@ -47,18 +47,18 @@ const projectsService = {
     /**
      * Fetches all projects for a specific manager.
      */
-    fetchManagerProjects: async (managerName) => {
-        const response = await apiClient.get(`/api/v1/projects/manager/${encodeURIComponent(managerName)}`);
+    fetchManagerProjects: async (managerId) => {
+        const response = await apiClient.get(`/api/v1/projects/manager/${managerId}`);
         return response.data;
     },
 
     /**
      * Checks availability for a manager or all managers.
      */
-    checkAvailability: async (startDate, endDate = null, managerName = null) => {
+    checkAvailability: async (startDate, endDate = null, managerId = null) => {
         const params = { start_date: startDate };
         if (endDate) params.end_date = endDate;
-        if (managerName) params.manager_name = managerName;
+        if (managerId) params.manager_id = managerId;
         
         const response = await apiClient.get('/api/v1/projects/availability-check', { params });
         return response.data;
@@ -73,34 +73,18 @@ const projectsService = {
     },
 
     /**
-     * Fetches all managers.
+     * Fetches the list of project managers.
      */
     fetchManagers: async () => {
-        const response = await apiClient.get('/api/v1/managers/');
+        const response = await apiClient.get('/api/v1/projects/pm-list');
         return response.data;
     },
 
     /**
-     * Creates a new manager.
+     * Fetches the list of clients.
      */
-    createManager: async (data) => {
-        const response = await apiClient.post('/api/v1/managers/', data);
-        return response.data;
-    },
-
-    /**
-     * Deletes a manager by ID.
-     */
-    deleteManager: async (id) => {
-        const response = await apiClient.delete(`/api/v1/managers/${id}`);
-        return response.data;
-    },
-
-    /**
-     * Updates an allocation.
-     */
-    updateAllocation: async (id, data) => {
-        const response = await apiClient.put(`/api/v1/manager_allocations/${id}`, data);
+    fetchClients: async () => {
+        const response = await apiClient.get('/api/v1/projects/client-list');
         return response.data;
     }
 };

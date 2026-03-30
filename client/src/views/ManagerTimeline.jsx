@@ -262,8 +262,8 @@ export default function ManagerTimeline() {
                    return getManagerAllocations(m).some(otherAlloc => {
                      const other = otherAlloc.project || otherAlloc;
                      return other.id !== p.id &&
-                       new Date(p.material_dispatch_date) <= (other.dismantling_date ? new Date(other.dismantling_date) : new Date()) &&
-                       (p.dismantling_date ? new Date(p.dismantling_date) : new Date()) >= new Date(other.material_dispatch_date);
+                       new Date(p.dispatch_date) <= (other.dismantling_date ? new Date(other.dismantling_date) : new Date()) &&
+                       (p.dismantling_date ? new Date(p.dismantling_date) : new Date()) >= new Date(other.dispatch_date);
                    });
                 }).length || 0), 0)}
               </div>
@@ -279,7 +279,7 @@ export default function ManagerTimeline() {
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--green)' }}>
                 {timelineData?.filter(m => !getManagerAllocations(m).some(a => {
                     const p = a.project || a;
-                    const start = new Date(p.material_dispatch_date);
+                    const start = new Date(p.dispatch_date);
                     const end = p.dismantling_date ? new Date(p.dismantling_date) : new Date();
                     const now = new Date();
                     return now >= start && now <= end;
@@ -376,37 +376,37 @@ export default function ManagerTimeline() {
                       cellWidth={cellWidth}
                       viewMode={viewMode}
                       onProjectClick={setSelectedProject}
-                      onReassign={async (id, newPM) => {
-                        await projectsService.updateProject(id, { project_manager: newPM === 'Unassigned' ? null : newPM }); 
+                      onReassign={async (id, newPMId) => {
+                        await projectsService.updateProject(id, { manager_id: newPMId || null }); 
                         refetch();
                       }}
                       onDateUpdate={async (id, data) => {
                         // Map allocation keys back to project DB columns natively
                         await projectsService.updateProject(id, {
-                           material_dispatch_date: data.allocation_start_date,
+                           dispatch_date: data.allocation_start_date,
                            dismantling_date: data.allocation_end_date
                         });
                         refetch();
                       }}
-                      onRemoveManager={async (name) => {
-                        if (virtualManagers.includes(name)) {
-                          setVirtualManagers(prev => prev.filter(v => v !== name));
+                      onRemoveManager={async (idOrName) => {
+                        if (typeof idOrName === 'string' && virtualManagers.includes(idOrName)) {
+                          setVirtualManagers(prev => prev.filter(v => v !== idOrName));
                           return;
                         }
-                        const confirmDelete = window.confirm(`Permanently delete manager: ${name}?`);
+                        const mName = typeof idOrName === 'number' ? (filteredData.find(m => m.manager?.id === idOrName)?.manager?.name || idOrName) : idOrName;
+                        const confirmDelete = window.confirm(`Permanently delete manager: ${mName}?`);
                         if (!confirmDelete) return;
 
-                        const mDB = managersList?.find(m => m.name === name);
-                        if (mDB && mDB.id) {
+                        if (typeof idOrName === 'number') {
                            try {
-                             await projectsService.deleteManager(mDB.id);
+                             await projectsService.deleteManager(idOrName);
                              refetch();
                              refetchManagers();
                            } catch (err) {
                              alert("Error deleting manager: " + (err.response?.data?.detail || err.message));
                            }
                         } else {
-                           alert(`Cannot delete ${name}: ID not found. Might be a ghost record or missing from database.`);
+                           alert(`Cannot delete ${idOrName}: ID not found. Might be a ghost record or missing from database.`);
                         }
                       }}
                     />
@@ -438,8 +438,8 @@ export default function ManagerTimeline() {
             <UnassignedTray 
               projects={unassignedProjects} 
               onProjectClick={setSelectedProject} 
-              onDropReassign={async (id, newPM) => {
-                await projectsService.updateProject(id, { project_manager: newPM === 'Unassigned' ? null : newPM });
+              onDropReassign={async (id, newPMId) => {
+                await projectsService.updateProject(id, { manager_id: newPMId || null });
                 refetch();
               }}
             />

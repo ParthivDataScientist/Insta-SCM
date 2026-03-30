@@ -8,7 +8,7 @@ import { useProjectData } from './useProjectData';
 export function useProjects() {
     const { 
         projects, stats, isLoading, isError, error, 
-        updateProject, deleteProject, refetch 
+        updateProject, deleteProject, createProject, refetch 
     } = useProjectData();
 
     // Filtering UI State
@@ -94,6 +94,7 @@ export function useProjects() {
         setSearchQuery,
         updateBoardStage,
         updateProjectFull,
+        createProject,
         deleteProject
     };
 }

@@ -1,36 +1,47 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { User, CheckCircle, AlertCircle, Info, Clock, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { User, CheckCircle, AlertCircle, Info, Loader2, ChevronDown } from 'lucide-react';
 import projectsService from '../api/projects';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
 
 /**
  * ManagerField Component
- * Handles manager assignment with smart availability checking and conflict detection.
+ * Handles manager assignment using IDs with smart availability checking.
  */
 export default function ManagerField({ 
     label, 
-    field, 
+    field, // Should be manager_id
     project, 
     updateProjectFull,
     icon: Icon = User
 }) {
-    const [managerStatus, setManagerStatus] = useState(null); // { available: bool, conflicts: [] }
+    const [managerStatus, setManagerStatus] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [localValue, setLocalValue] = useState(project[field] || '');
+    const [managers, setManagers] = useState([]); // [{id, full_name}, ...]
+    
+    // The underlying value is the ID
+    const currentManagerId = project[field];
 
-    const checkAvailability = useCallback(async (managerName, start, end) => {
-        if (!managerName || !start) {
+    const fetchManagers = async () => {
+        try {
+            const data = await projectsService.fetchManagers();
+            setManagers(data);
+        } catch (err) {
+            console.error("Failed to fetch managers:", err);
+        }
+    };
+
+    const checkAvailability = useCallback(async (managerId, start, end) => {
+        if (!managerId || !start) {
             setManagerStatus(null);
             return;
         }
 
         try {
             setLoading(true);
-            const results = await projectsService.checkAvailability(start, end, managerName);
-            const result = results[managerName];
+            const results = await projectsService.checkAvailability(start, end, managerId);
+            const result = results[managerId];
             
-            // Filter out current project from conflicts
             if (result && result.conflicts) {
                 result.conflicts = result.conflicts.filter(c => c.id !== project.id);
                 result.available = result.conflicts.length === 0;
@@ -44,41 +55,37 @@ export default function ManagerField({
         }
     }, [project.id]);
 
-    const [allManagersAvailability, setAllManagersAvailability] = useState({});
-
-    const checkAllAvailability = useCallback(async (start, end) => {
-        if (!start) return;
-        try {
-            const results = await projectsService.checkAvailability(start, end);
-            setAllManagersAvailability(results);
-        } catch (err) {
-            console.error("All availability check failed:", err);
-        }
+    useEffect(() => {
+        fetchManagers();
     }, []);
 
     useEffect(() => {
-        setLocalValue(project[field] || '');
-        checkAvailability(
-            project[field], 
-            project.material_dispatch_date, 
-            project.dismantling_date
-        );
-        checkAllAvailability(
-            project.material_dispatch_date,
-            project.dismantling_date
-        );
-    }, [project[field], project.material_dispatch_date, project.dismantling_date, checkAvailability, checkAllAvailability, field]);
+        if (currentManagerId) {
+            checkAvailability(
+                currentManagerId, 
+                project.dispatch_date, 
+                project.dismantling_date
+            );
+        } else {
+            setManagerStatus(null);
+        }
+    }, [currentManagerId, project.dispatch_date, project.dismantling_date, checkAvailability]);
 
-    const handleBlur = (e) => {
-        const newValue = e.target.value;
-        if (project[field] !== newValue) {
-            updateProjectFull(project.id, { [field]: newValue });
+    const handleChange = (e) => {
+        const newId = e.target.value ? parseInt(e.target.value, 10) : null;
+        if (currentManagerId !== newId) {
+            updateProjectFull(project.id, { [field]: newId });
         }
     };
 
+    const currentManagerName = useMemo(() => {
+        const m = managers.find(m => m.id === currentManagerId);
+        return m ? m.full_name : 'Unassigned';
+    }, [currentManagerId, managers]);
+
     const StatusIcon = () => {
         if (loading) return <Loader2 size={14} className="spin" color="var(--tx3)" />;
-        if (!managerStatus || !localValue) return <Info size={14} color="var(--tx3)" />;
+        if (!managerStatus || !currentManagerId) return <Info size={14} color="var(--tx3)" />;
         
         if (managerStatus.available) {
             return <CheckCircle size={14} color="var(--green)" title="Manager is available" />;
@@ -97,42 +104,37 @@ export default function ManagerField({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
                     <div 
-                        onClick={() => localValue && setIsModalOpen(true)}
-                        style={{ cursor: localValue ? 'pointer' : 'default', display: 'flex', gap: '4px', alignItems: 'center' }}
+                        onClick={() => currentManagerId && setIsModalOpen(true)}
+                        style={{ cursor: currentManagerId ? 'pointer' : 'default', display: 'flex', gap: '4px', alignItems: 'center' }}
                     >
                         <StatusIcon />
                     </div>
                 </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Icon size={14} color="var(--tx3)" style={{ cursor: localValue ? 'pointer' : 'default' }} onClick={() => localValue && setIsModalOpen(true)} />
-                    <input 
-                        type="text"
-                        list={`managers-list-${project.id}`}
-                        value={localValue}
-                        onChange={(e) => setLocalValue(e.target.value)}
-                        onBlur={handleBlur}
-                        placeholder="Assign manager..."
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+                    <Icon size={14} color="var(--tx3)" />
+                    <select 
+                        value={currentManagerId || ''}
+                        onChange={handleChange}
                         style={{
                             flex: 1,
                             background: 'transparent',
                             border: 'none',
-                            borderBottom: '1px solid transparent',
                             fontSize: '14px',
                             fontWeight: 600,
                             color: 'var(--tx)',
                             outline: 'none',
-                            paddingBottom: '2px'
+                            cursor: 'pointer',
+                            appearance: 'none',
+                            WebkitAppearance: 'none'
                         }}
-                        onFocus={(e) => e.target.style.borderBottom = '1px solid var(--org)'}
-                    />
-                    <datalist id={`managers-list-${project.id}`}>
-                        {Object.entries(allManagersAvailability).map(([name, status]) => (
-                            <option key={name} value={name}>
-                                {status.available ? '✅ Available' : '❌ Conflicting'}
-                            </option>
+                    >
+                        <option value="">Unassigned</option>
+                        {managers.map(m => (
+                            <option key={m.id} value={m.id}>{m.full_name}</option>
                         ))}
-                    </datalist>
+                    </select>
+                    <ChevronDown size={14} color="var(--tx3)" style={{ pointerEvents: 'none' }} />
                 </div>
                 
                 {managerStatus && !managerStatus.available && (
@@ -152,7 +154,8 @@ export default function ManagerField({
 
             {isModalOpen && (
                 <ManagerAvailabilityModal 
-                    managerName={localValue} 
+                    managerId={currentManagerId} 
+                    managerName={currentManagerName}
                     onClose={() => setIsModalOpen(false)} 
                 />
             )}

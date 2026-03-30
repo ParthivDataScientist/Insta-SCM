@@ -1,21 +1,22 @@
 import json
 from datetime import date as py_date
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
 
 from app.db.session import engine
-from app.models.dashboard_project import DashboardProject
-from app.models.manager import Manager
-from app.models.manager_allocation import ManagerAllocation
+from app.models.dashboard_project import DashboardProject, ProjectAuditLog, Client
 from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
 from app.services.availability import is_manager_available
 
 router = APIRouter()
 
+def get_session():
+    with Session(engine) as session:
+        yield session
 
 def _coerce_list(value: Any) -> list:
     if value is None:
@@ -35,204 +36,123 @@ def _coerce_list(value: Any) -> list:
         return parsed if isinstance(parsed, list) else [parsed]
     return [value]
 
-
-def _serialize_project(row: Any) -> DashboardProjectRead:
-    # Supports both ORM objects and SQL mappings.
-    get = row.get if hasattr(row, "get") else lambda key, default=None: getattr(row, key, default)
-
+def _serialize_project(project: DashboardProject) -> DashboardProjectRead:
+    """Enterprise-ready serialization mapping for DashboardProject."""
     return DashboardProjectRead(
-        id=get("id"),
-        project_name=get("project_name") or "Unknown",
-        date=get("date"),
-        client=get("client"),
-        city=get("city"),
-        event_name=get("event_name"),
-        venue=get("venue"),
-        area=get("area"),
-        event_start_date=get("event_start_date"),
-        event_end_date=get("event_end_date"),
-        material_dispatch_date=get("material_dispatch_date"),
-        installation_start_date=get("installation_start_date"),
-        installation_end_date=get("installation_end_date"),
-        dismantling_date=get("dismantling_date"),
-        project_manager=get("project_manager"),
-        team_type=get("team_type"),
-        stage=get("stage"),
-        branch=get("branch"),
-        board_stage=get("board_stage") or "TBC",
-        comments=_coerce_list(get("comments")),
-        materials=_coerce_list(get("materials")),
-        photos=_coerce_list(get("photos")),
-        qc_steps=_coerce_list(get("qc_steps")),
-        created_at=get("created_at") or datetime.now(timezone.utc),
-        updated_at=get("updated_at") or datetime.now(timezone.utc),
+        id=project.id,
+        project_name=project.project_name or "Unknown",
+        stage=project.stage or "Open",
+        board_stage=project.board_stage or "TBC",
+        venue=project.venue,
+        area=project.area,
+        branch=project.branch,
+        manager_id=project.manager_id,
+        project_manager=project.manager.full_name if project.manager else "Unassigned",
+        client_id=project.client_id, # Added client_id
+        client=project.client_relationship.name if project.client_relationship else "No Client",
+        event_start_date=project.event_start_date,
+        event_end_date=project.event_end_date,
+        dispatch_date=project.dispatch_date,
+        installation_start_date=project.installation_start_date,
+        installation_end_date=project.installation_end_date,
+        dismantling_date=project.dismantling_date,
+        allocation_start_date=project.allocation_start_date,
+        allocation_end_date=project.allocation_end_date,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        comments=_coerce_list(getattr(project, "comments", [])),
+        materials=_coerce_list(getattr(project, "materials", [])),
+        photos=_coerce_list(getattr(project, "photos", [])),
+        qc_steps=_coerce_list(getattr(project, "qc_steps", [])),
     )
-
-
-def resolve_manager_entities(session: Session, pm_name: Optional[str]):
-    normalized_name = (pm_name or "Unassigned").strip() or "Unassigned"
-
-    manager = session.exec(select(Manager).where(Manager.name == normalized_name)).first()
-    if not manager:
-        manager = Manager(name=normalized_name)
-        session.add(manager)
-        session.commit()
-        session.refresh(manager)
-
-    manager_user = session.exec(
-        select(User).where(
-            (User.full_name == normalized_name) | (User.email == normalized_name)
-        )
-    ).first()
-    return manager, manager_user
-
-
-def sync_project_manager_and_allocation(session: Session, project: DashboardProject) -> None:
-    manager = None
-    manager_user = None
-
-    if project.project_manager is not None and project.project_manager.strip():
-        manager, manager_user = resolve_manager_entities(session, project.project_manager)
-        project.manager_id = manager.id
-    else:
-        manager, manager_user = resolve_manager_entities(session, None)
-        project.manager_id = manager.id
-
-    start_date = project.material_dispatch_date or project.event_start_date
-    existing_alloc = session.exec(
-        select(ManagerAllocation).where(ManagerAllocation.project_id == project.id)
-    ).first()
-
-    if not start_date:
-        if existing_alloc:
-            session.delete(existing_alloc)
-        session.add(project)
-        session.commit()
-        return
-
-    import datetime
-
-    end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
-
-    if existing_alloc:
-        existing_alloc.manager_id = manager.id
-        existing_alloc.manager_user_id = manager_user.id if manager_user else None
-        existing_alloc.allocation_start_date = start_date
-        existing_alloc.allocation_end_date = end_date
-        session.add(existing_alloc)
-    else:
-        session.add(
-            ManagerAllocation(
-                manager_id=manager.id,
-                manager_user_id=manager_user.id if manager_user else None,
-                project_id=project.id,
-                allocation_start_date=start_date,
-                allocation_end_date=end_date,
-            )
-        )
-    session.add(project)
-    session.commit()
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
 
 @router.get("/stats")
 def get_project_stats(session: Session = Depends(get_session)):
+    """Calculate project statistics using the new 2-table schema."""
     projects = session.exec(select(DashboardProject)).all()
 
     total = len(projects)
-    open_briefs = sum(1 for p in projects if not p.stage or p.stage.lower() != "confirmed")
+    open_briefs = sum(1 for p in projects if p.stage and p.stage.lower() != "confirmed")
     won_projects = sum(1 for p in projects if p.stage and p.stage.lower() == "confirmed")
 
     # Unique branch count
     branches = {p.branch for p in projects if p.branch}
-    # Unique PM count
-    pms = {p.project_manager for p in projects if p.project_manager}
+    # Unique PM count (from User table)
+    pm_count = session.exec(select(func.count(User.id)).where(User.role == "PROJECT_MANAGER")).one()
 
     return {
         "total": total,
         "open_briefs": open_briefs,
         "won_projects": won_projects,
         "branches_count": len(branches),
-        "pm_count": len(pms)
+        "pm_count": pm_count
     }
-
 
 @router.get("/", response_model=List[DashboardProjectRead])
 def get_projects(
     session: Session = Depends(get_session),
     stage: Optional[str] = None
 ):
-    try:
-        query = select(DashboardProject)
-        if stage:
-            query = query.where(DashboardProject.stage == stage)
-        projects = session.exec(query).all()
-        return [_serialize_project(project) for project in projects]
-    except Exception:
-        # Production-safe fallback for partially migrated schemas:
-        # return records from raw table shape, filling missing fields.
-        rows = session.execute(text("SELECT * FROM dashboardproject")).mappings().all()
-        response = []
-        for row in rows:
-            if stage and row.get("stage") != stage:
-                continue
-            response.append(_serialize_project(row))
-        return response
-
+    """Retrieve all projects, optionally filtered by stage."""
+    query = select(DashboardProject)
+    if stage:
+        query = query.where(DashboardProject.stage == stage)
+    
+    projects = session.exec(query).all()
+    return [_serialize_project(p) for p in projects]
 
 @router.post("/", response_model=DashboardProjectRead)
 def create_project(project_in: DashboardProjectCreate, session: Session = Depends(get_session)):
+    """Create a new project in the unified schema."""
     project = DashboardProject.model_validate(project_in)
-
-    if project.project_manager is not None and project.project_manager.strip():
-        manager, _ = resolve_manager_entities(session, project.project_manager)
-        project.manager_id = manager.id
-
     session.add(project)
     session.commit()
     session.refresh(project)
-
-    # Strictly synchronize ManagerAllocation to project dates.
-    sync_project_manager_and_allocation(session, project)
-    session.refresh(project)
-    return project
-
+    return _serialize_project(project)
 
 @router.put("/{project_id}", response_model=DashboardProjectRead)
 def update_project(project_id: int, project_in: DashboardProjectUpdate, session: Session = Depends(get_session)):
+    """Update an existing project's details with automatic audit logging."""
     project = session.get(DashboardProject, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    # Fields to monitor for Audit Logging
+    audit_fields = ["stage", "dispatch_date", "dismantling_date", "manager_id"]
+    
+    # Capture current state of watched fields
+    prev_state = {field: getattr(project, field) for field in audit_fields}
+    
     update_data = project_in.model_dump(exclude_unset=True)
+    
+    # Apply updates
     for key, value in update_data.items():
         setattr(project, key, value)
 
-    if project.project_manager is not None and project.project_manager.strip():
-        manager, _ = resolve_manager_entities(session, project.project_manager)
-        project.manager_id = manager.id
-    elif "project_manager" in update_data:
-        project.manager_id = None
+    # Capture new state of watched fields
+    new_state = {field: getattr(project, field) for field in audit_fields}
 
-    # Force updated_at for SQLite triggers
-    project.updated_at = func.now()
+    # Check for changes in tracked fields
+    changesFound = any(prev_state[field] != new_state[field] for field in audit_fields)
+    
+    if changesFound:
+        # Create Audit Log Record
+        audit_entry = ProjectAuditLog(
+            project_id=project.id,
+            change_type="UPDATE",
+            prev_state={k: str(v) if v is not None else None for k, v in prev_state.items()},
+            new_state={k: str(v) if v is not None else None for k, v in new_state.items()}
+        )
+        session.add(audit_entry)
 
     session.add(project)
     session.commit()
     session.refresh(project)
-
-    # Strictly synchronize ManagerAllocation to project dates.
-    sync_project_manager_and_allocation(session, project)
-    session.refresh(project)
-    return project
-
+    return _serialize_project(project)
 
 @router.delete("/{project_id}")
 def delete_project(project_id: int, session: Session = Depends(get_session)):
+    """Delete a project and its associated data."""
     project = session.get(DashboardProject, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -241,98 +161,111 @@ def delete_project(project_id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"message": "Project deleted successfully"}
 
-
-@router.get("/manager/{manager_name}", response_model=List[DashboardProjectRead])
-def get_manager_projects(manager_name: str, session: Session = Depends(get_session)):
-    """
-    Fetch all projects assigned to a specific manager.
-    """
-    query = select(DashboardProject).where(DashboardProject.project_manager == manager_name)
+@router.get("/manager/{manager_id}", response_model=List[DashboardProjectRead])
+def get_manager_projects(manager_id: int, session: Session = Depends(get_session)):
+    """Fetch all projects assigned to a specific manager by ID."""
+    query = select(DashboardProject).where(DashboardProject.manager_id == manager_id)
     projects = session.exec(query).all()
-    return projects
-
+    return [_serialize_project(p) for p in projects]
 
 @router.get("/availability-check")
 def check_availability(
     start_date: py_date,
     end_date: Optional[py_date] = None,
-    manager_name: Optional[str] = None,
+    manager_id: Optional[int] = None,
     session: Session = Depends(get_session)
 ):
-    """
-    Check availability for a manager or all managers in a date range.
-    """
-    if manager_name:
+    """Check manager availability using unified allocation dates on the project."""
+    if manager_id:
         return {
-            manager_name: is_manager_available(
+            str(manager_id): is_manager_available(
                 session=session,
                 new_start=start_date,
                 new_end=end_date,
-                manager_name=manager_name,
+                manager_id=manager_id,
             )
         }
 
-    manager_names = session.exec(
-        select(DashboardProject.project_manager)
-        .where(DashboardProject.project_manager.is_not(None))
-        .distinct()
-    ).all()
-
+    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
     results = {}
-    for pm in manager_names:
-        if not pm:
-            continue
-        results[pm] = is_manager_available(
+    for m in managers:
+        results[str(m.id)] = is_manager_available(
             session=session,
             new_start=start_date,
             new_end=end_date,
-            manager_name=pm,
+            manager_id=m.id,
         )
 
     return results
 
-
 @router.get("/timeline")
 def get_timeline_data(session: Session = Depends(get_session)):
     """
-    Build timeline data exclusively from ManagerAllocation records.
+    Build timeline data by joining User and DashboardProject.
+    Optimized to eliminate N+1 queries by fetching everything in a single JOIN.
     """
     try:
         from collections import defaultdict
 
+        # Use a JOIN to get Managers and their Projects in one go
+        # Relaxed filter: show project if it has any date assigned
+        stmt = (
+            select(User, DashboardProject)
+            .join(DashboardProject, User.id == DashboardProject.manager_id)
+            .where(User.role == "PROJECT_MANAGER")
+            .where(
+                (DashboardProject.dispatch_date.is_not(None)) |
+                (DashboardProject.event_start_date.is_not(None))
+            )
+        )
+        
+        results = session.exec(stmt).all()
+        
         manager_groups = defaultdict(lambda: {"manager": None, "allocations": []})
 
-        allocations = session.exec(select(ManagerAllocation)).all()
-        for alloc in allocations:
-            project = alloc.project or session.get(DashboardProject, alloc.project_id)
-            if not project:
-                continue
-
-            manager_name = (
-                (alloc.manager_user.full_name if alloc.manager_user else None)
-                or (alloc.manager.name if alloc.manager else None)
-                or project.project_manager
-                or "Unassigned"
-            )
-
-            if manager_groups[manager_name]["manager"] is None:
-                manager_groups[manager_name]["manager"] = {
-                    "id": alloc.manager.id if alloc.manager else None,
-                    "name": manager_name
+        for manager, project in results:
+            if manager_groups[manager.id]["manager"] is None:
+                manager_groups[manager.id]["manager"] = {
+                    "id": manager.id,
+                    "full_name": manager.full_name # Standard key
                 }
 
-            manager_groups[manager_name]["allocations"].append({
-                "id": alloc.id,
-                "project_id": alloc.project_id,
-                "manager_id": alloc.manager_id,
-                "manager_user_id": alloc.manager_user_id,
-                "allocation_start_date": alloc.allocation_start_date,
-                "allocation_end_date": alloc.allocation_end_date,
-                "project": project.model_dump()
+            manager_groups[manager.id]["allocations"].append({
+                "id": project.id,
+                "project_id": project.id,
+                "project_name": project.project_name,
+                "manager_id": manager.id,
+                # Remapping: source from dispatch and dismantling dates as requested
+                "allocation_start_date": project.dispatch_date,
+                "allocation_end_date": project.dismantling_date,
+                "project": {
+                    "id": project.id,
+                    "project_name": project.project_name,
+                    "stage": project.stage,
+                    "board_stage": project.board_stage,
+                    "venue": project.venue,
+                    "branch": project.branch
+                }
             })
 
-        result = list(manager_groups.values())
-        return sorted(result, key=lambda x: str((x["manager"] or {}).get("name", "")))
+        # Convert back to sorted list
+        final_result = list(manager_groups.values())
+        return sorted(final_result, key=lambda x: str((x["manager"] or {}).get("name", "")))
+
     except Exception as e:
         print(f"Timeline generation error: {e}")
         return []
+
+@router.get("/pm-list")
+def get_pm_list(session: Session = Depends(get_session)):
+    """Fetch a simplified list of project managers for selection dropdowns."""
+    query = select(User).where(User.role == "PROJECT_MANAGER")
+    users = session.exec(query).all()
+    return [{"id": u.id, "full_name": u.full_name} for u in users]
+
+@router.get("/client-list")
+def get_client_list(session: Session = Depends(get_session)):
+    """Fetch all clients for selection dropdowns."""
+    query = select(Client)
+    clients = session.exec(query).all()
+    return [{"id": c.id, "name": c.name} for c in clients]

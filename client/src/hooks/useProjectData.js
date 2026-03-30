@@ -63,6 +63,15 @@ export function useProjectData() {
         }
     });
 
+    // 5. Mutation: Create Project
+    const createProjectMutation = useMutation({
+        mutationFn: (data) => projectsService.createProject(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+        }
+    });
+
     return {
         projects: projectsQuery.data || [],
         isLoading: projectsQuery.isLoading || statsQuery.isLoading,
@@ -71,6 +80,7 @@ export function useProjectData() {
         stats: statsQuery.data || {},
         updateProject: updateProjectMutation.mutateAsync,
         deleteProject: deleteProjectMutation.mutateAsync,
+        createProject: createProjectMutation.mutateAsync,
         refetch: projectsQuery.refetch
     };
 }

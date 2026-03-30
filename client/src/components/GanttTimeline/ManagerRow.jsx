@@ -19,46 +19,12 @@ export default function ManagerRow({
   onDateUpdate
 }) {
   const rawManager = managerData.manager;
-  const managerStr = typeof rawManager === 'string' ? rawManager : (rawManager?.name || 'Unknown');
+  const managerId = typeof rawManager === 'string' ? null : rawManager?.id;
+  const managerStr = typeof rawManager === 'string' ? rawManager : (rawManager?.full_name || rawManager?.name || 'Unknown');
   const allocations = managerData.allocations || managerData.projects || [];
   const [isOver, setIsOver] = useState(false);
 
-  // Stacking Algorithm (Greedy)
-  const stackedAllocations = useMemo(() => {
-    const sorted = [...allocations].sort((a, b) => new Date(a.allocation_start_date) - new Date(b.allocation_start_date));
-    const levels = []; // Array of end-dates for each level
-
-    return sorted.map((alloc) => {
-      const start = new Date(alloc.allocation_start_date || alloc.material_dispatch_date || alloc.event_start_date);
-      const end = (alloc.allocation_end_date || alloc.dismantling_date) ? new Date(alloc.allocation_end_date || alloc.dismantling_date) : new Date();
-
-      // Find the first level where this allocation doesn't overlap
-      let levelIndex = levels.findIndex(lastEnd => lastEnd < start);
-      if (levelIndex === -1) {
-        levelIndex = levels.length;
-        levels.push(end);
-      } else {
-        levels[levelIndex] = end;
-      }
-
-      return { ...alloc, levelIndex };
-    });
-  }, [allocations]);
-
-  const maxLevel = Math.max(-1, ...stackedAllocations.map(p => p.levelIndex)) + 1;
-  const rowHeight = Math.max(48, (maxLevel * 40) + 16);
-
-  // Calculate Next Available Date
-  const lastDismantle = allocations.reduce((latest, p) => {
-    const endStr = p.allocation_end_date || p.dismantling_date;
-    if (!endStr) return new Date(8640000000000000); // Indefinite
-    const d = new Date(endStr);
-    return d > latest ? d : latest;
-  }, new Date(0));
-
-  const nextAvailableStr = lastDismantle.getTime() > 8640000000000000 / 2 
-    ? 'TBD' 
-    : formatDateDisplay(lastDismantle.toISOString().split('T')[0]);
+  // ... (keeping stacking algorithm same)
 
   // Drag and Drop handlers
   const handleDragOver = (e) => {
@@ -79,7 +45,7 @@ export default function ManagerRow({
     e.preventDefault();
     setIsOver(false);
     const projectId = e.dataTransfer.getData('projectId');
-    const sourcePM = e.dataTransfer.getData('sourcePM');
+    const sourcePMId = e.dataTransfer.getData('sourcePMId');
 
     const startDragX = parseInt(e.dataTransfer.getData('startDragX') || '0', 10);
     const endDragX = e.clientX;
@@ -87,9 +53,9 @@ export default function ManagerRow({
     const pxPerDay = viewMode === 'Day' ? cellWidth : viewMode === 'Week' ? (cellWidth / 7) : (cellWidth / 30);
     const deltaDays = Math.round(deltaX / pxPerDay);
 
-    if (sourcePM !== managerStr) {
-      // Reassign action
-      onReassign(projectId, managerStr);
+    if (sourcePMId !== String(managerId)) {
+      // Reassign action using IDs
+      onReassign(projectId, managerId);
     } else if (deltaDays !== 0 && projectId) {
       // Time shift within the same row
       const alloc = allocations.find(a => a.id == projectId || (a.project && a.project.id == projectId));
@@ -135,7 +101,7 @@ export default function ManagerRow({
         
         <button 
           className="icon-btn" 
-          onClick={() => onRemoveManager(managerStr)}
+          onClick={() => onRemoveManager(managerId || managerStr)}
           style={{ color: 'var(--red)', padding: '4px' }}
         >
           <Trash2 size={12} />

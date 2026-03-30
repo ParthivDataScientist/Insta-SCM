@@ -10,13 +10,11 @@ import { useAuth } from '../contexts/AuthContext';
 import ProjectTable from '../components/ProjectTable';
 import { CardSkeleton } from '../components/SkeletonLoader';
 import { Link } from 'react-router-dom';
+import AddProjectModal from '../components/AddProjectModal';
 
-/**
- * ProjectsDashboard Component
- * Refactored for production with React Query and optimized filtering.
- */
 export default function ProjectsDashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState(null); // 'open', 'branch', 'pm'
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -28,7 +26,8 @@ export default function ProjectsDashboard() {
         filterBranch, setFilterBranch,
         filterPM, setFilterPM,
         searchQuery, setSearchQuery,
-        updateProjectFull
+        updateProjectFull,
+        createProject
     } = useProjects();
 
     const handleDoubleClick = (project) => {
@@ -111,7 +110,10 @@ export default function ProjectsDashboard() {
                                 <p className="header-role">Insta Exhibition - Projects Dashboard</p>
                             </div>
                         </div>
-                        <div className="header-right" style={{ display: 'flex', gap: '8px' }}>
+                        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <button className="icon-btn btn-animate" onClick={() => setIsAddModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', background: 'var(--blu)', color: 'white', border: 'none', borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 700, height: '36px', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)' }}>
+                                <Briefcase size={14} /> + NEW PROJECT
+                            </button>
                             {(filterStage !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || searchQuery !== '' || isProjectSelected) && (
                                 <button className="icon-btn btn-animate" onClick={resetFilters} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: 'var(--tx2)' }}>
                                     <X size={14} /> Disable Filters
@@ -126,7 +128,16 @@ export default function ProjectsDashboard() {
                             </button>
                         </div>
                     </header>
-                    <div className="header-accent-bar" />
+                {/* Secure & Lazy Modal */}
+                {isAddModalOpen && (
+                    <AddProjectModal 
+                        onClose={() => setIsAddModalOpen(false)} 
+                        createProject={createProject} 
+                        refetch={loadData}
+                    />
+                )}
+
+                <div className="header-accent-bar" />
 
                     <div className="tracking-body">
                         {/* ── KPI Cards ── */}

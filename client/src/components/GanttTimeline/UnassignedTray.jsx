@@ -19,11 +19,11 @@ export default function UnassignedTray({ projects, onProjectClick, onDropReassig
     e.preventDefault();
     setIsOver(false);
     const projectId = e.dataTransfer.getData('projectId');
-    const sourcePM = e.dataTransfer.getData('sourcePM');
+    const sourcePMId = e.dataTransfer.getData('sourcePMId');
 
     // If it was already in unassigned, skip
-    if (sourcePM !== 'Unassigned') {
-      onDropReassign(projectId, 'Unassigned');
+    if (sourcePMId !== '0') {
+      onDropReassign(projectId, null);
     }
   };
 

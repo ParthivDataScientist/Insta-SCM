@@ -1,28 +1,19 @@
 from typing import Optional, List
-from datetime import datetime, timezone
-from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, DateTime, func, String
+from sqlmodel import Field, Relationship
+from sqlalchemy import Column, String
+from .base import AuditMixin
 
-class UserBase(SQLModel):
-    email: str = Field(sa_column=Column(String, unique=True, index=True, nullable=False))
-    full_name: str
-    role: str = Field(default="Operator")
-    is_active: bool = Field(default=True)
-
-class User(UserBase, table=True):
+class User(AuditMixin, table=True):
+    """Consolidated User model for both standard users and project managers."""
     id: Optional[int] = Field(default=None, primary_key=True)
-    hashed_password: str
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column(DateTime(timezone=True), default=func.now(), nullable=False),
+    full_name: str = Field(index=True, description="Full display name of the user.")
+    email: str = Field(
+        sa_column=Column(String, unique=True, index=True, nullable=False),
+        description="Primary identifier and contact email."
     )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column(
-            DateTime(timezone=True),
-            default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-        ),
-    )
-    managed_allocations: List["ManagerAllocation"] = Relationship(back_populates="manager_user")
+    hashed_password: str = Field(description="Securely hashed password string.")
+    role: str = Field(default="VIEWER", description="User permission level (e.g., ADMIN, PROJECT_MANAGER, VIEWER).")
+    is_active: bool = Field(default=True, description="Status flag for account enabling.")
+
+    # Relationships
+    managed_projects: List["DashboardProject"] = Relationship(back_populates="manager")

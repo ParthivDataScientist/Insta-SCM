@@ -30,49 +30,38 @@ export default function ProjectKanbanCard({ project, onClick }) {
             }}
         >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx)' }}>
-                    Proj # {project.id} | {project.project_name}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--tx)', letterSpacing: '0.2px' }}>
+                        {project.client || 'No Client'}
+                    </div>
+                    <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--tx3)' }}>
+                        ID: <span style={{ color: 'var(--tx2)' }}>#{project.id}</span> | Project: <span style={{ color: 'var(--tx)' }}>{project.project_name}</span>
+                    </div>
+                </div>
+                <div style={{ flexShrink: 0 }}>
+                     <Activity size={14} color="var(--org)" />
                 </div>
             </div>
 
             {project.event_name && (
-                <div style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 500 }}>
+                <div style={{ fontSize: '11px', color: 'var(--tx2)', fontWeight: 600, marginTop: '4px' }}>
                     {project.event_name}
                 </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)' }}>
-                    <User size={12} color="var(--tx3)" /> PM: <strong>{project.project_manager || 'Unassigned'}</strong>
-                </div>
-                {/* Mocking GM logic using team_type or just static if none */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)' }}>
-                    <User size={12} color="var(--tx3)" /> GM: <strong>{project.team_type || 'Unassigned'}</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx)' }}>
+                    <User size={12} color="var(--red)" /> Manager: <strong>{project.project_manager || 'Unassigned'}</strong>
                 </div>
             </div>
 
-            <div style={{ marginTop: '6px', borderTop: '1px solid var(--bd-l)', paddingTop: '6px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--tx3)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    Event Details
+            <div style={{ marginTop: '8px', borderTop: '1px solid var(--bd-l)', paddingTop: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--tx3)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Logistics Schedule
                 </div>
-                {project.event_name && (
+                {project.dispatch_date && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)', marginBottom: '4px' }}>
-                        <Calendar size={12} color="var(--tx3)" /> Show: <strong>{project.event_name}</strong>
-                    </div>
-                )}
-                {project.event_start_date && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)', marginBottom: '4px' }}>
-                        <Calendar size={12} color="var(--tx3)" /> Show Date: {project.event_start_date}
-                    </div>
-                )}
-                {project.venue && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)', marginBottom: '4px' }}>
-                        <MapPin size={12} color="var(--tx3)" /> Venue: {project.venue}
-                    </div>
-                )}
-                {project.material_dispatch_date && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)', marginBottom: '4px' }}>
-                        <Warehouse size={12} color="var(--tx3)" /> AWD Start: {project.material_dispatch_date}
+                        <Warehouse size={12} color="var(--tx3)" /> Dispatch: <strong>{project.dispatch_date}</strong>
                     </div>
                 )}
                 {project.installation_start_date && (

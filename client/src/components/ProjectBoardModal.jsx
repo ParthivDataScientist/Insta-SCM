@@ -5,6 +5,7 @@ import { sanitize, stripTags } from '../utils/sanitizer';
 import CalendarPicker from './CalendarPicker';
 import { formatDateDisplay } from '../utils/dateUtils';
 import ManagerField from './ManagerField';
+import ClientField from './ClientField';
 
 export default function ProjectBoardModal({ project, onClose, updateProjectFull }) {
     const { user } = useAuth();
@@ -188,8 +189,8 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                            <ManagerField label="Project Manager" field="project_manager" project={project} updateProjectFull={updateProjectFull} icon={User} />
-                            <TextField label="Graphics Manager" field="team_type" icon={User} />
+                            <ManagerField label="Project Manager" field="manager_id" project={project} updateProjectFull={updateProjectFull} icon={User} />
+                            <ClientField label="Client" field="client_id" project={project} updateProjectFull={updateProjectFull} />
                         </div>
 
                         <div style={{ padding: '24px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
@@ -203,7 +204,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                                 <DateDetailField label="Event End" field="event_end_date" />
                                 <DateDetailField label="Installs Start" field="installation_start_date" />
                                 <DateDetailField label="Installs End" field="installation_end_date" />
-                                <DateDetailField label="Material Dispatch" field="material_dispatch_date" />
+                                <DateDetailField label="Material Dispatch" field="dispatch_date" />
                                 <DateDetailField label="Dismantling Date" field="dismantling_date" />
                                 <TextField label="Branch" field="branch" />
                             </div>
