@@ -21,6 +21,7 @@ class DashboardProjectBase(SQLModel):
     installation_end_date: Optional[py_date] = None
     dismantling_date: Optional[py_date] = None
     project_manager: Optional[str] = None
+    manager_id: Optional[int] = Field(default=None, foreign_key="manager.id")
     team_type: Optional[str] = None
     stage: Optional[str] = Field(default="Open") # e.g. Open, Confirmed, Lost
     branch: Optional[str] = None
