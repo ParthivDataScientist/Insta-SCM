@@ -84,7 +84,8 @@ export default function ManagerRow({
     const startDragX = parseInt(e.dataTransfer.getData('startDragX') || '0', 10);
     const endDragX = e.clientX;
     const deltaX = startDragX > 0 ? endDragX - startDragX : 0;
-    const deltaDays = Math.round(deltaX / cellWidth);
+    const pxPerDay = viewMode === 'Day' ? cellWidth : viewMode === 'Week' ? (cellWidth / 7) : (cellWidth / 30);
+    const deltaDays = Math.round(deltaX / pxPerDay);
 
     if (sourcePM !== managerStr) {
       // Reassign action
@@ -161,6 +162,7 @@ export default function ManagerRow({
             }}
             timelineStart={timelineStart}
             cellWidth={cellWidth}
+            viewMode={viewMode}
             levelIndex={alloc.levelIndex}
             onClick={onProjectClick}
             onDateUpdate={onDateUpdate}

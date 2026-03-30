@@ -72,6 +72,7 @@ export default function ManagerTimeline() {
   };
 
   const cellWidth = getCellWidth();
+  const getManagerAllocations = (m) => m.allocations || m.projects || [];
 
   // Fetch Grouped Data
   const { data: timelineData, isLoading, refetch, isFetching } = useQuery({
@@ -126,7 +127,10 @@ export default function ManagerTimeline() {
     if (!timelineData) return ['All'];
     const branches = new Set(['All']);
     timelineData.forEach(m => {
-      m.projects?.forEach(p => { if (p.branch) branches.add(p.branch); });
+      getManagerAllocations(m).forEach(a => {
+        const p = a.project || a;
+        if (p.branch) branches.add(p.branch);
+      });
     });
     return Array.from(branches).sort();
   }, [timelineData]);
@@ -158,9 +162,12 @@ export default function ManagerTimeline() {
   React.useEffect(() => {
     if (!isLoading && parentRef.current) {
         const now = new Date();
-        const start = timeWindow.start;
-        const diffDays = Math.max(0, (now.setHours(0,0,0,0) - start.setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
-        const autoScrollPx = (diffDays * cellWidth) - 400; // Centered back a bit
+        const start = new Date(timeWindow.start);
+        const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const startMidnight = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+        const diffDays = Math.max(0, (nowMidnight - startMidnight) / (1000 * 60 * 60 * 24));
+        const pxPerDay = viewMode === 'Day' ? cellWidth : viewMode === 'Week' ? (cellWidth / 7) : (cellWidth / 30);
+        const autoScrollPx = (diffDays * pxPerDay) - 400; // Centered back a bit
         
         requestAnimationFrame(() => {
             if (parentRef.current) {
@@ -168,7 +175,7 @@ export default function ManagerTimeline() {
             }
         });
     }
-  }, [isLoading, timeWindow.start, cellWidth]);
+  }, [isLoading, timeWindow.start, cellWidth, viewMode]);
 
   return (
     <div className={isDark ? 'dark' : 'light'} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -249,22 +256,29 @@ export default function ManagerTimeline() {
             <div style={{ padding: '12px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--tx3)', textTransform: 'uppercase', marginBottom: '4px' }}>Conflict Warnings</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--red)' }}>
-                {timelineData?.reduce((acc, m) => acc + (m.projects?.filter(p => {
+                {timelineData?.reduce((acc, m) => acc + (getManagerAllocations(m).filter(a => {
+                   const p = a.project || a;
                    // Quick overlap check for stats
-                   return m.projects.some(other => other.id !== p.id && new Date(p.material_dispatch_date) <= (other.dismantling_date ? new Date(other.dismantling_date) : new Date()) && (p.dismantling_date ? new Date(p.dismantling_date) : new Date()) >= new Date(other.material_dispatch_date));
+                   return getManagerAllocations(m).some(otherAlloc => {
+                     const other = otherAlloc.project || otherAlloc;
+                     return other.id !== p.id &&
+                       new Date(p.material_dispatch_date) <= (other.dismantling_date ? new Date(other.dismantling_date) : new Date()) &&
+                       (p.dismantling_date ? new Date(p.dismantling_date) : new Date()) >= new Date(other.material_dispatch_date);
+                   });
                 }).length || 0), 0)}
               </div>
             </div>
             <div style={{ padding: '12px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--tx3)', textTransform: 'uppercase', marginBottom: '4px' }}>Fully Booked Managers</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--org)' }}>
-                {timelineData?.filter(m => (m.projects?.length || 0) > 3).length || 0}
+                {timelineData?.filter(m => getManagerAllocations(m).length > 3).length || 0}
               </div>
             </div>
             <div style={{ padding: '12px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--tx3)', textTransform: 'uppercase', marginBottom: '4px' }}>Available Now</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--green)' }}>
-                {timelineData?.filter(m => !m.projects?.some(p => {
+                {timelineData?.filter(m => !getManagerAllocations(m).some(a => {
+                    const p = a.project || a;
                     const start = new Date(p.material_dispatch_date);
                     const end = p.dismantling_date ? new Date(p.dismantling_date) : new Date();
                     const now = new Date();
@@ -403,7 +417,14 @@ export default function ManagerTimeline() {
                   {viewMode === 'Day' && timeUnits.some(d => d.toDateString() === new Date().toDateString()) && (
                     <div style={{
                       position: 'absolute', top: 0, bottom: '-2000px',
-                      left: 240 + (Math.ceil((new Date().setHours(0,0,0,0) - timeWindow.start.setHours(0,0,0,0)) / (1000*60*60*24)) * cellWidth) + (cellWidth/2),
+                      left: (() => {
+                        const now = new Date();
+                        const start = new Date(timeWindow.start);
+                        const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                        const startMidnight = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+                        const diffDays = Math.ceil((nowMidnight - startMidnight) / (1000*60*60*24));
+                        return 240 + (diffDays * cellWidth) + (cellWidth / 2);
+                      })(),
                       width: '3px', background: 'var(--red)', zIndex: 99, pointerEvents: 'none',
                       boxShadow: '0 0 8px rgba(255, 60, 60, 0.4)'
                     }}>
