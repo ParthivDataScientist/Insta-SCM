@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, text
 from typing import List, Optional
 from app.db.session import engine
 from app.models.dashboard_project import DashboardProject
@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
 from app.services.availability import is_manager_available
 from datetime import date as py_date
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -59,12 +60,47 @@ def get_projects(
     session: Session = Depends(get_session),
     stage: Optional[str] = None
 ):
-    query = select(DashboardProject)
-    if stage:
-        query = query.where(DashboardProject.stage == stage)
-        
-    projects = session.exec(query).all()
-    return projects
+    try:
+        query = select(DashboardProject)
+        if stage:
+            query = query.where(DashboardProject.stage == stage)
+        return session.exec(query).all()
+    except Exception:
+        # Production-safe fallback for partially migrated schemas:
+        # return records from raw table shape, filling missing fields.
+        rows = session.execute(text("SELECT * FROM dashboardproject")).mappings().all()
+        response = []
+        for row in rows:
+            if stage and row.get("stage") != stage:
+                continue
+            response.append(DashboardProjectRead(
+                id=row.get("id"),
+                project_name=row.get("project_name") or "Unknown",
+                date=row.get("date"),
+                client=row.get("client"),
+                city=row.get("city"),
+                event_name=row.get("event_name"),
+                venue=row.get("venue"),
+                area=row.get("area"),
+                event_start_date=row.get("event_start_date"),
+                event_end_date=row.get("event_end_date"),
+                material_dispatch_date=row.get("material_dispatch_date"),
+                installation_start_date=row.get("installation_start_date"),
+                installation_end_date=row.get("installation_end_date"),
+                dismantling_date=row.get("dismantling_date"),
+                project_manager=row.get("project_manager"),
+                team_type=row.get("team_type"),
+                stage=row.get("stage"),
+                branch=row.get("branch"),
+                board_stage=row.get("board_stage") or "TBC",
+                comments=row.get("comments") or [],
+                materials=row.get("materials") or [],
+                photos=row.get("photos") or [],
+                qc_steps=row.get("qc_steps") or [],
+                created_at=row.get("created_at") or datetime.now(timezone.utc),
+                updated_at=row.get("updated_at") or datetime.now(timezone.utc),
+            ))
+        return response
 
 @router.post("/", response_model=DashboardProjectRead)
 def create_project(project_in: DashboardProjectCreate, session: Session = Depends(get_session)):
