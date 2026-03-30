@@ -1,6 +1,6 @@
 import React, { useState, useMemo, Suspense, lazy } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Calendar, Briefcase, Layout, Truck, Filter, MapPin, Search, RefreshCw, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Calendar, Briefcase, Layout, Truck, Filter, MapPin, Search, RefreshCw, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // Hooks & API
@@ -21,6 +21,7 @@ const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
  */
 export default function ManagerTimeline() {
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState('Day'); // Day, Week, Month
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +93,7 @@ export default function ManagerTimeline() {
     if (!timelineData) return { filteredData: [], unassignedProjects: [] };
     
     // Unassigned mapping
-    const getManagerName = (m) => typeof m.manager === 'string' ? m.manager : (m.manager?.name || 'Unknown');
+    const getManagerName = (m) => typeof m.manager === 'string' ? m.manager : (m.manager?.full_name || m.manager?.name || 'Unknown');
     const getProjects = (m) => m.allocations || m.projects || [];
 
     const unassignedData = timelineData.find(m => getManagerName(m) === 'Unassigned');
@@ -208,11 +209,14 @@ export default function ManagerTimeline() {
               <Layout size={17} /> Project Board
             </Link>
             <Link to="/timeline" className="sidebar-item active">
-              <RefreshCw size={17} /> Manager Timeline
+              <RefreshCw size={17} /> Resource Timeline
             </Link>
-            {/* <Link to="/dashboard" className="sidebar-item">
+            <Link to="/dashboard" className="sidebar-item">
               <Truck size={17} /> Shipment Tracking
-            </Link> */}
+            </Link>
+            <Link to="/storage" className="sidebar-item">
+              <Archive size={17} /> Storage
+            </Link>
           </div>
         </aside>
 
@@ -338,16 +342,18 @@ export default function ManagerTimeline() {
                 onKeyDown={async e => {
                   if (e.key === 'Enter' && newManagerName.trim()) {
                     try {
-                      await projectsService.createManager({ name: newManagerName.trim(), availability_status: "Available", role: "Manager" });
+                      await projectsService.createManager({ name: newManagerName.trim() });
                       setNewManagerName('');
                       setShowAddManager(false);
-                      refetch();
-                      refetchManagers();
+                      // Global invalidation for consistency
+                      queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+                      queryClient.invalidateQueries({ queryKey: ['managers_list'] });
+                      queryClient.invalidateQueries({ queryKey: ['projects'] });
                     } catch (err) {
-                      setVirtualManagers(prev => [...prev, newManagerName.trim()]);
+                      console.error("Failed to create manager:", err);
+                      alert("Error creating manager. Please check backend logs.");
                       setNewManagerName('');
                       setShowAddManager(false);
-                      // Silent fallback to virtual UI state since backend rejected or not fully hot-loaded
                     }
                   }
                 }}
@@ -366,7 +372,7 @@ export default function ManagerTimeline() {
                   <TimelineHeader units={timeUnits} cellWidth={cellWidth} viewMode={viewMode} />
                   
                   {filteredData.map((managerData) => {
-                    const mName = typeof managerData.manager === 'string' ? managerData.manager : (managerData.manager?.name || 'Unknown');
+                    const mName = typeof managerData.manager === 'string' ? managerData.manager : (managerData.manager?.full_name || managerData.manager?.name || 'Unknown');
                     return (
                     <ManagerRow 
                       key={mName}
@@ -378,7 +384,9 @@ export default function ManagerTimeline() {
                       onProjectClick={setSelectedProject}
                       onReassign={async (id, newPMId) => {
                         await projectsService.updateProject(id, { manager_id: newPMId || null }); 
-                        refetch();
+                        queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+                        queryClient.invalidateQueries({ queryKey: ['projects'] });
+                        queryClient.invalidateQueries({ queryKey: ['projectStats'] });
                       }}
                       onDateUpdate={async (id, data) => {
                         // Map allocation keys back to project DB columns natively
@@ -386,7 +394,9 @@ export default function ManagerTimeline() {
                            dispatch_date: data.allocation_start_date,
                            dismantling_date: data.allocation_end_date
                         });
-                        refetch();
+                        queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+                        queryClient.invalidateQueries({ queryKey: ['projects'] });
+                        queryClient.invalidateQueries({ queryKey: ['projectStats'] });
                       }}
                       onRemoveManager={async (idOrName) => {
                         if (typeof idOrName === 'string' && virtualManagers.includes(idOrName)) {
@@ -400,8 +410,9 @@ export default function ManagerTimeline() {
                         if (typeof idOrName === 'number') {
                            try {
                              await projectsService.deleteManager(idOrName);
-                             refetch();
-                             refetchManagers();
+                             queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+                             queryClient.invalidateQueries({ queryKey: ['managers_list'] });
+                             queryClient.invalidateQueries({ queryKey: ['projects'] });
                            } catch (err) {
                              alert("Error deleting manager: " + (err.response?.data?.detail || err.message));
                            }
@@ -440,7 +451,9 @@ export default function ManagerTimeline() {
               onProjectClick={setSelectedProject} 
               onDropReassign={async (id, newPMId) => {
                 await projectsService.updateProject(id, { manager_id: newPMId || null });
-                refetch();
+                queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+                queryClient.invalidateQueries({ queryKey: ['projects'] });
+                queryClient.invalidateQueries({ queryKey: ['projectStats'] });
               }}
             />
           </div>

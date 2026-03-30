@@ -77,7 +77,7 @@ export default function UnassignedTray({ projects, onProjectClick, onDropReassig
                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--red)' }} />
                    <span style={{ color: 'var(--tx3)', textTransform: 'uppercase', fontWeight: 800 }}>Dispatch:</span>
-                   <span style={{ color: 'var(--tx)', fontWeight: 700 }}>{p.material_dispatch_date}</span>
+                   <span style={{ color: 'var(--tx)', fontWeight: 700 }}>{p.dispatch_date || p.allocation_start_date}</span>
                  </div>
                  
                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

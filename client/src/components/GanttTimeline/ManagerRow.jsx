@@ -24,7 +24,50 @@ export default function ManagerRow({
   const allocations = managerData.allocations || managerData.projects || [];
   const [isOver, setIsOver] = useState(false);
 
-  // ... (keeping stacking algorithm same)
+  // Group allocations into vertical levels to prevent overlap
+  const stackedAllocations = useMemo(() => {
+    const sorted = [...allocations].sort((a, b) => {
+      const startA = new Date(a.allocation_start_date || a.dispatch_date || a.event_start_date || 0);
+      const startB = new Date(b.allocation_start_date || b.dispatch_date || b.event_start_date || 0);
+      return startA - startB;
+    });
+
+    const levels = [];
+    return sorted.map((alloc) => {
+      const sDate = alloc.allocation_start_date || alloc.dispatch_date || alloc.event_start_date;
+      const eDate = alloc.allocation_end_date || alloc.dismantling_date;
+      
+      let levelIdx = 0;
+      while (true) {
+        if (!levels[levelIdx]) {
+          levels[levelIdx] = eDate;
+          break;
+        } else {
+          // If the new project starts after the current level's last end date, stack it here
+          if (new Date(sDate) >= new Date(levels[levelIdx])) {
+            levels[levelIdx] = eDate;
+            break;
+          }
+        }
+        levelIdx++;
+      }
+      return { ...alloc, levelIndex: levelIdx };
+    });
+  }, [allocations]);
+
+  const rowHeight = Math.max(48, Math.max(...stackedAllocations.map(a => a.levelIndex + 1), 1) * 36 + 12);
+
+  // Calculate Next Available Date
+  const lastDismantle = allocations.reduce((latest, p) => {
+    const endStr = p.allocation_end_date || p.dismantling_date;
+    if (!endStr) return new Date(8640000000000000); // Indefinite
+    const d = new Date(endStr);
+    return d > latest ? d : latest;
+  }, new Date(0));
+
+  const nextAvailableStr = lastDismantle.getTime() > 8640000000000000 / 2 
+    ? 'TBD' 
+    : formatDateDisplay(lastDismantle.toISOString().split('T')[0]);
 
   // Drag and Drop handlers
   const handleDragOver = (e) => {
@@ -60,8 +103,8 @@ export default function ManagerRow({
       // Time shift within the same row
       const alloc = allocations.find(a => a.id == projectId || (a.project && a.project.id == projectId));
       if (alloc) {
-          const sDate = strToUTC(alloc.allocation_start_date || alloc.material_dispatch_date || alloc.event_start_date);
-          const eDate = strToUTC(alloc.allocation_end_date || alloc.dismantling_date || alloc.allocation_start_date || alloc.material_dispatch_date || alloc.event_start_date);
+          const sDate = strToUTC(alloc.allocation_start_date || alloc.dispatch_date || alloc.event_start_date);
+          const eDate = strToUTC(alloc.allocation_end_date || alloc.dismantling_date || alloc.allocation_start_date || alloc.dispatch_date || alloc.event_start_date);
           
           sDate.setUTCDate(sDate.getUTCDate() + deltaDays);
           eDate.setUTCDate(eDate.getUTCDate() + deltaDays);
@@ -123,7 +166,7 @@ export default function ManagerRow({
             key={alloc.id || idx}
             allocation={{
                 ...alloc, 
-                allocation_start_date: alloc.allocation_start_date || alloc.material_dispatch_date || alloc.event_start_date,
+                allocation_start_date: alloc.allocation_start_date || alloc.dispatch_date || alloc.event_start_date,
                 allocation_end_date: alloc.allocation_end_date || alloc.dismantling_date
             }}
             timelineStart={timelineStart}

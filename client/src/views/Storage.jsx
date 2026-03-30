@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-    Archive, Truck, AlertTriangle, ChevronRight, ArrowLeft, RefreshCw, Trash2
+    Archive, Truck, AlertTriangle, ChevronRight, ArrowLeft, RefreshCw, Trash2, Briefcase, Layout
 } from 'lucide-react';
 import { useShipments } from '../hooks/useShipments';
 import { useAuth } from '../contexts/AuthContext';
@@ -66,12 +66,21 @@ export default function Storage() {
                     <div className="sidebar-tagline">Excellence in Exhibition Logistics</div>
 
                     <nav className="sidebar-nav">
-                        {/* <Link to="/" className="sidebar-item">
+                        <Link to="/projects" className="sidebar-item">
+                            <Briefcase size={17} /> Projects List
+                        </Link>
+                        <Link to="/board" className="sidebar-item">
+                            <Layout size={17} /> Project Board
+                        </Link>
+                        <Link to="/timeline" className="sidebar-item">
+                            <RefreshCw size={17} /> Resource Timeline
+                        </Link>
+                        <Link to="/dashboard" className="sidebar-item">
                             <Truck size={17} /> Shipment Tracking
-                        </Link> */}
-                        <button className="sidebar-item active">
+                        </Link>
+                        <a className="sidebar-item active">
                             <Archive size={17} /> Storage
-                        </button>
+                        </a>
                     </nav>
                     
                     <div className="sidebar-footer-area">

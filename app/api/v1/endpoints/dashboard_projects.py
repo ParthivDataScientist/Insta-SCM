@@ -207,16 +207,11 @@ def get_timeline_data(session: Session = Depends(get_session)):
     try:
         from collections import defaultdict
 
-        # Use a JOIN to get Managers and their Projects in one go
-        # Relaxed filter: show project if it has any date assigned
+        # Fetch all managers and their projects via LEFT JOIN
         stmt = (
             select(User, DashboardProject)
-            .join(DashboardProject, User.id == DashboardProject.manager_id)
+            .join(DashboardProject, User.id == DashboardProject.manager_id, isouter=True)
             .where(User.role == "PROJECT_MANAGER")
-            .where(
-                (DashboardProject.dispatch_date.is_not(None)) |
-                (DashboardProject.event_start_date.is_not(None))
-            )
         )
         
         results = session.exec(stmt).all()
@@ -230,31 +225,118 @@ def get_timeline_data(session: Session = Depends(get_session)):
                     "full_name": manager.full_name # Standard key
                 }
 
-            manager_groups[manager.id]["allocations"].append({
-                "id": project.id,
-                "project_id": project.id,
-                "project_name": project.project_name,
-                "manager_id": manager.id,
-                # Remapping: source from dispatch and dismantling dates as requested
-                "allocation_start_date": project.dispatch_date,
-                "allocation_end_date": project.dismantling_date,
-                "project": {
+            if project is not None and (project.dispatch_date is not None or project.event_start_date is not None):
+                manager_groups[manager.id]["allocations"].append({
                     "id": project.id,
+                    "project_id": project.id,
                     "project_name": project.project_name,
-                    "stage": project.stage,
-                    "board_stage": project.board_stage,
-                    "venue": project.venue,
-                    "branch": project.branch
-                }
-            })
+                    "manager_id": manager.id,
+                    "allocation_start_date": project.dispatch_date,
+                    "allocation_end_date": project.dismantling_date,
+                    "project": {
+                        "id": project.id,
+                        "project_name": project.project_name,
+                        "stage": project.stage,
+                        "board_stage": project.board_stage,
+                        "venue": project.venue,
+                        "branch": project.branch
+                    }
+                })
 
-        # Convert back to sorted list
-        final_result = list(manager_groups.values())
-        return sorted(final_result, key=lambda x: str((x["manager"] or {}).get("name", "")))
+        # Fetch unassigned projects
+        unassigned_stmt = (
+            select(DashboardProject)
+            .where(DashboardProject.manager_id == None)
+            .where(
+                (DashboardProject.dispatch_date.is_not(None)) |
+                (DashboardProject.event_start_date.is_not(None))
+            )
+        )
+        unassigned_projects = session.exec(unassigned_stmt).all()
+        
+        if unassigned_projects:
+            manager_groups["unassigned"] = {
+                "manager": "Unassigned",
+                "allocations": []
+            }
+            for project in unassigned_projects:
+                manager_groups["unassigned"]["allocations"].append({
+                    "id": project.id,
+                    "project_id": project.id,
+                    "project_name": project.project_name,
+                    "manager_id": None,
+                    "allocation_start_date": project.dispatch_date,
+                    "allocation_end_date": project.dismantling_date,
+                    "project": {
+                        "id": project.id,
+                        "project_name": project.project_name,
+                        "stage": project.stage,
+                        "board_stage": project.board_stage,
+                        "venue": project.venue,
+                        "branch": project.branch
+                    }
+                })
+
+        # Sort helper to handle both dict managers and "Unassigned" string safely
+        def sort_by_name(items):
+            def manager_name(m):
+                manager = m.get("manager")
+                if isinstance(manager, dict):
+                    return manager.get("full_name") or ""
+                return str(manager or "")
+            return sorted(items, key=manager_name)
+
+        return sort_by_name(list(manager_groups.values()))
 
     except Exception as e:
         print(f"Timeline generation error: {e}")
         return []
+
+@router.post("/managers")
+def create_manager(manager_data: dict, session: Session = Depends(get_session)):
+    """Create a new user with the PROJECT_MANAGER role."""
+    name = manager_data.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+    
+    # Generate a dummy email based on name
+    email = f"{name.lower().replace(' ', '.')}@insta-scm.com"
+    
+    # Check if user already exists
+    existing = session.exec(select(User).where(User.email == email)).first()
+    if existing:
+        return {"id": existing.id, "full_name": existing.full_name}
+
+    new_user = User(
+        full_name=name,
+        email=email,
+        hashed_password="DUMMY_PASSWORD_SCM", # Placeholder for Gantt-created managers
+        role="PROJECT_MANAGER",
+        is_active=True
+    )
+    session.add(new_user)
+    session.commit()
+    session.refresh(new_user)
+    return {"id": new_user.id, "full_name": new_user.full_name}
+
+@router.delete("/managers/{manager_id}")
+def delete_manager(manager_id: int, session: Session = Depends(get_session)):
+    """Delete a manager user."""
+    user = session.get(User, manager_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Manager not found")
+    
+    # Optional: Check if manager has projects
+    projects = session.exec(select(DashboardProject).where(DashboardProject.manager_id == manager_id)).all()
+    if projects:
+        # Reassign projects to None before deleting manager
+        for p in projects:
+            p.manager_id = None
+            session.add(p)
+    
+    session.delete(user)
+    session.commit()
+    return {"message": "Manager deleted successfully"}
 
 @router.get("/pm-list")
 def get_pm_list(session: Session = Depends(get_session)):

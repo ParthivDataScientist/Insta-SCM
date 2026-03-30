@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime, date as py_date
 
 class DashboardProjectCreate(BaseModel):
@@ -25,6 +25,18 @@ class DashboardProjectCreate(BaseModel):
     materials: Optional[list] = []
     photos: Optional[list] = []
     qc_steps: Optional[list] = []
+
+    @field_validator(
+        "event_start_date", "event_end_date", "dispatch_date",
+        "installation_start_date", "installation_end_date",
+        "dismantling_date", "allocation_start_date", "allocation_end_date",
+        mode="before"
+    )
+    @classmethod
+    def parse_empty_date_create(cls, v):
+        if v == "":
+            return None
+        return v
 
 class DashboardProjectRead(DashboardProjectCreate):
     id: int
@@ -56,3 +68,15 @@ class DashboardProjectUpdate(BaseModel):
     materials: Optional[list] = None
     photos: Optional[list] = None
     qc_steps: Optional[list] = None
+
+    @field_validator(
+        "event_start_date", "event_end_date", "dispatch_date",
+        "installation_start_date", "installation_end_date",
+        "dismantling_date", "allocation_start_date", "allocation_end_date",
+        mode="before"
+    )
+    @classmethod
+    def parse_empty_date_update(cls, v):
+        if v == "":
+            return None
+        return v

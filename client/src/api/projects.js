@@ -86,6 +86,22 @@ const projectsService = {
     fetchClients: async () => {
         const response = await apiClient.get('/api/v1/projects/client-list');
         return response.data;
+    },
+
+    /**
+     * Creates a new project manager account.
+     */
+    createManager: async (data) => {
+        const response = await apiClient.post('/api/v1/projects/managers', data);
+        return response.data;
+    },
+
+    /**
+     * Deletes a project manager account.
+     */
+    deleteManager: async (id) => {
+        const response = await apiClient.delete(`/api/v1/projects/managers/${id}`);
+        return response.data;
     }
 };
 

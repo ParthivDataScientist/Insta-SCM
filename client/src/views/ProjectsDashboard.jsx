@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, RefreshCw, Briefcase, MapPin, AlertTriangle, ChevronRight, Truck, LogOut, Search, X, CheckCircle, Users, Layout } from 'lucide-react';
+import { Menu, RefreshCw, Briefcase, MapPin, AlertTriangle, ChevronRight, Truck, LogOut, Search, X, CheckCircle, Users, Layout, Archive } from 'lucide-react';
 
 // Hooks
 import { useProjects } from '../hooks/useProjects';
@@ -92,9 +92,12 @@ export default function ProjectsDashboard() {
                         <Link to="/timeline" className="sidebar-item">
                             <RefreshCw size={17} /> Resource Timeline
                         </Link>
-                        {/* <Link to="/dashboard" className="sidebar-item">
+                        <Link to="/dashboard" className="sidebar-item">
                             <Truck size={17} /> Shipment Tracking
-                        </Link> */}
+                        </Link>
+                        <Link to="/storage" className="sidebar-item">
+                            <Archive size={17} /> Storage
+                        </Link>
                     </nav>
                 </aside>
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { Menu, RefreshCw, Filter, Search, Copy, CheckSquare, Box, MapPin, AlertTriangle, User, Calendar, ChevronRight, CheckCircle2, Factory, Briefcase, Truck, PackageCheck, Anchor, Plane, ArrowRightCircle, CheckCircle, Clock, Archive, LogOut, Cloud, Bell, Zap, X, FilterX, DownloadCloud, PenTool, Layout } from 'lucide-react';
+import { Menu, RefreshCw, Filter, Search, Copy, CheckSquare, Box, MapPin, AlertTriangle, User, Calendar, ChevronRight, CheckCircle2, Factory, Briefcase, Truck, PackageCheck, Anchor, Plane, ArrowRightCircle, CheckCircle, Clock, Archive, LogOut, Cloud, Bell, Zap, X, FilterX, DownloadCloud, PenTool, Layout, ArrowUpRight, Package, Plus, FileSpreadsheet, Download, Trash2 } from 'lucide-react';
 import { useShipments } from '../hooks/useShipments';
 import { useAuth } from '../contexts/AuthContext';
 import ShipmentTable from '../components/ShipmentTable';
@@ -133,8 +133,14 @@ export default function ShipmentDashboard() {
                         <Link to="/board" className="sidebar-item">
                             <Layout size={17} /> Project Board
                         </Link>
+                        <Link to="/timeline" className="sidebar-item">
+                            <RefreshCw size={17} /> Resource Timeline
+                        </Link>
                         <Link to="/dashboard" className="sidebar-item active">
                             <Truck size={17} /> Shipment Tracking
+                        </Link>
+                        <Link to="/storage" className="sidebar-item">
+                            <Archive size={17} /> Storage
                         </Link>
                     </nav>
                     
