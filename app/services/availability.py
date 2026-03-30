@@ -1,45 +1,60 @@
 from datetime import date as py_date
-from typing import List, Optional
+from typing import Optional
 
-def is_manager_available(new_start: py_date, new_end: Optional[py_date], existing_projects: List[dict]) -> dict:
+from sqlmodel import Session, select
+
+from app.models.dashboard_project import DashboardProject
+
+
+def is_manager_available(
+    session: Session,
+    new_start: py_date,
+    new_end: Optional[py_date],
+    manager_name: Optional[str] = None,
+) -> dict:
     """
-    Checks if a manager is available for a given date range.
-    
+    Checks manager availability for a given date range directly at the database layer.
+
     Args:
-        new_start: The start date (dispatch date) of the new project.
-        new_end: The end date (dismantle date) of the new project. If None, it's considered indefinite.
-        existing_projects: A list of dicts with 'material_dispatch_date' and 'dismantling_date'.
-        
+        session: Database session.
+        new_start: Start date of the incoming assignment.
+        new_end: End date of the incoming assignment. If None, treated as open-ended.
+        manager_name: Optional manager name filter.
+
     Returns:
         dict: { "available": bool, "conflicts": List[dict] }
     """
-    conflicts = []
-    
-    # If no start date, we can't check
     if not new_start:
         return {"available": True, "conflicts": []}
 
-    for project in existing_projects:
-        start = project.get("material_dispatch_date")
-        end = project.get("dismantling_date")
-        
-        # If no start date for existing project, it's an invalid data state, skip
-        if not start:
-            continue
-            
-        # Overlap Logic:
-        # (StartA <= EndB) and (EndA >= StartB)
-        # If End is None, we treat it as infinite in the future
-        
-        # Determine effective end dates
-        effective_new_end = new_end if new_end else py_date.max
-        effective_existing_end = end if end else py_date.max
-        
-        # Check overlap
-        if new_start <= effective_existing_end and effective_new_end >= start:
-            conflicts.append(project)
-            
+    stmt = select(DashboardProject).where(DashboardProject.material_dispatch_date.is_not(None))
+
+    if manager_name:
+        stmt = stmt.where(DashboardProject.project_manager == manager_name)
+
+    # Overlap conditions:
+    # existing_start <= new_end (or always true when new_end is open-ended)
+    # AND existing_end/open >= new_start
+    if new_end is not None:
+        stmt = stmt.where(DashboardProject.material_dispatch_date <= new_end)
+
+    stmt = stmt.where(
+        (DashboardProject.dismantling_date.is_(None))
+        | (DashboardProject.dismantling_date >= new_start)
+    )
+
+    conflicts = session.exec(stmt).all()
+
     return {
         "available": len(conflicts) == 0,
-        "conflicts": conflicts
+        "conflicts": [
+            {
+                "id": project.id,
+                "project_name": project.project_name,
+                "project_manager": project.project_manager,
+                "material_dispatch_date": project.material_dispatch_date,
+                "dismantling_date": project.dismantling_date,
+            }
+            for project in conflicts
+        ],
     }

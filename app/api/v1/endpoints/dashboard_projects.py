@@ -68,6 +68,7 @@ def _serialize_project(row: Any) -> DashboardProjectRead:
         updated_at=get("updated_at") or datetime.now(timezone.utc),
     )
 
+
 def resolve_manager_entities(session: Session, pm_name: Optional[str]):
     normalized_name = (pm_name or "Unassigned").strip() or "Unassigned"
 
@@ -85,23 +86,72 @@ def resolve_manager_entities(session: Session, pm_name: Optional[str]):
     ).first()
     return manager, manager_user
 
+
+def sync_project_manager_and_allocation(session: Session, project: DashboardProject) -> None:
+    manager = None
+    manager_user = None
+
+    if project.project_manager is not None and project.project_manager.strip():
+        manager, manager_user = resolve_manager_entities(session, project.project_manager)
+        project.manager_id = manager.id
+    else:
+        manager, manager_user = resolve_manager_entities(session, None)
+        project.manager_id = manager.id
+
+    start_date = project.material_dispatch_date or project.event_start_date
+    existing_alloc = session.exec(
+        select(ManagerAllocation).where(ManagerAllocation.project_id == project.id)
+    ).first()
+
+    if not start_date:
+        if existing_alloc:
+            session.delete(existing_alloc)
+        session.add(project)
+        session.commit()
+        return
+
+    import datetime
+
+    end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
+
+    if existing_alloc:
+        existing_alloc.manager_id = manager.id
+        existing_alloc.manager_user_id = manager_user.id if manager_user else None
+        existing_alloc.allocation_start_date = start_date
+        existing_alloc.allocation_end_date = end_date
+        session.add(existing_alloc)
+    else:
+        session.add(
+            ManagerAllocation(
+                manager_id=manager.id,
+                manager_user_id=manager_user.id if manager_user else None,
+                project_id=project.id,
+                allocation_start_date=start_date,
+                allocation_end_date=end_date,
+            )
+        )
+    session.add(project)
+    session.commit()
+
+
 def get_session():
     with Session(engine) as session:
         yield session
 
+
 @router.get("/stats")
 def get_project_stats(session: Session = Depends(get_session)):
     projects = session.exec(select(DashboardProject)).all()
-    
+
     total = len(projects)
     open_briefs = sum(1 for p in projects if not p.stage or p.stage.lower() != "confirmed")
     won_projects = sum(1 for p in projects if p.stage and p.stage.lower() == "confirmed")
-    
+
     # Unique branch count
     branches = {p.branch for p in projects if p.branch}
     # Unique PM count
     pms = {p.project_manager for p in projects if p.project_manager}
-    
+
     return {
         "total": total,
         "open_briefs": open_briefs,
@@ -109,6 +159,7 @@ def get_project_stats(session: Session = Depends(get_session)):
         "branches_count": len(branches),
         "pm_count": len(pms)
     }
+
 
 @router.get("/", response_model=List[DashboardProjectRead])
 def get_projects(
@@ -132,87 +183,64 @@ def get_projects(
             response.append(_serialize_project(row))
         return response
 
+
 @router.post("/", response_model=DashboardProjectRead)
 def create_project(project_in: DashboardProjectCreate, session: Session = Depends(get_session)):
     project = DashboardProject.model_validate(project_in)
+
+    if project.project_manager is not None and project.project_manager.strip():
+        manager, _ = resolve_manager_entities(session, project.project_manager)
+        project.manager_id = manager.id
+
     session.add(project)
     session.commit()
     session.refresh(project)
-    
-    # Mirror into ManagerAllocation
-    manager, manager_user = resolve_manager_entities(session, project.project_manager)
-        
-    start_date = project.material_dispatch_date or project.event_start_date
-    if start_date:
-        import datetime
-        end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
-        alloc = ManagerAllocation(
-            manager_id=manager.id,
-            manager_user_id=manager_user.id if manager_user else None,
-            project_id=project.id,
-            allocation_start_date=start_date,
-            allocation_end_date=end_date
-        )
-        session.add(alloc)
-        session.commit()
-        
+
+    # Strictly synchronize ManagerAllocation to project dates.
+    sync_project_manager_and_allocation(session, project)
+    session.refresh(project)
     return project
+
 
 @router.put("/{project_id}", response_model=DashboardProjectRead)
 def update_project(project_id: int, project_in: DashboardProjectUpdate, session: Session = Depends(get_session)):
     project = session.get(DashboardProject, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     update_data = project_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(project, key, value)
-    
+
+    if project.project_manager is not None and project.project_manager.strip():
+        manager, _ = resolve_manager_entities(session, project.project_manager)
+        project.manager_id = manager.id
+    elif "project_manager" in update_data:
+        project.manager_id = None
+
     # Force updated_at for SQLite triggers
     project.updated_at = func.now()
-        
+
     session.add(project)
     session.commit()
     session.refresh(project)
-    
-    # Sync ManagerAllocation
-    manager, manager_user = resolve_manager_entities(session, project.project_manager)
 
-    start_date = project.material_dispatch_date or project.event_start_date
-    existing_alloc = session.exec(select(ManagerAllocation).where(ManagerAllocation.project_id == project.id)).first()
-    
-    if existing_alloc:
-        existing_alloc.manager_id = manager.id
-        existing_alloc.manager_user_id = manager_user.id if manager_user else None
-        if start_date:
-            import datetime
-            existing_alloc.allocation_start_date = start_date
-            existing_alloc.allocation_end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
-        session.add(existing_alloc)
-    elif start_date:
-        import datetime
-        end_date = project.dismantling_date or (start_date + datetime.timedelta(days=7))
-        new_alloc = ManagerAllocation(
-            manager_id=manager.id,
-            manager_user_id=manager_user.id if manager_user else None,
-            project_id=project.id,
-            allocation_start_date=start_date,
-            allocation_end_date=end_date
-        )
-        session.add(new_alloc)
-
-    session.commit()
+    # Strictly synchronize ManagerAllocation to project dates.
+    sync_project_manager_and_allocation(session, project)
+    session.refresh(project)
     return project
+
 
 @router.delete("/{project_id}")
 def delete_project(project_id: int, session: Session = Depends(get_session)):
     project = session.get(DashboardProject, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     session.delete(project)
     session.commit()
     return {"message": "Project deleted successfully"}
+
 
 @router.get("/manager/{manager_name}", response_model=List[DashboardProjectRead])
 def get_manager_projects(manager_name: str, session: Session = Depends(get_session)):
@@ -222,6 +250,7 @@ def get_manager_projects(manager_name: str, session: Session = Depends(get_sessi
     query = select(DashboardProject).where(DashboardProject.project_manager == manager_name)
     projects = session.exec(query).all()
     return projects
+
 
 @router.get("/availability-check")
 def check_availability(
@@ -234,34 +263,39 @@ def check_availability(
     Check availability for a manager or all managers in a date range.
     """
     if manager_name:
-        # Check specific manager
-        query = select(DashboardProject).where(DashboardProject.project_manager == manager_name)
-        projects = session.exec(query).all()
-        result = is_manager_available(start_date, end_date, [p.model_dump() for p in projects])
-        return {manager_name: result}
-    else:
-        # Check all managers
-        query = select(DashboardProject)
-        all_projects = session.exec(query).all()
-        
-        # Group by manager
-        manager_map = {}
-        for p in all_projects:
-            if not p.project_manager: continue
-            if p.project_manager not in manager_map:
-                manager_map[p.project_manager] = []
-            manager_map[p.project_manager].append(p.model_dump())
-            
-        results = {}
-        for pm, projects in manager_map.items():
-            results[pm] = is_manager_available(start_date, end_date, projects)
-            
-        return results
+        return {
+            manager_name: is_manager_available(
+                session=session,
+                new_start=start_date,
+                new_end=end_date,
+                manager_name=manager_name,
+            )
+        }
+
+    manager_names = session.exec(
+        select(DashboardProject.project_manager)
+        .where(DashboardProject.project_manager.is_not(None))
+        .distinct()
+    ).all()
+
+    results = {}
+    for pm in manager_names:
+        if not pm:
+            continue
+        results[pm] = is_manager_available(
+            session=session,
+            new_start=start_date,
+            new_end=end_date,
+            manager_name=pm,
+        )
+
+    return results
+
 
 @router.get("/timeline")
 def get_timeline_data(session: Session = Depends(get_session)):
     """
-    Dynamically group all active projects by their project_manager to build the timeline natively.
+    Build timeline data exclusively from ManagerAllocation records.
     """
     try:
         from collections import defaultdict
@@ -294,28 +328,6 @@ def get_timeline_data(session: Session = Depends(get_session)):
                 "manager_user_id": alloc.manager_user_id,
                 "allocation_start_date": alloc.allocation_start_date,
                 "allocation_end_date": alloc.allocation_end_date,
-                "project": project.model_dump()
-            })
-
-        # Include projects that do not yet have explicit managerallocation rows.
-        projects = session.exec(select(DashboardProject)).all()
-        projects_with_alloc = {a.project_id for a in allocations}
-        for project in projects:
-            if project.id in projects_with_alloc:
-                continue
-            start = project.material_dispatch_date or project.event_start_date
-            if not start:
-                continue
-            manager_name = project.project_manager or "Unassigned"
-            if manager_groups[manager_name]["manager"] is None:
-                manager_groups[manager_name]["manager"] = {"id": None, "name": manager_name}
-            manager_groups[manager_name]["allocations"].append({
-                "id": f"fallback-{project.id}",
-                "project_id": project.id,
-                "manager_id": None,
-                "manager_user_id": None,
-                "allocation_start_date": start,
-                "allocation_end_date": project.dismantling_date,
                 "project": project.model_dump()
             })
 
