@@ -5,6 +5,8 @@ from typing import Any, List, Optional, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
+from sqlalchemy.exc import IntegrityError
+import logging
 
 from app.db.session import engine
 from app.models.dashboard_project import DashboardProject, ProjectAuditLog, Client
@@ -13,6 +15,7 @@ from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProje
 from app.services.availability import is_manager_available
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 def get_session():
     with Session(engine) as session:
@@ -146,7 +149,16 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
         session.add(audit_entry)
 
     session.add(project)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        logger.warning("Project update failed integrity check for id=%s: %s", project_id, exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid project update payload (e.g., unknown manager/client reference).",
+        ) from exc
+
     session.refresh(project)
     return _serialize_project(project)
 

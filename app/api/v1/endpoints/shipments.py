@@ -30,7 +30,7 @@ class TrackRequest(BaseModel):
     recipient: Optional[str] = None
     shipment_name: Optional[str] = None
     show_date: Optional[str] = None
-    exhibition_name: str
+    exhibition_name: Optional[str] = None
     cs: Optional[str] = None
     no_of_box: Optional[str] = None
 
@@ -84,7 +84,7 @@ def track_shipment(
         recipient=body.recipient,
         items=body.shipment_name,
         show_date=body.show_date,
-        exhibition_name=body.exhibition_name,
+        exhibition_name=body.exhibition_name or "Unknown Exhibition",
         db=db,
     )
     if "error" in result:

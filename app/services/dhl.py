@@ -8,6 +8,17 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_dhl_tracking_number(tracking_number: str) -> str:
+    """
+    Normalize DHL tracking numbers from import flows.
+    Common issue: Excel numeric cells become values like `1234567890.0`.
+    """
+    tn = str(tracking_number or "").strip()
+    if tn.endswith(".0") and tn[:-2].isdigit():
+        tn = tn[:-2]
+    return "".join(ch for ch in tn if ch.isalnum())
+
 # Map DHL status code/description to dashboard categories
 DHL_STATUS_MAP = {
     "delivered": "Delivered",
@@ -57,7 +68,15 @@ class DHLService(CarrierService):
 
     def track(self, tracking_number: str) -> Dict[str, Any]:
         """Track a shipment using DHL Unified Tracking API."""
-        params = {"trackingNumber": tracking_number, "language": "en"}
+        normalized_tracking_number = _normalize_dhl_tracking_number(tracking_number)
+        if normalized_tracking_number != tracking_number:
+            logger.info(
+                "Normalized DHL tracking number from '%s' to '%s'",
+                tracking_number,
+                normalized_tracking_number,
+            )
+
+        params = {"trackingNumber": normalized_tracking_number, "language": "en"}
         headers = {
             "DHL-API-Key": self.api_key,
             "Accept": "application/json"
@@ -73,14 +92,14 @@ class DHLService(CarrierService):
 
             if response.status_code == 200:
                 raw_data = response.json()
-                return self._standardize_response(raw_data, tracking_number)
+                return self._standardize_response(raw_data, normalized_tracking_number)
             elif response.status_code == 404:
                 return {"carrier": "DHL", "error": "Shipment not found"}
             else:
-                logger.warning("DHL API returned %d for %s. Response: %s", response.status_code, tracking_number, response.text)
+                logger.warning("DHL API returned %d for %s. Response: %s", response.status_code, normalized_tracking_number, response.text)
                 return {"carrier": "DHL", "error": f"DHL API Error: {response.status_code}"}
         except Exception as e:
-            logger.error("DHL request failed for %s: %s", tracking_number, e)
+            logger.error("DHL request failed for %s: %s", normalized_tracking_number, e)
             return {"error": f"DHL Request Failed: {str(e)}"}
 
     def _extract_piece_data(self, shipment: Dict[str, Any]) -> Dict[str, Any]:
@@ -228,4 +247,4 @@ class DHLService(CarrierService):
 
         except Exception as e:
             logger.error("Error parsing DHL response: %s", e)
-            return {"error": f"Failed to parse DHL response: {str(e)}"}
+            return {"error": f"Failed to parse DHL response: {str(e)}"}
