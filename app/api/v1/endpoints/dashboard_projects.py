@@ -1,6 +1,11 @@
+import json
+from datetime import date as py_date
+from datetime import datetime, timezone
+from typing import Any, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
-from typing import List, Optional
+
 from app.db.session import engine
 from app.models.dashboard_project import DashboardProject
 from app.models.manager import Manager
@@ -8,10 +13,60 @@ from app.models.manager_allocation import ManagerAllocation
 from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
 from app.services.availability import is_manager_available
-from datetime import date as py_date
-from datetime import datetime, timezone
 
 router = APIRouter()
+
+
+def _coerce_list(value: Any) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, (tuple, set)):
+        return list(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return [value]
+        return parsed if isinstance(parsed, list) else [parsed]
+    return [value]
+
+
+def _serialize_project(row: Any) -> DashboardProjectRead:
+    # Supports both ORM objects and SQL mappings.
+    get = row.get if hasattr(row, "get") else lambda key, default=None: getattr(row, key, default)
+
+    return DashboardProjectRead(
+        id=get("id"),
+        project_name=get("project_name") or "Unknown",
+        date=get("date"),
+        client=get("client"),
+        city=get("city"),
+        event_name=get("event_name"),
+        venue=get("venue"),
+        area=get("area"),
+        event_start_date=get("event_start_date"),
+        event_end_date=get("event_end_date"),
+        material_dispatch_date=get("material_dispatch_date"),
+        installation_start_date=get("installation_start_date"),
+        installation_end_date=get("installation_end_date"),
+        dismantling_date=get("dismantling_date"),
+        project_manager=get("project_manager"),
+        team_type=get("team_type"),
+        stage=get("stage"),
+        branch=get("branch"),
+        board_stage=get("board_stage") or "TBC",
+        comments=_coerce_list(get("comments")),
+        materials=_coerce_list(get("materials")),
+        photos=_coerce_list(get("photos")),
+        qc_steps=_coerce_list(get("qc_steps")),
+        created_at=get("created_at") or datetime.now(timezone.utc),
+        updated_at=get("updated_at") or datetime.now(timezone.utc),
+    )
 
 def resolve_manager_entities(session: Session, pm_name: Optional[str]):
     normalized_name = (pm_name or "Unassigned").strip() or "Unassigned"
@@ -64,7 +119,8 @@ def get_projects(
         query = select(DashboardProject)
         if stage:
             query = query.where(DashboardProject.stage == stage)
-        return session.exec(query).all()
+        projects = session.exec(query).all()
+        return [_serialize_project(project) for project in projects]
     except Exception:
         # Production-safe fallback for partially migrated schemas:
         # return records from raw table shape, filling missing fields.
@@ -73,33 +129,7 @@ def get_projects(
         for row in rows:
             if stage and row.get("stage") != stage:
                 continue
-            response.append(DashboardProjectRead(
-                id=row.get("id"),
-                project_name=row.get("project_name") or "Unknown",
-                date=row.get("date"),
-                client=row.get("client"),
-                city=row.get("city"),
-                event_name=row.get("event_name"),
-                venue=row.get("venue"),
-                area=row.get("area"),
-                event_start_date=row.get("event_start_date"),
-                event_end_date=row.get("event_end_date"),
-                material_dispatch_date=row.get("material_dispatch_date"),
-                installation_start_date=row.get("installation_start_date"),
-                installation_end_date=row.get("installation_end_date"),
-                dismantling_date=row.get("dismantling_date"),
-                project_manager=row.get("project_manager"),
-                team_type=row.get("team_type"),
-                stage=row.get("stage"),
-                branch=row.get("branch"),
-                board_stage=row.get("board_stage") or "TBC",
-                comments=row.get("comments") or [],
-                materials=row.get("materials") or [],
-                photos=row.get("photos") or [],
-                qc_steps=row.get("qc_steps") or [],
-                created_at=row.get("created_at") or datetime.now(timezone.utc),
-                updated_at=row.get("updated_at") or datetime.now(timezone.utc),
-            ))
+            response.append(_serialize_project(row))
         return response
 
 @router.post("/", response_model=DashboardProjectRead)
