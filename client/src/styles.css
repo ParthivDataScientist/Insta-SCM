@@ -1503,6 +1503,26 @@ select {
     color: var(--tx)
 }
 
+.tracking-table--projects .project-date-heading,
+.tracking-table--projects .project-date-cell {
+    white-space: nowrap;
+}
+
+.tracking-table--projects .project-date-heading {
+    min-width: 124px;
+}
+
+.tracking-table--projects .project-date-cell {
+    font-variant-numeric: tabular-nums;
+}
+
+.tracking-table--projects .project-date-cell__content {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
 .tid-cell {
     display: flex;
     align-items: center;
@@ -2892,10 +2912,11 @@ select {
     color: var(--tx);
     font-size: 13px;
     font-weight: 600;
-    width: 90px;
+    width: 108px;
     outline: none;
     padding: 2px 0;
     text-align: center;
+    white-space: nowrap;
 }
 
 .calendar-picker-popover {
