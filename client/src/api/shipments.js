@@ -29,8 +29,16 @@ const shipmentsService = {
         return response.data;
     },
 
-    trackShipment: async (trackingNumber, data = {}) => {
-        const response = await apiClient.post(`/api/v1/shipments/track/${trackingNumber}`, data);
+    trackShipment: async (trackingNumber, payload = {}) => {
+        const response = await apiClient.post(`/api/v1/shipments/track/${trackingNumber}`, payload);
+        return response.data;
+    },
+
+    refreshShipments: async (shipmentIds = null) => {
+        const payload = shipmentIds && shipmentIds.length > 0
+            ? { shipment_ids: shipmentIds }
+            : { shipment_ids: null };
+        const response = await apiClient.post('/api/v1/shipments/refresh', payload);
         return response.data;
     },
 

@@ -73,6 +73,7 @@ const ShipmentTable = ({
     onSelectShipment, 
     onDeleteShipment, 
     onArchiveShipment, 
+    onRefreshShipment,
     onTracked,
     selectedIds = [],
     onSelectionChange = () => {}
@@ -227,6 +228,7 @@ const ShipmentTable = ({
                                     onSelectShipment={onSelectShipment} 
                                     onDeleteShipment={onDeleteShipment} 
                                     onArchiveShipment={onArchiveShipment}
+                                    onRefreshShipment={onRefreshShipment}
                                     onTracked={onTracked}
                                     isSelected={selectedIds.includes(s.id)}
                                     onSelectRow={(e) => handleSelectRow(e, s.id)}
@@ -252,13 +254,22 @@ const ShipmentRowGroup = ({
     onSelectShipment, 
     onDeleteShipment, 
     onArchiveShipment, 
+    onRefreshShipment,
     onTracked,
     isSelected,
     onSelectRow
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [loadingChild, setLoadingChild] = useState(null);
+    const [syncingMaster, setSyncingMaster] = useState(false);
     const hasChildren = s.child_parcels && s.child_parcels.length > 0;
+    const canExpand = Boolean(s.is_master || hasChildren);
+
+    useEffect(() => {
+        if (hasChildren) {
+            setIsExpanded(true);
+        }
+    }, [hasChildren]);
 
     const handleTrackChild = async (child) => {
         setLoadingChild(child.tracking_number);
@@ -295,6 +306,28 @@ const ShipmentRowGroup = ({
         }
     };
 
+    const handleToggleChildren = async (e) => {
+        e.stopPropagation();
+
+        if (hasChildren) {
+            setIsExpanded(prev => !prev);
+            return;
+        }
+
+        if (!s.is_master || !onRefreshShipment) {
+            return;
+        }
+
+        setSyncingMaster(true);
+        try {
+            await onRefreshShipment([s.id]);
+        } catch (err) {
+            alert(err.message || 'Could not load child packages');
+        } finally {
+            setSyncingMaster(false);
+        }
+    };
+
     return (
         <Fragment>
             <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={isSelected ? 'row-selected' : ''}>
@@ -305,15 +338,13 @@ const ShipmentRowGroup = ({
                 </td>
                 <td>
                     <div className="tid-cell">
-                        {hasChildren && (
+                        {canExpand && (
                             <div 
                                 className="child-nav" 
-                                onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    setIsExpanded(!isExpanded); 
-                                }}
+                                onClick={handleToggleChildren}
+                                title={hasChildren ? 'Show child packages' : 'Sync child packages'}
                             >
-                                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                {syncingMaster ? <Loader size={14} className="animate-spin" /> : (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                             </div>
                         )}
                         <div className="tid-icon"><Package size={14} /></div>

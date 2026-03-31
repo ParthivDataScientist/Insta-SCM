@@ -18,6 +18,10 @@ export function useShipments() {
     const [dateFilter, setDateFilter] = useState('All');
     const [isArchivedView, setIsArchivedView] = useState(false);
 
+    const getErrorMessage = useCallback((err) => {
+        return err?.response?.data?.detail || err?.message || 'Something went wrong';
+    }, []);
+
     const loadData = useCallback(async (includeArchived = null) => {
         const archivedState = includeArchived !== null ? includeArchived : isArchivedView;
         if (includeArchived !== null) setIsArchivedView(includeArchived);
@@ -25,19 +29,38 @@ export function useShipments() {
         setLoading(true);
         setError(null);
         try {
-            const [shipmentsData, statsData] = await Promise.all([
+            let [shipmentsData, statsData] = await Promise.all([
                 archivedState ? shipmentsService.fetchArchivedShipments() : shipmentsService.fetchShipments(),
                 shipmentsService.fetchStats(),
             ]);
+
+            const staleMasterIds = archivedState
+                ? []
+                : shipmentsData
+                    .filter(s => s.is_master && (!Array.isArray(s.child_parcels) || s.child_parcels.length === 0))
+                    .map(s => s.id)
+                    .filter(Boolean);
+
+            if (staleMasterIds.length > 0) {
+                const refreshResult = await shipmentsService.refreshShipments(staleMasterIds);
+                [shipmentsData, statsData] = await Promise.all([
+                    shipmentsService.fetchShipments(),
+                    shipmentsService.fetchStats(),
+                ]);
+                if (refreshResult.failed > 0) {
+                    setError(`Refreshed ${refreshResult.refreshed} shipment(s), but ${refreshResult.failed} could not be re-synced.`);
+                }
+            }
+
             setShipments(shipmentsData);
             setStats(statsData);
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
             console.error('Failed to load data from backend:', err);
         } finally {
             setLoading(false);
         }
-    }, [isArchivedView]);
+    }, [getErrorMessage, isArchivedView]);
 
     useEffect(() => { loadData(false); }, [loadData]); // Initial load default to dashboard
 
@@ -49,11 +72,11 @@ export function useShipments() {
             // Refresh stats in background
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
             console.error('Failed to archive shipment:', err);
             loadData(); // Rollback on error
         }
-    }, [loadData]);
+    }, [getErrorMessage, loadData]);
 
     const deleteShipment = useCallback(async (id) => {
         // Optimistic Update
@@ -62,11 +85,11 @@ export function useShipments() {
             await shipmentsService.deleteShipment(id);
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
             console.error('Failed to delete shipment:', err);
             loadData(); // Rollback
         }
-    }, [loadData]);
+    }, [getErrorMessage, loadData]);
 
     const batchArchive = useCallback(async (ids, archive) => {
         // Optimistic Update
@@ -75,10 +98,10 @@ export function useShipments() {
             await shipmentsService.batchArchiveShipments(ids, archive);
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
             loadData();
         }
-    }, [loadData]);
+    }, [getErrorMessage, loadData]);
 
     const batchDelete = useCallback(async (ids) => {
         // Optimistic Update
@@ -87,10 +110,10 @@ export function useShipments() {
             await shipmentsService.batchDeleteShipments(ids);
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
             loadData();
         }
-    }, [loadData]);
+    }, [getErrorMessage, loadData]);
 
     const importExcel = useCallback(async (file) => {
         setLoading(true);
@@ -99,12 +122,34 @@ export function useShipments() {
             await shipmentsService.importExcel(file);
             await loadData();
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
             console.error('Failed to import Excel file:', err);
         } finally {
             setLoading(false);
         }
-    }, [loadData]);
+    }, [getErrorMessage, loadData]);
+
+    const refreshTracking = useCallback(async (shipmentIds = null) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await shipmentsService.refreshShipments(shipmentIds);
+            await loadData();
+            if (result.failed > 0) {
+                const message = `Refreshed ${result.refreshed} shipment(s), but ${result.failed} could not be re-synced.`;
+                setError(message);
+                throw new Error(message);
+            }
+            return result;
+        } catch (err) {
+            const message = getErrorMessage(err);
+            setError(message);
+            console.error('Failed to refresh shipments:', err);
+            throw new Error(message);
+        } finally {
+            setLoading(false);
+        }
+    }, [getErrorMessage, loadData]);
 
     const filteredShipments = useMemo(() => {
         return shipments.filter(item => {
@@ -158,11 +203,11 @@ export function useShipments() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [getErrorMessage]);
 
     return {
         shipments,
@@ -181,6 +226,7 @@ export function useShipments() {
         batchDelete,
         batchArchive,
         importExcel,
+        refreshTracking,
         exportExcel,
     };
 }

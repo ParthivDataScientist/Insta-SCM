@@ -4,7 +4,7 @@ import time
 import logging
 from .carrier_base import CarrierService, HISTORY_STATUS_MAP
 from app.core.config import settings
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +115,105 @@ class FedExService(CarrierService):
             logger.error("FedEx Auth Failed: %s", e)
             raise
 
+    def _extract_tracking_number(self, payload: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(payload, dict):
+            return None
+        return (
+            payload.get("trackingNumberInfo", {}).get("trackingNumber")
+            or payload.get("trackingNumber")
+            or payload.get("tracking_number")
+        )
+
+    def _extract_track_results(self, payload: Any) -> List[Dict[str, Any]]:
+        """
+        FedEx MPS responses can nest piece results in a few different places.
+        Walk the payload recursively and collect any dict that looks like a
+        track result so child parcels are not lost when the shape varies.
+        """
+        collected: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def visit(node: Any) -> None:
+            if isinstance(node, dict):
+                tracking_number = self._extract_tracking_number(node)
+                if tracking_number and (
+                    "latestStatusDetail" in node
+                    or "scanEvents" in node
+                    or "dateAndTimes" in node
+                    or "associatedShipments" in node
+                ):
+                    if tracking_number not in seen:
+                        seen.add(tracking_number)
+                        collected.append(node)
+                for value in node.values():
+                    visit(value)
+            elif isinstance(node, list):
+                for item in node:
+                    visit(item)
+
+        visit(payload)
+        return collected
+
+    def _build_child_parcel(self, piece: Dict[str, Any], tracking_number: str) -> Dict[str, Any]:
+        child_data = self._extract_piece_data(piece)
+        return {
+            "tracking_number": tracking_number,
+            "status": child_data["status"],
+            "raw_status": child_data["raw_status"],
+            "origin": child_data["origin"],
+            "destination": child_data["destination"],
+            "eta": child_data["eta"],
+            "last_date": child_data["last_date"],
+            "last_location": child_data["last_location"],
+            "carrier": "FedEx",
+        }
+
+    def _request_track(self, url: str, headers: Dict[str, str], body: Dict[str, Any], timeout: int = 15) -> Optional[Dict[str, Any]]:
+        response = requests.post(url, headers=headers, json=body, timeout=timeout)
+        if response.status_code != 200:
+            logger.warning("FedEx API returned %d for body %s", response.status_code, json.dumps(body)[:200])
+            return None
+        return response.json()
+
+    def _track_with_mps_variants(self, track_url: str, headers: Dict[str, str], tracking_number: str) -> Optional[Dict[str, Any]]:
+        """
+        Inference from FedEx docs: MPS tracking requires the master number with
+        STANDARD_MPS. We try a small set of request variants and keep the first
+        one that actually returns child parcels.
+        """
+        variant_bodies = [
+            {
+                "trackingInfo": [
+                    {
+                        "trackingNumberInfo": {"trackingNumber": tracking_number},
+                        "associatedType": "STANDARD_MPS",
+                    }
+                ],
+                "includeDetailedScans": True,
+            },
+            {
+                "trackingInfo": [
+                    {
+                        "trackingNumberInfo": {"trackingNumber": tracking_number},
+                        "packageIdentifier": {
+                            "type": "STANDARD_MPS",
+                            "value": tracking_number,
+                        },
+                    }
+                ],
+                "includeDetailedScans": True,
+            },
+        ]
+
+        for body in variant_bodies:
+            raw_data = self._request_track(track_url, headers, body)
+            if not raw_data:
+                continue
+            parsed = self._standardize_response(raw_data, tracking_number)
+            if parsed.get("child_parcels"):
+                return parsed
+        return None
+
     def track(self, tracking_number: str) -> Dict[str, Any]:
         normalized_tracking_number = _normalize_fedex_tracking_number(tracking_number)
         if normalized_tracking_number != tracking_number:
@@ -142,9 +241,8 @@ class FedExService(CarrierService):
         }
 
         try:
-            resp = requests.post(track_url, headers=headers, json=body, timeout=15)
-            if resp.status_code == 200:
-                raw_data = resp.json()
+            raw_data = self._request_track(track_url, headers, body, timeout=15)
+            if raw_data:
 
                 # --- NEW CODE: MPS Check ---
                 # Default associated payload
@@ -160,11 +258,15 @@ class FedExService(CarrierService):
                     # 1. Check associatedShipments array
                     for assoc in associated_shipments:
                         rel_type = assoc.get("type", "").upper()
-                        if rel_type == "CHILD" or rel_type == "ASSOCIATED":
+                        assoc_tn = self._extract_tracking_number(assoc)
+                        if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT", "PIECE"):
+                            is_master = True
+                            break
+                        if assoc_tn and assoc_tn != normalized_tracking_number:
                             is_master = True
                             break
                         elif rel_type == "MASTER":
-                            master_tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
+                            master_tn = assoc_tn
 
                     # 2. Check packageIdentifiers for STANDARD_MPS
                     if not is_master:
@@ -174,7 +276,7 @@ class FedExService(CarrierService):
                                 values = pkg.get("values", [])
                                 if values:
                                     master_tn = values[0]
-                                    if master_tn == normalized_tracking_number:
+                                    if normalized_tracking_number in values or master_tn == normalized_tracking_number:
                                         is_master = True
                                 break
 
@@ -183,30 +285,36 @@ class FedExService(CarrierService):
                         assoc_url = f"{self.base_url}/track/v1/associatedshipments"
                         assoc_body = {
                             "masterTrackingNumberInfo": {
-                                "trackingNumberInfo": {
-                                    "trackingNumber": normalized_tracking_number
-                                }
+                                "trackingNumber": normalized_tracking_number
                             },
                             "associatedType": "STANDARD_MPS",
+                            "associatedReturnReferenceIndicator": "false",
                             "includeDetailedScans": True
                         }
                         assoc_resp = requests.post(assoc_url, headers=headers, json=assoc_body, timeout=20)
                         
                         if assoc_resp.status_code == 200:
                             assoc_data = assoc_resp.json()
-                            try:
-                                associated_results = assoc_data["output"]["completeTrackResults"][0]["trackResults"]
-                            except (KeyError, IndexError):
-                                associated_results = []
+                            associated_results = assoc_data.get("output", {}).get("completeTrackResults", [])
+                            if not associated_results:
+                                associated_results = self._extract_track_results(assoc_data)
                         else:
                             logger.warning(f"Failed to fetch associated shipments for MPS {normalized_tracking_number}: {assoc_resp.status_code}")
+
+                    if not associated_results and associated_shipments:
+                        associated_results = associated_shipments
                 except (KeyError, IndexError) as e:
                     logger.error(f"Error inspecting MPS raw data for {normalized_tracking_number}: {e}")
 
-                return self._standardize_response(raw_data, normalized_tracking_number, associated_results, master_tn, is_master)
+                parsed = self._standardize_response(raw_data, normalized_tracking_number, associated_results, master_tn, is_master)
+                if parsed.get("is_master") and not parsed.get("child_parcels"):
+                    inferred_mps_result = self._track_with_mps_variants(track_url, headers, normalized_tracking_number)
+                    if inferred_mps_result and inferred_mps_result.get("child_parcels"):
+                        return inferred_mps_result
+                return parsed
             else:
-                logger.warning("FedEx API returned %d for %s", resp.status_code, normalized_tracking_number)
-                return {"error": f"FedEx API Error: {resp.status_code} — {resp.text[:200]}"}
+                logger.warning("FedEx tracking request failed for %s", normalized_tracking_number)
+                return {"error": "FedEx API Error: tracking request failed."}
         except Exception as e:
             logger.error("FedEx request failed for %s: %s", normalized_tracking_number, e)
             return {"error": f"Request Failed: {str(e)}"}
@@ -343,47 +451,34 @@ class FedExService(CarrierService):
             associated_shipments = output.get("associatedShipments", [])
             child_parcels: list = []
             master_tracking_number = master_tn
+            seen_children: set[str] = set()
+
+            def append_child(piece: Dict[str, Any], fallback_tracking_number: Optional[str] = None) -> None:
+                track_results = piece.get("trackResults", []) if isinstance(piece, dict) else []
+                piece_output = track_results[0] if track_results else piece
+                child_tracking_number = (
+                    self._extract_tracking_number(piece)
+                    or self._extract_tracking_number(piece_output)
+                    or fallback_tracking_number
+                )
+                if not child_tracking_number or child_tracking_number == tracking_number or child_tracking_number in seen_children:
+                    return
+                seen_children.add(child_tracking_number)
+                child_parcels.append(self._build_child_parcel(piece_output, child_tracking_number))
 
             if associated_results:
                 is_master = True
                 for c_res in associated_results:
-                    c_tn = c_res.get("trackingNumberInfo", {}).get("trackingNumber")
-                    if not c_tn or c_tn == tracking_number:
-                        continue
-                    
-                    # Extract full details for child parcel
-                    child_data = self._extract_piece_data(c_res)
-                    child_parcels.append({
-                        "tracking_number": c_tn,
-                        "status": child_data["status"],
-                        "raw_status": child_data["raw_status"],
-                        "origin": child_data["origin"],
-                        "destination": child_data["destination"],
-                        "eta": child_data["eta"],
-                        "last_date": child_data["last_date"],
-                        "last_location": child_data["last_location"],
-                        "carrier": "FedEx",
-                    })
+                    append_child(c_res)
             else:
                 for assoc in associated_shipments:
                     rel_type = assoc.get("type", "").upper()
-                    tn = assoc.get("trackingNumberInfo", {}).get("trackingNumber")
+                    tn = self._extract_tracking_number(assoc)
                     if not tn:
                         continue
 
-                    if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT"):
-                        child_data = self._extract_piece_data(assoc)
-                        child_parcels.append({
-                            "tracking_number": tn,
-                            "status": child_data["status"],
-                            "raw_status": child_data["raw_status"],
-                            "origin": child_data["origin"],
-                            "destination": child_data["destination"],
-                            "eta": child_data["eta"],
-                            "last_date": child_data["last_date"],
-                            "last_location": child_data["last_location"],
-                            "carrier": "FedEx",
-                        })
+                    if rel_type in ("CHILD", "ASSOCIATED", "ASSOCIATED_SHIPMENT", "PIECE") or tn != tracking_number:
+                        append_child(assoc, tn)
                         is_master = True
                     elif rel_type == "MASTER":
                         if not master_tracking_number:

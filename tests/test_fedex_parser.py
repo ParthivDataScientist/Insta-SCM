@@ -133,3 +133,137 @@ class TestFedExMPSParser:
         result = fedex_service._standardize_response(fedex_mps_response, "999000000000")
         expected = {"888000000001", "888000000002", "888000000003"}
         assert set(result["child_tracking_numbers"]) == expected
+
+    def test_track_extracts_children_from_nested_associated_response(self, fedex_service, fedex_response, monkeypatch):
+        main_response = json.loads(json.dumps(fedex_response))
+        track_result = main_response["output"]["completeTrackResults"][0]["trackResults"][0]
+        track_result["associatedShipments"] = []
+        track_result["additionalTrackingInfo"] = {
+            "packageIdentifiers": [
+                {
+                    "type": "STANDARD_MPS",
+                    "values": ["884158465641"],
+                }
+            ]
+        }
+
+        associated_response = {
+            "output": {
+                "completeTrackResults": [
+                    {
+                        "trackResults": [
+                            {
+                                "packageDetails": {
+                                    "pieces": [
+                                        {
+                                            "trackingNumberInfo": {"trackingNumber": "884158465642"},
+                                            "latestStatusDetail": {"statusByLocale": "In transit"},
+                                            "scanEvents": [],
+                                        },
+                                        {
+                                            "trackingNumberInfo": {"trackingNumber": "884158465643"},
+                                            "latestStatusDetail": {"statusByLocale": "Delivered"},
+                                            "scanEvents": [],
+                                        },
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        auth_response = MagicMock()
+        auth_response.raise_for_status = MagicMock()
+        auth_response.json.return_value = {"access_token": "token", "expires_in": 3600}
+
+        track_response = MagicMock()
+        track_response.status_code = 200
+        track_response.json.return_value = main_response
+
+        assoc_response = MagicMock()
+        assoc_response.status_code = 200
+        assoc_response.json.return_value = associated_response
+
+        responses = [auth_response, track_response, assoc_response]
+
+        def fake_post(*args, **kwargs):
+            return responses.pop(0)
+
+        monkeypatch.setattr("app.services.fedex.requests.post", fake_post)
+
+        result = fedex_service.track("884158465641")
+
+        assert result["is_master"] is True
+        assert {parcel["tracking_number"] for parcel in result["child_parcels"]} == {
+            "884158465642",
+            "884158465643",
+        }
+
+    def test_track_extracts_children_from_complete_track_results_shape(self, fedex_service, fedex_response, monkeypatch):
+        main_response = json.loads(json.dumps(fedex_response))
+        track_result = main_response["output"]["completeTrackResults"][0]["trackResults"][0]
+        track_result["associatedShipments"] = []
+        track_result["additionalTrackingInfo"] = {
+            "packageIdentifiers": [
+                {
+                    "type": "STANDARD_MPS",
+                    "values": ["884158465641"],
+                }
+            ]
+        }
+
+        associated_response = {
+            "output": {
+                "completeTrackResults": [
+                    {
+                        "trackingNumber": "884158465642",
+                        "trackResults": [
+                            {
+                                "trackingNumberInfo": {"trackingNumber": "884158465642"},
+                                "latestStatusDetail": {"statusByLocale": "In transit"},
+                                "scanEvents": [],
+                            }
+                        ],
+                    },
+                    {
+                        "trackingNumber": "884158465643",
+                        "trackResults": [
+                            {
+                                "trackingNumberInfo": {"trackingNumber": "884158465643"},
+                                "latestStatusDetail": {"statusByLocale": "Delivered"},
+                                "scanEvents": [],
+                            }
+                        ],
+                    },
+                ]
+            }
+        }
+
+        auth_response = MagicMock()
+        auth_response.raise_for_status = MagicMock()
+        auth_response.json.return_value = {"access_token": "token", "expires_in": 3600}
+
+        track_response = MagicMock()
+        track_response.status_code = 200
+        track_response.json.return_value = main_response
+
+        assoc_response = MagicMock()
+        assoc_response.status_code = 200
+        assoc_response.json.return_value = associated_response
+
+        responses = [auth_response, track_response, assoc_response]
+
+        def fake_post(*args, **kwargs):
+            return responses.pop(0)
+
+        monkeypatch.setattr("app.services.fedex.requests.post", fake_post)
+
+        result = fedex_service.track("884158465641")
+
+        assert result["is_master"] is True
+        assert {parcel["tracking_number"] for parcel in result["child_parcels"]} == {
+            "884158465642",
+            "884158465643",
+        }

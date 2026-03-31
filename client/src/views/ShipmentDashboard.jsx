@@ -70,11 +70,11 @@ export default function ShipmentDashboard() {
     const {
         shipments, stats, loading, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, setCarrierFilter, setDateFilter,
-        deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, exportExcel,
+        deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
 
     const handleRefresh = async () => {
-        await loadData();
+        await refreshTracking();
         setLastUpdated(new Date());
     };
 
@@ -88,8 +88,7 @@ export default function ShipmentDashboard() {
         [shipments]
     );
 
-    const handleDelete = (e, id) => {
-        e.stopPropagation();
+    const handleDelete = (id) => {
         if (window.confirm('Delete this shipment?')) deleteShipment(id);
     };
 
@@ -340,8 +339,9 @@ export default function ShipmentDashboard() {
                                                 allShipments={shipments}
                                                 loading={loading}
                                                 onSelectShipment={setSelected}
-                                                onDeleteShipment={(id) => handleDelete(new Event('click'), id)}
+                                                onDeleteShipment={handleDelete}
                                                 onArchiveShipment={handleArchive}
+                                                onRefreshShipment={refreshTracking}
                                                 onTracked={loadData}
                                                 selectedIds={selectedIds}
                                                 onSelectionChange={setSelectedIds}

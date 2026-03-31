@@ -44,29 +44,36 @@ const TrackModal = ({ onClose, onTracked }) => {
     };
 
     const handleTrack = async () => {
-        if (!trackingNum.trim()) {
+        const trackingNumber = trackingNum.trim().toUpperCase();
+        const shipmentLabel = shipmentName.trim();
+        const exhibition = exhibitionName.trim();
+        const eventDate = showDate.trim();
+        const incoterm = cs.trim();
+        const boxCount = noOfBox.trim();
+
+        if (!trackingNumber) {
             setError('Please enter a tracking number');
             return;
         }
-        if (!exhibitionName.trim()) {
+        if (!exhibition) {
             setError('Please enter an Exhibition Name');
             return;
         }
         setLoading(true);
         setError('');
         try {
-            await shipmentsService.trackShipment(
-                trackingNum.trim().toUpperCase(),
-                shipmentName.trim() || null,
-                showDate.trim() || null,
-                exhibitionName.trim(),
-                cs.trim() || null,
-                noOfBox.trim() || null
-            );
+            await shipmentsService.trackShipment(trackingNumber, {
+                recipient: shipmentLabel || null,
+                shipment_name: shipmentLabel || null,
+                show_date: eventDate || null,
+                exhibition_name: exhibition,
+                cs: incoterm || null,
+                no_of_box: boxCount || null
+            });
             onTracked();
             onClose();
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.detail || err.message || 'Failed to track shipment');
         } finally {
             setLoading(false);
         }

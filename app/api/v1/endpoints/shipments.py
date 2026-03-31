@@ -17,7 +17,7 @@ from app.core.security import verify_api_key
 from app.db.session import get_session
 from app.models.shipment import Shipment
 from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
-from app.services.shipment_service import get_stats, track_and_save, preview_track
+from app.services.shipment_service import get_stats, track_and_save, preview_track, refresh_tracked_shipments
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,6 +39,11 @@ class BatchRequest(BaseModel):
     """Request body for batch operations."""
     shipment_ids: List[int]
     archive: Optional[bool] = None
+
+
+class RefreshRequest(BaseModel):
+    """Request body for re-syncing saved shipment records."""
+    shipment_ids: Optional[List[int]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +91,8 @@ def track_shipment(
         show_date=body.show_date,
         exhibition_name=body.exhibition_name or "Unknown Exhibition",
         db=db,
+        cs=body.cs,
+        no_of_box=body.no_of_box,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -377,6 +384,16 @@ def export_shipments(
 def shipment_stats(db: Session = Depends(get_session)):
     """Return counts by status for the dashboard stat cards (SQL aggregation)."""
     return get_stats(db)
+
+
+@router.post("/refresh", status_code=200)
+def refresh_shipments(
+    body: RefreshRequest,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """Refresh saved shipments from their carriers and hydrate missing MPS child parcels."""
+    return refresh_tracked_shipments(db=db, shipment_ids=body.shipment_ids)
 
 
 # ---------------------------------------------------------------------------

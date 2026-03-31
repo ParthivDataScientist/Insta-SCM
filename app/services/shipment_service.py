@@ -4,7 +4,7 @@ Encapsulates all business logic for tracking and managing shipments.
 Endpoints should call these functions instead of containing business logic directly.
 """
 import logging
-from typing import Optional
+from typing import Optional, Sequence
 
 from sqlmodel import Session, select
 from sqlalchemy import func, case
@@ -207,6 +207,56 @@ def preview_track(tracking_number: str) -> dict:
     result["tracking_number"] = tracking_number
     result["carrier"] = carrier_name
     return result
+
+
+def refresh_tracked_shipments(
+    db: Session,
+    shipment_ids: Optional[Sequence[int]] = None,
+    include_archived: bool = False,
+) -> dict:
+    """
+    Re-sync one or more saved shipments from the carrier APIs.
+    Useful for pulling fresh statuses and hydrating MPS child parcels that may
+    have been missing in older saved records.
+    """
+    statement = select(Shipment)
+    if shipment_ids:
+        statement = statement.where(Shipment.id.in_(list(shipment_ids)))
+    if not include_archived:
+        statement = statement.where(Shipment.is_archived == False)
+
+    shipments = db.exec(statement).all()
+    refreshed = 0
+    errors: list[str] = []
+
+    for shipment in shipments:
+        result = track_and_save(
+            tracking_number=shipment.tracking_number,
+            recipient=shipment.recipient,
+            items=shipment.items,
+            show_date=shipment.show_date,
+            exhibition_name=shipment.exhibition_name or "Unknown Exhibition",
+            db=db,
+            cs=shipment.cs,
+            no_of_box=shipment.no_of_box,
+        )
+        if "error" in result:
+            errors.append(f"{shipment.tracking_number}: {result['error']}")
+        else:
+            refreshed_shipment = db.exec(
+                select(Shipment).where(Shipment.tracking_number == shipment.tracking_number)
+            ).first()
+            if refreshed_shipment and refreshed_shipment.is_master and not (refreshed_shipment.child_parcels or []):
+                errors.append(f"{shipment.tracking_number}: master shipment refreshed but no child packages were returned by the carrier.")
+            else:
+                refreshed += 1
+
+    return {
+        "requested": len(shipments),
+        "refreshed": refreshed,
+        "failed": len(errors),
+        "errors": errors,
+    }
 
 
 def toggle_archive(shipment_id: int, db: Session) -> Optional[Shipment]:
