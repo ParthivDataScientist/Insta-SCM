@@ -82,10 +82,40 @@ export default function ManagerTimeline() {
     staleTime: 10000
   });
 
-  const { data: managersList, refetch: refetchManagers } = useQuery({
+  useQuery({
     queryKey: ['managers_list'],
     queryFn: projectsService.fetchManagers,
   });
+
+  const refreshTimelineCaches = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['manager_timeline'] }),
+      queryClient.invalidateQueries({ queryKey: ['projects'] }),
+      queryClient.invalidateQueries({ queryKey: ['projectStats'] }),
+    ]);
+    await refetch();
+  };
+
+  const handleAllocationCommit = async (id, data) => {
+    const payload = {};
+
+    if (Object.prototype.hasOwnProperty.call(data, 'manager_id')) {
+      payload.manager_id = data.manager_id ?? null;
+    }
+
+    if (data.allocation_start_date) {
+      payload.dispatch_date = data.allocation_start_date;
+    }
+
+    if (data.allocation_end_date) {
+      payload.dismantling_date = data.allocation_end_date;
+    }
+
+    if (Object.keys(payload).length === 0) return;
+
+    await projectsService.updateProject(id, payload);
+    await refreshTimelineCaches();
+  };
 
 
   // Filtering Logic
@@ -232,13 +262,9 @@ export default function ManagerTimeline() {
             </div>
 
             <div className="header-right">
-              <div className="animate-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'var(--bg-in)', borderRadius: 'var(--r-md)', border: '1px solid var(--bd)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--tx3)', textTransform: 'uppercase' }}>
-                  {timeWindow.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                </span>
+              <div className="animate-card" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 8px', background: 'var(--bg-in)', borderRadius: 'var(--r-md)', border: '1px solid var(--bd)' }}>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <button className="icon-btn" onClick={() => goToMonth(-1)} style={{ width: '28px', height: '28px' }}><ChevronLeft size={14} /></button>
-                  <button className="icon-btn" onClick={goToToday} style={{ fontSize: '10px', fontWeight: 800, padding: '0 8px' }}>TODAY</button>
                   <button className="icon-btn" onClick={() => goToMonth(1)} style={{ width: '28px', height: '28px' }}><ChevronRight size={14} /></button>
                 </div>
               </div>
@@ -382,22 +408,7 @@ export default function ManagerTimeline() {
                       cellWidth={cellWidth}
                       viewMode={viewMode}
                       onProjectClick={setSelectedProject}
-                      onReassign={async (id, newPMId) => {
-                        await projectsService.updateProject(id, { manager_id: newPMId || null }); 
-                        queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
-                        queryClient.invalidateQueries({ queryKey: ['projects'] });
-                        queryClient.invalidateQueries({ queryKey: ['projectStats'] });
-                      }}
-                      onDateUpdate={async (id, data) => {
-                        // Map allocation keys back to project DB columns natively
-                        await projectsService.updateProject(id, {
-                           dispatch_date: data.allocation_start_date,
-                           dismantling_date: data.allocation_end_date
-                        });
-                        queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
-                        queryClient.invalidateQueries({ queryKey: ['projects'] });
-                        queryClient.invalidateQueries({ queryKey: ['projectStats'] });
-                      }}
+                      onAllocationCommit={handleAllocationCommit}
                       onRemoveManager={async (idOrName) => {
                         if (typeof idOrName === 'string' && virtualManagers.includes(idOrName)) {
                           setVirtualManagers(prev => prev.filter(v => v !== idOrName));
@@ -424,7 +435,7 @@ export default function ManagerTimeline() {
                     );
                   })}
 
-                  {/* Today Line - Fixed with maximum Z-Index and High Contrast */}
+                   {/* Today indicator removed */}
                   {viewMode === 'Day' && timeUnits.some(d => d.toDateString() === new Date().toDateString()) && (
                     <div style={{
                       position: 'absolute', top: 0, bottom: '-2000px',
@@ -437,9 +448,9 @@ export default function ManagerTimeline() {
                         return 240 + (diffDays * cellWidth) + (cellWidth / 2);
                       })(),
                       width: '3px', background: 'var(--red)', zIndex: 99, pointerEvents: 'none',
-                      boxShadow: '0 0 8px rgba(255, 60, 60, 0.4)'
+                      boxShadow: 'none'
                     }}>
-                      <div style={{ fontSize: '11px', fontWeight: 900, color: 'white', background: 'var(--red)', padding: '4px 8px', borderRadius: '4px', position: 'sticky', top: '24px', marginLeft: '-16px', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>NOW</div>
+                      <div style={{ fontSize: '11px', fontWeight: 900, color: 'white', background: 'var(--red)', padding: '4px 8px', borderRadius: '4px', position: 'sticky', top: '24px', marginLeft: '-16px', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}></div>
                     </div>
                   )}
                 </div>
@@ -450,10 +461,7 @@ export default function ManagerTimeline() {
               projects={unassignedProjects} 
               onProjectClick={setSelectedProject} 
               onDropReassign={async (id, newPMId) => {
-                await projectsService.updateProject(id, { manager_id: newPMId || null });
-                queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
-                queryClient.invalidateQueries({ queryKey: ['projects'] });
-                queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+                await handleAllocationCommit(id, { manager_id: newPMId || null });
               }}
             />
           </div>

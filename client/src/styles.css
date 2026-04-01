@@ -2018,6 +2018,26 @@ select {
     border-color: var(--trn-bd)
 }
 
+.gantt-row[data-drop-state="active"] {
+    background: color-mix(in srgb, var(--red-ghost) 74%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 22%, transparent);
+}
+
+.gantt-row[data-drop-state="invalid"] {
+    background: color-mix(in srgb, var(--bg-in) 84%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bd) 60%, transparent);
+}
+
+.gantt-row[data-drop-state="active"] [data-gantt-track="true"] {
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--red) 8%, transparent), transparent 35%),
+        linear-gradient(180deg, color-mix(in srgb, var(--red-glow) 18%, transparent), transparent);
+}
+
+.unassigned-tray[data-drop-state="active"] {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--red) 30%, transparent);
+}
+
 .status-badge.in-progress { background: var(--b-bg); color: var(--trn-tx); border-color: var(--trn-bd); }
 .status-badge.delayed { background: var(--exc-bg); color: var(--exc-tx); border-color: var(--exc-bd); }
 

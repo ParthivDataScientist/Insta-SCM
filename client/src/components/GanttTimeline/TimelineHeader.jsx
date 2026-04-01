@@ -45,8 +45,7 @@ export default function TimelineHeader({ units, cellWidth, viewMode }) {
           Resources / Managers
         </div>
         {units.map((date, idx) => {
-          const isToday = date.toDateString() === new Date().toDateString();
-          const isCurrentUnit = viewMode === 'Day' ? isToday : 
+          const isCurrentUnit = viewMode === 'Day' ? false : 
                                viewMode === 'Week' ? (new Date() >= date && new Date() < new Date(date.getTime() + 7*24*60*60*1000)) :
                                (new Date().getMonth() === date.getMonth() && new Date().getFullYear() === date.getFullYear());
           

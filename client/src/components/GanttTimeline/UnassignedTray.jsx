@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Briefcase, Calendar, Grab, X } from 'lucide-react';
+import { Briefcase, Grab } from 'lucide-react';
+import { diffDaysUTC } from './timelineMath';
 
 /**
  * UnassignedTray Component
@@ -7,6 +8,15 @@ import { Briefcase, Calendar, Grab, X } from 'lucide-react';
  */
 export default function UnassignedTray({ projects, onProjectClick, onDropReassign }) {
   const [isOver, setIsOver] = useState(false);
+
+  const getProjectStart = (project) =>
+    project.dispatch_date || project.allocation_start_date || project.event_start_date;
+
+  const getProjectEnd = (project) =>
+    project.dismantling_date ||
+    project.allocation_end_date ||
+    project.event_end_date ||
+    getProjectStart(project);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -30,6 +40,7 @@ export default function UnassignedTray({ projects, onProjectClick, onDropReassig
   return (
     <div 
       className="unassigned-tray"
+      data-unassigned-tray="true"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -59,8 +70,17 @@ export default function UnassignedTray({ projects, onProjectClick, onDropReassig
               key={p.id}
               draggable
               onDragStart={(e) => {
+                const startDate = getProjectStart(p);
+                const endDate = getProjectEnd(p);
+
                 e.dataTransfer.setData('projectId', p.id);
-                e.dataTransfer.setData('sourcePM', 'Unassigned');
+                e.dataTransfer.setData('sourcePMId', '0');
+                e.dataTransfer.setData('timelineStartDate', startDate || '');
+                e.dataTransfer.setData('timelineEndDate', endDate || '');
+                e.dataTransfer.setData(
+                  'timelineDurationDays',
+                  String(diffDaysUTC(startDate || new Date(), endDate || startDate || new Date()))
+                );
               }}
               onClick={() => onProjectClick(p)}
               style={{
