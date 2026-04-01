@@ -243,13 +243,7 @@ def refresh_tracked_shipments(
         if "error" in result:
             errors.append(f"{shipment.tracking_number}: {result['error']}")
         else:
-            refreshed_shipment = db.exec(
-                select(Shipment).where(Shipment.tracking_number == shipment.tracking_number)
-            ).first()
-            if refreshed_shipment and refreshed_shipment.is_master and not (refreshed_shipment.child_parcels or []):
-                errors.append(f"{shipment.tracking_number}: master shipment refreshed but no child packages were returned by the carrier.")
-            else:
-                refreshed += 1
+            refreshed += 1
 
     return {
         "requested": len(shipments),

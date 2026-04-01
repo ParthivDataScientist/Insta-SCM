@@ -34,24 +34,6 @@ export function useShipments() {
                 shipmentsService.fetchStats(),
             ]);
 
-            const staleMasterIds = archivedState
-                ? []
-                : shipmentsData
-                    .filter(s => s.is_master && (!Array.isArray(s.child_parcels) || s.child_parcels.length === 0))
-                    .map(s => s.id)
-                    .filter(Boolean);
-
-            if (staleMasterIds.length > 0) {
-                const refreshResult = await shipmentsService.refreshShipments(staleMasterIds);
-                [shipmentsData, statsData] = await Promise.all([
-                    shipmentsService.fetchShipments(),
-                    shipmentsService.fetchStats(),
-                ]);
-                if (refreshResult.failed > 0) {
-                    setError(`Refreshed ${refreshResult.refreshed} shipment(s), but ${refreshResult.failed} could not be re-synced.`);
-                }
-            }
-
             setShipments(shipmentsData);
             setStats(statsData);
         } catch (err) {
