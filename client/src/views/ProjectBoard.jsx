@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, RefreshCw, AlertTriangle, ChevronRight, Briefcase, Truck, Archive, LogOut, Layout, Calendar, X } from 'lucide-react';
+import { Menu, RefreshCw, AlertTriangle, ChevronRight, Briefcase, Truck, Archive, LogOut, Layout, Calendar, X, PenTool } from 'lucide-react';
 
 // Hooks & Context
 import { useProjects } from '../hooks/useProjects';
@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import KanbanColumn from '../components/KanbanColumn';
 import FiltersToolbar from '../components/FiltersToolbar';
 import { BoardSkeleton } from '../components/SkeletonLoader';
+import { isWonProject } from '../utils/projectStatus';
 
 // Lazy load modal for performance
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
@@ -47,7 +48,7 @@ export default function ProjectBoard() {
 
     // Memoize confirmed projects to prevent unnecessary filter recalculations
     const confirmedProjects = useMemo(() => 
-        filteredProjects.filter(p => p.stage === 'Confirmed'),
+        filteredProjects.filter(p => isWonProject(p.stage)),
     [filteredProjects]);
 
     const toggleTheme = useCallback(() => {
@@ -97,7 +98,7 @@ export default function ProjectBoard() {
                 <Suspense fallback={null}>
                     {selectedProject && (
                         <ProjectBoardModal 
-                            project={confirmedProjects.find(p => p.id === selectedProject.id) || selectedProject} 
+                            project={projects.find((p) => p.id === selectedProject.id) || selectedProject} 
                             onClose={() => setSelectedProject(null)} 
                             updateProjectFull={updateProjectFull}
                         />
@@ -110,6 +111,9 @@ export default function ProjectBoard() {
                     <div className="sidebar-tagline">Excellence in Exhibition Logistics</div>
 
                     <nav className="sidebar-nav">
+                        <Link to="/design" className="sidebar-item">
+                            <PenTool size={17} /> Design Management
+                        </Link>
                         <Link to="/projects" className="sidebar-item">
                             <Briefcase size={17} /> Projects List
                         </Link>
@@ -147,7 +151,7 @@ export default function ProjectBoard() {
                                 <Menu size={20} />
                             </button>
                             <div>
-                                <h1>Confirmed Projects <strong>Board</strong></h1>
+                                <h1>Execution Projects <strong>Board</strong></h1>
                                 <p className="header-role">Drag and drop projects to update workflow stages</p>
                             </div>
                         </div>
@@ -159,7 +163,7 @@ export default function ProjectBoard() {
                                 background: 'var(--bg-in)', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)'
                             }}>
                                 <Calendar size={13} color="var(--tx3)" />
-                                <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--tx3)' }}>Timeline:</span>
+                                <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--tx3)' }}>Master Date</span>
                                 <input 
                                     type="date" 
                                     value={dateRange.start}

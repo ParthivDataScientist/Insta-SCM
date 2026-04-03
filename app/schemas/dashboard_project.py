@@ -3,6 +3,7 @@ from pydantic import BaseModel, field_validator
 from datetime import datetime, date as py_date
 
 class DashboardProjectCreate(BaseModel):
+    crm_project_id: Optional[str] = None
     project_name: str
     client_id: Optional[int] = None
     city: Optional[str] = None
@@ -46,6 +47,7 @@ class DashboardProjectRead(DashboardProjectCreate):
     updated_at: datetime
 
 class DashboardProjectUpdate(BaseModel):
+    crm_project_id: Optional[str] = None
     project_name: Optional[str] = None
     client_id: Optional[int] = None
     city: Optional[str] = None

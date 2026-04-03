@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { useGlobalDateRange } from '../contexts/GlobalDateRangeContext';
 import { useProjectData } from './useProjectData';
+import { isWonProject, normalizeProjectStage } from '../utils/projectStatus';
 
 /**
  * Hook for managing Projects UI state (filters, search)
  * Delegates data fetching and updates to useProjectData (React Query).
  */
 export function useProjects() {
+    const { dateRange, setDateRange } = useGlobalDateRange();
     const { 
         projects, stats, isLoading, isError, error, 
         updateProject, deleteProject, createProject, refetch 
@@ -18,7 +21,6 @@ export function useProjects() {
     const [filterCity, setFilterCity] = useState('All');
     const [filterClient, setFilterClient] = useState('All');
     const [filterStatus, setFilterStatus] = useState('All');
-    const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [searchQuery, setSearchQuery] = useState('');
 
     // Filtering Logic (Memoized by React Query's projects stability)
@@ -28,6 +30,8 @@ export function useProjects() {
             const q = searchQuery.toLowerCase();
             const matchesSearch = (p.project_name || '').toLowerCase().includes(q) ||
                                   (p.event_name || '').toLowerCase().includes(q) ||
+                                  (p.crm_project_id || '').toLowerCase().includes(q) ||
+                                  (p.board_stage || '').toLowerCase().includes(q) ||
                                   (p.project_manager || '').toLowerCase().includes(q);
             if (!matchesSearch) return false;
         }
@@ -35,11 +39,11 @@ export function useProjects() {
         // KPI Filter (Stage)
         if (filterStage !== 'All') {
             if (filterStage === 'Open') {
-                if (p.stage && p.stage.toLowerCase() === 'confirmed') return false;
+                if (isWonProject(p.stage)) return false;
             } else if (filterStage === 'Confirmed') {
-                if (!p.stage || p.stage.toLowerCase() !== 'confirmed') return false;
+                if (!isWonProject(p.stage)) return false;
             } else {
-                if (p.stage !== filterStage) return false;
+                if (normalizeProjectStage(p.stage) !== normalizeProjectStage(filterStage)) return false;
             }
         }
 
@@ -51,6 +55,9 @@ export function useProjects() {
         if (filterStatus !== 'All' && p.board_stage !== filterStatus) return false;
 
         // Date Range
+        if ((dateRange.start || dateRange.end) && !p.event_start_date) {
+            return false;
+        }
         if (dateRange.start && p.event_start_date) {
             if (new Date(p.event_start_date) < new Date(dateRange.start)) return false;
         }

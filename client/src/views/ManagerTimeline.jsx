@@ -1,16 +1,18 @@
 import React, { useState, useMemo, Suspense, lazy } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Briefcase, Layout, Truck, Filter, MapPin, Search, RefreshCw, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
+import { Briefcase, Layout, Truck, MapPin, Search, RefreshCw, X, ChevronLeft, ChevronRight, Archive, PenTool } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // Hooks & API
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalDateRange } from '../contexts/GlobalDateRangeContext';
 import projectsService from '../api/projects';
 
 // Components
 import TimelineHeader from '../components/GanttTimeline/TimelineHeader';
 import ManagerRow from '../components/GanttTimeline/ManagerRow';
 import UnassignedTray from '../components/GanttTimeline/UnassignedTray';
+import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
 import { BoardSkeleton } from '../components/SkeletonLoader';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
@@ -22,6 +24,7 @@ const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 export default function ManagerTimeline() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
+  const { dateRange } = useGlobalDateRange();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState('Day'); // Day, Week, Month
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,11 +78,27 @@ export default function ManagerTimeline() {
   const cellWidth = getCellWidth();
   const getManagerAllocations = (m) => m.allocations || m.projects || [];
 
+  const projectInDateRange = (project) => {
+    if (!dateRange.start && !dateRange.end) return true;
+    if (!project?.event_start_date) return false;
+
+    const eventDate = new Date(project.event_start_date);
+    if (dateRange.start && eventDate < new Date(dateRange.start)) return false;
+    if (dateRange.end && eventDate > new Date(dateRange.end)) return false;
+    return true;
+  };
+
   // Fetch Grouped Data
   const { data: timelineData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['manager_timeline'],
     queryFn: projectsService.fetchTimeline,
     staleTime: 10000
+  });
+
+  const { data: projectsData = [] } = useQuery({
+    queryKey: ['projects'],
+    queryFn: projectsService.fetchProjects,
+    staleTime: 10000,
   });
 
   useQuery({
@@ -92,6 +111,7 @@ export default function ManagerTimeline() {
       queryClient.invalidateQueries({ queryKey: ['manager_timeline'] }),
       queryClient.invalidateQueries({ queryKey: ['projects'] }),
       queryClient.invalidateQueries({ queryKey: ['projectStats'] }),
+      queryClient.invalidateQueries({ queryKey: ['managerProjects'] }),
     ]);
     await refetch();
   };
@@ -105,10 +125,12 @@ export default function ManagerTimeline() {
 
     if (data.allocation_start_date) {
       payload.dispatch_date = data.allocation_start_date;
+      payload.allocation_start_date = data.allocation_start_date;
     }
 
     if (data.allocation_end_date) {
       payload.dismantling_date = data.allocation_end_date;
+      payload.allocation_end_date = data.allocation_end_date;
     }
 
     if (Object.keys(payload).length === 0) return;
@@ -127,7 +149,9 @@ export default function ManagerTimeline() {
     const getProjects = (m) => m.allocations || m.projects || [];
 
     const unassignedData = timelineData.find(m => getManagerName(m) === 'Unassigned');
-    const unassigned = unassignedData ? getProjects(unassignedData).map(a => a.project || a) : [];
+    const unassigned = unassignedData
+      ? getProjects(unassignedData).map(a => a.project || a).filter(projectInDateRange)
+      : [];
 
     // Combine real data with virtual placeholders
     const combined = [...timelineData].filter(m => getManagerName(m) !== 'Unassigned');
@@ -140,7 +164,7 @@ export default function ManagerTimeline() {
     const filtered = combined.filter(m => {
       const mName = getManagerName(m);
       const nameMatch = mName.toLowerCase().includes(searchQuery.toLowerCase());
-      const pmAllocations = getProjects(m);
+      const pmAllocations = getProjects(m).filter(a => projectInDateRange(a.project || a));
       
       const branchMatch = filterBranch === 'All' || pmAllocations.some(a => 
         (a.project || a).branch === filterBranch || (a.project || a).venue?.includes(filterBranch)
@@ -149,10 +173,33 @@ export default function ManagerTimeline() {
       if (pmAllocations.length === 0) return nameMatch && (filterBranch === 'All' || virtualManagers.includes(mName));
       
       return nameMatch && branchMatch;
-    });
+    }).map((managerData) => ({
+      ...managerData,
+      allocations: getProjects(managerData).filter((allocation) => projectInDateRange(allocation.project || allocation)),
+    }));
 
     return { filteredData: filtered, unassignedProjects: unassigned };
-  }, [timelineData, virtualManagers, searchQuery, filterBranch]);
+  }, [timelineData, virtualManagers, searchQuery, filterBranch, dateRange.start, dateRange.end]);
+
+  const modalProject = useMemo(() => {
+    if (!selectedProject) return selectedProject;
+
+    const fullProject = projectsData.find((project) => project.id === selectedProject.id);
+    if (fullProject) return fullProject;
+
+    if (!timelineData) return selectedProject;
+
+    for (const managerData of timelineData) {
+      for (const allocation of getManagerAllocations(managerData)) {
+        const project = allocation.project || allocation;
+        if (project.id === selectedProject.id) {
+          return project;
+        }
+      }
+    }
+
+    return selectedProject;
+  }, [projectsData, selectedProject, timelineData]);
 
   const uniqueBranches = useMemo(() => {
     if (!timelineData) return ['All'];
@@ -216,11 +263,11 @@ export default function ManagerTimeline() {
         <Suspense fallback={null}>
           {selectedProject && (
             <ProjectBoardModal 
-              project={selectedProject} 
+              project={modalProject} 
               onClose={() => setSelectedProject(null)} 
               updateProjectFull={async (id, data) => {
                 await projectsService.updateProject(id, data);
-                refetch();
+                await refreshTimelineCaches();
               }}
             />
           )}
@@ -232,6 +279,9 @@ export default function ManagerTimeline() {
             <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ width: '130px', height: 'auto' }} />
           </div>
           <div className="sidebar-nav">
+            <Link to="/design" className="sidebar-item">
+              <PenTool size={17} /> Design Management
+            </Link>
             <Link to="/projects" className="sidebar-item">
               <Briefcase size={17} /> Projects List
             </Link>
@@ -262,6 +312,7 @@ export default function ManagerTimeline() {
             </div>
 
             <div className="header-right">
+              <GlobalDateRangePicker compact />
               <div className="animate-card" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 8px', background: 'var(--bg-in)', borderRadius: 'var(--r-md)', border: '1px solid var(--bd)' }}>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <button className="icon-btn" onClick={() => goToMonth(-1)} style={{ width: '28px', height: '28px' }}><ChevronLeft size={14} /></button>

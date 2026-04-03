@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, text, select, func
+from sqlalchemy import inspect
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -23,7 +24,26 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Application lifespan: create DB tables on startup."""
     SQLModel.metadata.create_all(engine)
+    _ensure_project_schema_compatibility()
     yield
+
+
+def _ensure_project_schema_compatibility() -> None:
+    """Add newly introduced nullable columns when running against an older DB."""
+    inspector = inspect(engine)
+    if "dashboardproject" not in inspector.get_table_names():
+        return
+
+    existing_columns = {
+        column["name"]
+        for column in inspector.get_columns("dashboardproject")
+    }
+
+    if "crm_project_id" not in existing_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE dashboardproject ADD COLUMN crm_project_id VARCHAR")
+            )
 
 
 app = FastAPI(

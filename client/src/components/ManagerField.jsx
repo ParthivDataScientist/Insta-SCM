@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { User, CheckCircle, AlertCircle, Info, Loader2, ChevronDown } from 'lucide-react';
 import projectsService from '../api/projects';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
+import { formatDateDisplay } from '../utils/dateUtils';
 
 /**
  * ManagerField Component
@@ -17,19 +19,14 @@ export default function ManagerField({
     const [managerStatus, setManagerStatus] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [managers, setManagers] = useState([]); // [{id, full_name}, ...]
+    const { data: managers = [] } = useQuery({
+        queryKey: ['managers_list'],
+        queryFn: projectsService.fetchManagers,
+        staleTime: 30000,
+    });
     
     // The underlying value is the ID
     const currentManagerId = project[field];
-
-    const fetchManagers = async () => {
-        try {
-            const data = await projectsService.fetchManagers();
-            setManagers(data);
-        } catch (err) {
-            console.error("Failed to fetch managers:", err);
-        }
-    };
 
     const checkAvailability = useCallback(async (managerId, start, end) => {
         if (!managerId || !start) {
@@ -39,14 +36,8 @@ export default function ManagerField({
 
         try {
             setLoading(true);
-            const results = await projectsService.checkAvailability(start, end, managerId);
+            const results = await projectsService.checkAvailability(start, end, managerId, project.id || null);
             const result = results[managerId];
-            
-            if (result && result.conflicts) {
-                result.conflicts = result.conflicts.filter(c => c.id !== project.id);
-                result.available = result.conflicts.length === 0;
-            }
-            
             setManagerStatus(result);
         } catch (err) {
             console.error("Availability check failed:", err);
@@ -56,20 +47,16 @@ export default function ManagerField({
     }, [project.id]);
 
     useEffect(() => {
-        fetchManagers();
-    }, []);
-
-    useEffect(() => {
         if (currentManagerId) {
             checkAvailability(
                 currentManagerId, 
-                project.dispatch_date, 
-                project.dismantling_date
+                project.dispatch_date || project.event_start_date || new Date().toISOString().split('T')[0],
+                project.dismantling_date || project.event_end_date || null
             );
         } else {
             setManagerStatus(null);
         }
-    }, [currentManagerId, project.dispatch_date, project.dismantling_date, checkAvailability]);
+    }, [currentManagerId, project.dispatch_date, project.dismantling_date, project.event_start_date, project.event_end_date, checkAvailability]);
 
     const handleChange = (e) => {
         const newId = e.target.value ? parseInt(e.target.value, 10) : null;
@@ -82,6 +69,8 @@ export default function ManagerField({
         const m = managers.find(m => m.id === currentManagerId);
         return m ? m.full_name : 'Unassigned';
     }, [currentManagerId, managers]);
+
+    const availabilityWindows = managerStatus?.available_windows || [];
 
     const StatusIcon = () => {
         if (loading) return <Loader2 size={14} className="spin" color="var(--tx3)" />;
@@ -144,9 +133,28 @@ export default function ManagerField({
                         display: 'flex', flexDirection: 'column', gap: '4px',
                         border: '1px solid var(--red-glow)'
                     }}>
-                        <div style={{ fontWeight: 700 }}>CONFLICT DETECTED:</div>
+                        <div style={{ fontWeight: 700 }}>CONFLICT DETECTED (override allowed):</div>
                         {managerStatus.conflicts.map(c => (
-                            <div key={c.id}>• Overlaps with Proj #{c.id}: {c.project_name}</div>
+                            <div key={c.id}>- Overlaps with {c.crm_project_id || `PRJ-${String(c.id).padStart(5, '0')}`}: {c.project_name}</div>
+                        ))}
+                    </div>
+                )}
+
+                {currentManagerId && availabilityWindows.length > 0 && (
+                    <div style={{
+                        marginTop: '10px',
+                        padding: '8px',
+                        background: 'var(--bg-in)',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        color: 'var(--tx2)',
+                        border: '1px solid var(--bd)',
+                    }}>
+                        <div style={{ fontWeight: 700, color: 'var(--green)', marginBottom: '4px' }}>AVAILABLE WINDOWS</div>
+                        {availabilityWindows.slice(0, 3).map((window, index) => (
+                            <div key={`${window.start_date}-${window.end_date || 'open'}-${index}`}>
+                                {formatDateDisplay(window.start_date)} to {window.end_date ? formatDateDisplay(window.end_date) : 'Open'}
+                            </div>
                         ))}
                     </div>
                 )}

@@ -6,6 +6,20 @@ import CalendarPicker from './CalendarPicker';
 import { formatDateDisplay } from '../utils/dateUtils';
 import ManagerField from './ManagerField';
 import ClientField from './ClientField';
+import { getProjectCode } from '../utils/projectStatus';
+
+const BOARD_STAGE_OPTIONS = [
+    'TBC',
+    'Approved',
+    'Material management',
+    'upcoming Prebuild',
+    'Current Prebuild',
+    'QC Ready',
+    'Ready to ship',
+    'Shipped',
+    'Assembeled',
+    'Return to Inventory',
+];
 
 export default function ProjectBoardModal({ project, onClose, updateProjectFull }) {
     const { user } = useAuth();
@@ -177,6 +191,33 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                     </div>
                 );
 
+                const SelectField = ({ label, field, options, icon: Icon }) => (
+                    <div style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {Icon && <Icon size={14} color="var(--tx3)" />}
+                            <select
+                                value={project[field] || ''}
+                                onChange={(event) => updateProjectFull(project.id, { [field]: event.target.value })}
+                                style={{
+                                    flex: 1,
+                                    background: 'transparent',
+                                    border: 'none',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: 'var(--tx)',
+                                    outline: 'none',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {options.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                );
+
                 return (
                     <>
                         <div style={{
@@ -191,6 +232,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                             <ManagerField label="Project Manager" field="manager_id" project={project} updateProjectFull={updateProjectFull} icon={User} />
                             <ClientField label="Client" field="client_id" project={project} updateProjectFull={updateProjectFull} />
+                            <SelectField label="Board Stage" field="board_stage" options={BOARD_STAGE_OPTIONS} icon={CheckCircle} />
                         </div>
 
                         <div style={{ padding: '24px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
@@ -393,7 +435,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                 }}>
                     <div>
                         <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            Proj # {project.id} | {project.project_name} | {project.area || 'Size TBD'} | {project.event_name}
+                            {getProjectCode(project)} | {project.project_name} | {project.area || 'Size TBD'} | {project.event_name}
                         </h2>
                         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                             <span style={{ padding: '4px 10px', background: '#10B981', color: 'white', fontSize: '11px', borderRadius: '99px', fontWeight: 600 }}>{project.stage || 'Status TBD'}</span>

@@ -3,6 +3,7 @@ import { Edit3, User } from 'lucide-react';
 import CalendarPicker from './CalendarPicker';
 import { formatDateDisplay, parseDateInput } from '../utils/dateUtils';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
+import { getProjectCode } from '../utils/projectStatus';
 
 const DATE_PLACEHOLDER = '-';
 
@@ -99,6 +100,7 @@ export default function ProjectTable({
             <table className="tracking-table tracking-table--projects">
                 <thead>
                     <tr>
+                        <th>Project ID</th>
                         <th>Project Name</th>
                         <th>Stage</th>
                         <th>Event Name</th>
@@ -123,10 +125,11 @@ export default function ProjectTable({
                             onDoubleClick={() => onDoubleClickProject && onDoubleClickProject(project)}
                             style={{ cursor: 'pointer', userSelect: 'none' }}
                         >
+                            <td className="fw-600">{getProjectCode(project)}</td>
                             <td className="fw-600">{project.project_name || DATE_PLACEHOLDER}</td>
                             <td>
-                                <span className={`status-badge ${project.stage?.toLowerCase() === 'confirmed' ? 'delivered' : 'in-transit'}`}>
-                                    {project.stage || 'Open'}
+                                <span className={`status-badge ${(project.board_stage || 'TBC') === 'TBC' ? 'in-transit' : 'delivered'}`}>
+                                    {project.board_stage || 'TBC'}
                                 </span>
                             </td>
                             <td>{project.event_name || DATE_PLACEHOLDER}</td>

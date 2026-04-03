@@ -26,7 +26,9 @@ def client_fixture(monkeypatch):
     )
 
     # 2. Import model to register with SQLModel.metadata
+    from app.models.dashboard_project import Client, DashboardProject, ProjectAuditLog  # noqa: F401
     from app.models.shipment import Shipment  # noqa: F401
+    from app.models.user import User  # noqa: F401
 
     # 3. Create tables before TestClient starts
     SQLModel.metadata.create_all(test_engine)

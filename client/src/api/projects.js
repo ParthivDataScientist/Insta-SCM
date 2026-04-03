@@ -21,6 +21,38 @@ const projectsService = {
     },
 
     /**
+     * Fetches design-stage projects that have not yet been promoted to Win.
+     */
+    fetchDesignProjects: async () => {
+        const response = await apiClient.get('/api/v1/projects/designs');
+        return response.data;
+    },
+
+    /**
+     * Fetches Design Management KPIs.
+     */
+    fetchDesignStats: async () => {
+        const response = await apiClient.get('/api/v1/projects/designs/stats');
+        return response.data;
+    },
+
+    /**
+     * Fetches the simulated CRM feed without persisting it.
+     */
+    fetchCrmDesignFeed: async () => {
+        const response = await apiClient.get('/api/v1/projects/crm/designs');
+        return response.data;
+    },
+
+    /**
+     * Upserts the simulated CRM design feed into DashboardProject.
+     */
+    syncCrmDesignFeed: async () => {
+        const response = await apiClient.post('/api/v1/projects/crm/designs/sync');
+        return response.data;
+    },
+
+    /**
      * Creates a new project.
      */
     createProject: async (data) => {
@@ -33,6 +65,14 @@ const projectsService = {
      */
     updateProject: async (id, data) => {
         const response = await apiClient.put(`/api/v1/projects/${id}`, data);
+        return response.data;
+    },
+
+    /**
+     * Promotes a design-stage project into the execution pipeline.
+     */
+    convertDesignToProject: async (id) => {
+        const response = await apiClient.post(`/api/v1/projects/designs/${id}/win`);
         return response.data;
     },
 
@@ -55,10 +95,11 @@ const projectsService = {
     /**
      * Checks availability for a manager or all managers.
      */
-    checkAvailability: async (startDate, endDate = null, managerId = null) => {
+    checkAvailability: async (startDate, endDate = null, managerId = null, projectId = null) => {
         const params = { start_date: startDate };
         if (endDate) params.end_date = endDate;
         if (managerId) params.manager_id = managerId;
+        if (projectId) params.project_id = projectId;
         
         const response = await apiClient.get('/api/v1/projects/availability-check', { params });
         return response.data;

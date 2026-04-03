@@ -1,14 +1,14 @@
 import json
 from datetime import date as py_date
 from datetime import datetime, timezone
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
 from sqlalchemy.exc import IntegrityError
 import logging
 
-from app.db.session import engine
+from app.db.session import get_session
 from app.models.dashboard_project import DashboardProject, ProjectAuditLog, Client
 from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
@@ -16,6 +16,50 @@ from app.services.availability import is_manager_available
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+WIN_STAGE_ALIASES = {"win", "won", "confirmed"}
+DROP_STAGE_ALIASES = {"drop", "dropped", "lost"}
+DESIGN_ITERATION_ALIASES = {"design change", "design-change", "design_change"}
+IN_PROCESS_ALIASES = {"open", "in-process", "in process", "in_progress", "in-progress"}
+
+CRM_DESIGN_FEED = [
+    {
+        "crm_project_id": "CRM-DES-2401",
+        "project_name": "Aero India Pavilion",
+        "event_name": "Aero India",
+        "venue": "Yelahanka Air Force Station",
+        "area": "360 Sqm",
+        "city": "Bengaluru",
+        "branch": "Bangalore",
+        "stage": "In-Process",
+        "event_start_date": py_date(2026, 4, 12),
+        "event_end_date": py_date(2026, 4, 16),
+    },
+    {
+        "crm_project_id": "CRM-DES-2402",
+        "project_name": "Dubai Health Expo Booth",
+        "event_name": "Arab Health",
+        "venue": "Dubai World Trade Centre",
+        "area": "180 Sqm",
+        "city": "Dubai",
+        "branch": "Dubai",
+        "stage": "Design Change",
+        "event_start_date": py_date(2026, 4, 8),
+        "event_end_date": py_date(2026, 4, 11),
+    },
+    {
+        "crm_project_id": "CRM-DES-2403",
+        "project_name": "Retail Tech Island Stand",
+        "event_name": "NRF APAC",
+        "venue": "Marina Bay Sands",
+        "area": "220 Sqm",
+        "city": "Singapore",
+        "branch": "Singapore",
+        "stage": "Drop",
+        "event_start_date": py_date(2026, 5, 4),
+        "event_end_date": py_date(2026, 5, 8),
+    },
+]
 
 
 def _sync_postgres_sequence(session: Session, table_name: str, column_name: str = "id") -> None:
@@ -42,10 +86,6 @@ def _sync_postgres_sequence(session: Session, table_name: str, column_name: str 
     )
     session.exec(sync_stmt)
 
-def get_session():
-    with Session(engine) as session:
-        yield session
-
 def _coerce_list(value: Any) -> list:
     if value is None:
         return []
@@ -64,19 +104,56 @@ def _coerce_list(value: Any) -> list:
         return parsed if isinstance(parsed, list) else [parsed]
     return [value]
 
+
+def _normalize_stage(stage: Optional[str]) -> str:
+    raw_stage = (stage or "Open").strip()
+    stage_key = raw_stage.lower()
+
+    if stage_key in WIN_STAGE_ALIASES:
+        return "Win"
+    if stage_key in DROP_STAGE_ALIASES:
+        return "Drop"
+    if stage_key in DESIGN_ITERATION_ALIASES:
+        return "Design Change"
+    if stage_key in IN_PROCESS_ALIASES:
+        return "In-Process"
+
+    return raw_stage or "Open"
+
+
+def _is_won_project(stage: Optional[str]) -> bool:
+    return _normalize_stage(stage) == "Win"
+
+
+def _is_design_project(stage: Optional[str]) -> bool:
+    return not _is_won_project(stage)
+
+
+def _apply_stage_transition(project: DashboardProject, next_stage: Optional[str]) -> None:
+    if next_stage is None:
+        return
+
+    project.stage = _normalize_stage(next_stage)
+
+    if project.stage == "Win" and not project.board_stage:
+        project.board_stage = "TBC"
+
 def _serialize_project(project: DashboardProject) -> DashboardProjectRead:
     """Enterprise-ready serialization mapping for DashboardProject."""
     return DashboardProjectRead(
         id=project.id,
+        crm_project_id=project.crm_project_id,
         project_name=project.project_name or "Unknown",
-        stage=project.stage or "Open",
+        city=project.city,
+        event_name=project.event_name,
+        stage=_normalize_stage(project.stage),
         board_stage=project.board_stage or "TBC",
         venue=project.venue,
         area=project.area,
         branch=project.branch,
         manager_id=project.manager_id,
         project_manager=project.manager.full_name if project.manager else "Unassigned",
-        client_id=project.client_id, # Added client_id
+        client_id=project.client_id,
         client=project.client_relationship.name if project.client_relationship else "No Client",
         event_start_date=project.event_start_date,
         event_end_date=project.event_end_date,
@@ -96,15 +173,16 @@ def _serialize_project(project: DashboardProject) -> DashboardProjectRead:
 
 @router.get("/stats")
 def get_project_stats(session: Session = Depends(get_session)):
-    """Calculate project statistics using the new 2-table schema."""
+    """Calculate execution project statistics."""
     projects = session.exec(select(DashboardProject)).all()
+    execution_projects = [p for p in projects if _is_won_project(p.stage)]
 
-    total = len(projects)
-    open_briefs = sum(1 for p in projects if p.stage and p.stage.lower() != "confirmed")
-    won_projects = sum(1 for p in projects if p.stage and p.stage.lower() == "confirmed")
+    total = len(execution_projects)
+    open_briefs = sum(1 for p in projects if _normalize_stage(p.stage) == "In-Process")
+    won_projects = len(execution_projects)
 
     # Unique branch count
-    branches = {p.branch for p in projects if p.branch}
+    branches = {p.branch for p in execution_projects if p.branch}
     # Unique PM count (from User table)
     pm_count = session.exec(select(func.count(User.id)).where(User.role == "PROJECT_MANAGER")).one()
 
@@ -116,25 +194,159 @@ def get_project_stats(session: Session = Depends(get_session)):
         "pm_count": pm_count
     }
 
+
+@router.get("/designs/stats")
+def get_design_stats(session: Session = Depends(get_session)):
+    """Return KPI metrics for the pre-sales Design Management page."""
+    design_source_projects = session.exec(
+        select(DashboardProject).where(DashboardProject.crm_project_id.is_not(None))
+    ).all()
+
+    total_brief = sum(
+        1
+        for project in design_source_projects
+        if _normalize_stage(project.stage) != "Drop"
+    )
+    win_count = sum(1 for project in design_source_projects if _is_won_project(project.stage))
+    drop_count = sum(
+        1
+        for project in design_source_projects
+        if _normalize_stage(project.stage) == "Drop"
+    )
+    design_iterations = sum(
+        1
+        for project in design_source_projects
+        if _normalize_stage(project.stage) == "Design Change"
+    )
+    decisions = win_count + drop_count
+    win_rate = round((win_count / decisions) * 100, 1) if decisions else 0.0
+    drop_rate = round((drop_count / decisions) * 100, 1) if decisions else 0.0
+
+    return {
+        "total_brief": total_brief,
+        "win_count": win_count,
+        "drop_count": drop_count,
+        "win_rate": win_rate,
+        "drop_rate": drop_rate,
+        "design_iterations": design_iterations,
+    }
+
+
+@router.get("/crm/designs")
+def get_crm_design_feed():
+    """Simulate the upstream CRM design API payload."""
+    return CRM_DESIGN_FEED
+
+
+@router.get("/designs", response_model=List[DashboardProjectRead])
+def get_design_projects(session: Session = Depends(get_session)):
+    """Retrieve pre-sales projects that have not yet transitioned into execution."""
+    projects = session.exec(select(DashboardProject)).all()
+    design_projects = [
+        project
+        for project in projects
+        if _is_design_project(project.stage)
+    ]
+    return [_serialize_project(project) for project in design_projects]
+
+
+@router.post("/crm/designs/sync")
+def sync_crm_design_feed(session: Session = Depends(get_session)):
+    """Upsert simulated CRM briefs into the shared DashboardProject table."""
+    upserted = 0
+
+    for crm_record in CRM_DESIGN_FEED:
+        project = session.exec(
+            select(DashboardProject).where(
+                DashboardProject.crm_project_id == crm_record["crm_project_id"]
+            )
+        ).first()
+        already_won = bool(project and _is_won_project(project.stage))
+
+        if not project:
+            project = DashboardProject(
+                crm_project_id=crm_record["crm_project_id"],
+                project_name=crm_record["project_name"],
+                board_stage="TBC",
+            )
+
+        for key, value in crm_record.items():
+            if key == "stage":
+                _apply_stage_transition(project, "Win" if already_won else value)
+            else:
+                setattr(project, key, value)
+
+        if not project.board_stage:
+            project.board_stage = "TBC"
+
+        session.add(project)
+        upserted += 1
+
+    session.commit()
+
+    return {
+        "message": "CRM design feed synchronized",
+        "upserted": upserted,
+        "records": CRM_DESIGN_FEED,
+    }
+
+
+@router.post("/designs/{project_id}/win", response_model=DashboardProjectRead)
+def convert_design_to_project(project_id: int, session: Session = Depends(get_session)):
+    """Promote a design brief into an execution project."""
+    project = session.get(DashboardProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    _apply_stage_transition(project, "Win")
+    project.board_stage = project.board_stage or "TBC"
+    session.add(project)
+    session.commit()
+    session.refresh(project)
+    return _serialize_project(project)
+
 @router.get("/", response_model=List[DashboardProjectRead])
 def get_projects(
     session: Session = Depends(get_session),
-    stage: Optional[str] = None
+    stage: Optional[str] = None,
+    scope: str = Query(default="execution")
 ):
-    """Retrieve all projects, optionally filtered by stage."""
-    query = select(DashboardProject)
+    """Retrieve projects, defaulting to execution projects only."""
+    projects = session.exec(select(DashboardProject)).all()
+
+    if scope == "execution":
+        projects = [project for project in projects if _is_won_project(project.stage)]
+    elif scope == "design":
+        projects = [project for project in projects if _is_design_project(project.stage)]
+    elif scope != "all":
+        raise HTTPException(status_code=400, detail="scope must be one of: execution, design, all")
+
     if stage:
-        query = query.where(DashboardProject.stage == stage)
-    
-    projects = session.exec(query).all()
-    return [_serialize_project(p) for p in projects]
+        normalized_stage = _normalize_stage(stage)
+        projects = [
+            project
+            for project in projects
+            if _normalize_stage(project.stage) == normalized_stage
+        ]
+
+    return [_serialize_project(project) for project in projects]
 
 @router.post("/", response_model=DashboardProjectRead)
 def create_project(project_in: DashboardProjectCreate, session: Session = Depends(get_session)):
     """Create a new project in the unified schema."""
     project = DashboardProject.model_validate(project_in)
+    _apply_stage_transition(project, project.stage)
+    project.board_stage = project.board_stage or "TBC"
     session.add(project)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        logger.warning("Project create failed integrity check: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid project create payload (e.g., duplicate CRM Project ID or unknown references).",
+        ) from exc
     session.refresh(project)
     return _serialize_project(project)
 
@@ -146,7 +358,13 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Fields to monitor for Audit Logging
-    audit_fields = ["stage", "dispatch_date", "dismantling_date", "manager_id"]
+    audit_fields = [
+        "stage",
+        "board_stage",
+        "dispatch_date",
+        "dismantling_date",
+        "manager_id",
+    ]
     
     # Capture current state of watched fields
     prev_state = {field: getattr(project, field) for field in audit_fields}
@@ -155,7 +373,13 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
     
     # Apply updates
     for key, value in update_data.items():
-        setattr(project, key, value)
+        if key == "stage":
+            _apply_stage_transition(project, value)
+        else:
+            setattr(project, key, value)
+
+    if _is_won_project(project.stage) and not project.board_stage:
+        project.board_stage = "TBC"
 
     # Capture new state of watched fields
     new_state = {field: getattr(project, field) for field in audit_fields}
@@ -204,14 +428,19 @@ def delete_project(project_id: int, session: Session = Depends(get_session)):
 def get_manager_projects(manager_id: int, session: Session = Depends(get_session)):
     """Fetch all projects assigned to a specific manager by ID."""
     query = select(DashboardProject).where(DashboardProject.manager_id == manager_id)
-    projects = session.exec(query).all()
-    return [_serialize_project(p) for p in projects]
+    projects = [
+        project
+        for project in session.exec(query).all()
+        if _is_won_project(project.stage)
+    ]
+    return [_serialize_project(project) for project in projects]
 
 @router.get("/availability-check")
 def check_availability(
     start_date: py_date,
     end_date: Optional[py_date] = None,
     manager_id: Optional[int] = None,
+    project_id: Optional[int] = None,
     session: Session = Depends(get_session)
 ):
     """Check manager availability using unified allocation dates on the project."""
@@ -222,6 +451,7 @@ def check_availability(
                 new_start=start_date,
                 new_end=end_date,
                 manager_id=manager_id,
+                exclude_project_id=project_id,
             )
         }
 
@@ -233,6 +463,7 @@ def check_availability(
             new_start=start_date,
             new_end=end_date,
             manager_id=m.id,
+            exclude_project_id=project_id,
         )
 
     return results
@@ -264,20 +495,38 @@ def get_timeline_data(session: Session = Depends(get_session)):
                     "full_name": manager.full_name # Standard key
                 }
 
-            if project is not None and (project.dispatch_date is not None or project.event_start_date is not None):
+            if (
+                project is not None
+                and _is_won_project(project.stage)
+                and (
+                    project.dispatch_date is not None
+                    or project.event_start_date is not None
+                )
+            ):
                 manager_groups[manager.id]["allocations"].append({
                     "id": project.id,
                     "project_id": project.id,
+                    "crm_project_id": project.crm_project_id,
                     "project_name": project.project_name,
                     "manager_id": manager.id,
-                    "allocation_start_date": project.dispatch_date,
-                    "allocation_end_date": project.dismantling_date,
+                    "allocation_start_date": project.allocation_start_date or project.dispatch_date or project.event_start_date,
+                    "allocation_end_date": project.allocation_end_date or project.dismantling_date or project.event_end_date,
                     "project": {
                         "id": project.id,
+                        "crm_project_id": project.crm_project_id,
                         "project_name": project.project_name,
-                        "stage": project.stage,
+                        "stage": _normalize_stage(project.stage),
                         "board_stage": project.board_stage,
+                        "event_name": project.event_name,
+                        "event_start_date": project.event_start_date,
+                        "event_end_date": project.event_end_date,
+                        "dispatch_date": project.dispatch_date,
+                        "installation_start_date": project.installation_start_date,
+                        "installation_end_date": project.installation_end_date,
+                        "dismantling_date": project.dismantling_date,
+                        "manager_id": project.manager_id,
                         "venue": project.venue,
+                        "area": project.area,
                         "branch": project.branch
                     }
                 })
@@ -291,7 +540,11 @@ def get_timeline_data(session: Session = Depends(get_session)):
                 (DashboardProject.event_start_date.is_not(None))
             )
         )
-        unassigned_projects = session.exec(unassigned_stmt).all()
+        unassigned_projects = [
+            project
+            for project in session.exec(unassigned_stmt).all()
+            if _is_won_project(project.stage)
+        ]
         
         if unassigned_projects:
             manager_groups["unassigned"] = {
@@ -302,16 +555,27 @@ def get_timeline_data(session: Session = Depends(get_session)):
                 manager_groups["unassigned"]["allocations"].append({
                     "id": project.id,
                     "project_id": project.id,
+                    "crm_project_id": project.crm_project_id,
                     "project_name": project.project_name,
                     "manager_id": None,
-                    "allocation_start_date": project.dispatch_date,
-                    "allocation_end_date": project.dismantling_date,
+                    "allocation_start_date": project.allocation_start_date or project.dispatch_date or project.event_start_date,
+                    "allocation_end_date": project.allocation_end_date or project.dismantling_date or project.event_end_date,
                     "project": {
                         "id": project.id,
+                        "crm_project_id": project.crm_project_id,
                         "project_name": project.project_name,
-                        "stage": project.stage,
+                        "stage": _normalize_stage(project.stage),
                         "board_stage": project.board_stage,
+                        "event_name": project.event_name,
+                        "event_start_date": project.event_start_date,
+                        "event_end_date": project.event_end_date,
+                        "dispatch_date": project.dispatch_date,
+                        "installation_start_date": project.installation_start_date,
+                        "installation_end_date": project.installation_end_date,
+                        "dismantling_date": project.dismantling_date,
+                        "manager_id": project.manager_id,
                         "venue": project.venue,
+                        "area": project.area,
                         "branch": project.branch
                     }
                 })

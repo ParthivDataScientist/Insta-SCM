@@ -79,7 +79,7 @@ export default function ManagerRow({
   const nextAvailableStr =
     lastDismantle.getTime() === 0
       ? 'Open'
-      : formatDateDisplay(formatUTCDate(lastDismantle));
+      : formatDateDisplay(formatUTCDate(addDaysUTC(lastDismantle, 1)));
 
   const markNativeDropState = (state) => {
     if (!rowRef.current) return;

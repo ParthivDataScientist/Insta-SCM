@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Menu, RefreshCw, Briefcase, MapPin, Truck, LogOut, Search, X, CheckCircle, Users, Layout, Archive } from 'lucide-react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
+import { Menu, RefreshCw, Briefcase, MapPin, Truck, LogOut, Search, X, CheckCircle, Users, Layout, Archive, PenTool } from 'lucide-react';
 
 // Hooks
 import { useProjects } from '../hooks/useProjects';
@@ -9,33 +8,35 @@ import { useAuth } from '../contexts/AuthContext';
 // Components
 import ProjectTable from '../components/ProjectTable';
 import { CardSkeleton } from '../components/SkeletonLoader';
+import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
 import { Link } from 'react-router-dom';
+
+const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 
 export default function ProjectsDashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [activeDropdown, setActiveDropdown] = useState(null); // 'open', 'branch', 'pm'
+    const [activeDropdown, setActiveDropdown] = useState(null); // 'stage', 'branch', 'pm'
     const { user, logout } = useAuth();
-    const navigate = useNavigate();
     const [selectedProject, setSelectedProject] = useState(null);
+    const [activeProjectCard, setActiveProjectCard] = useState(null);
 
     const {
         projects, filteredProjects, stats, loading, error, loadData,
         filterStage, setFilterStage,
         filterBranch, setFilterBranch,
         filterPM, setFilterPM,
+        filterStatus, setFilterStatus,
         searchQuery, setSearchQuery,
         updateProjectFull
     } = useProjects();
 
     const handleDoubleClick = (project) => {
-        if (project.stage?.toLowerCase() === 'confirmed') {
-            navigate(`/board?projectId=${project.id}`);
-        }
+        setActiveProjectCard(project);
     };
 
     // Memoize derivative data for performance
-    const uniqueOpenStages = useMemo(() => 
-        ['All Open', ...new Set(projects.filter(p => p.stage?.toLowerCase() !== 'confirmed').map(p => p.stage).filter(Boolean))].sort(),
+    const uniqueBoardStages = useMemo(() => 
+        ['All', ...new Set(projects.map(p => p.board_stage || 'TBC').filter(Boolean))].sort(),
     [projects]);
 
     const uniqueBranches = useMemo(() => 
@@ -48,6 +49,13 @@ export default function ProjectsDashboard() {
 
     const isDark = localStorage.getItem('insta_theme') === 'dark';
     const isProjectSelected = !!selectedProject;
+    const latestActiveProject = projects.find((project) => project.id === activeProjectCard?.id) || activeProjectCard;
+    const displayBoardStage = isProjectSelected
+        ? (selectedProject.board_stage || 'TBC')
+        : (filterStatus === 'All' ? Math.max(0, uniqueBoardStages.length - 1) : filterStatus);
+    const displayExecution = isProjectSelected
+        ? (selectedProject.stage || 'Win')
+        : (stats.won_projects ?? projects.length ?? 0);
 
     // KPI Display Logic
     const displayBranch = isProjectSelected ? (selectedProject.branch || 'None') : (filterBranch === 'All' ? (stats.branches_count ?? 0) : filterBranch);
@@ -62,16 +70,27 @@ export default function ProjectsDashboard() {
 
     const resetFilters = () => {
         setFilterStage('All');
+        setFilterStatus('All');
         setFilterBranch('All');
         setFilterPM('All');
         setSearchQuery('');
         setSelectedProject(null);
+        setActiveProjectCard(null);
         setActiveDropdown(null);
     };
 
     return (
         <div className={isDark ? 'dark' : 'light'} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
             <div className={`app-layout ${sidebarOpen ? '' : 'sidebar-closed'}`}>
+                <Suspense fallback={null}>
+                    {latestActiveProject && (
+                        <ProjectBoardModal
+                            project={latestActiveProject}
+                            onClose={() => setActiveProjectCard(null)}
+                            updateProjectFull={updateProjectFull}
+                        />
+                    )}
+                </Suspense>
                 {/* ═══════ SIDEBAR ═══════ */}
                 <aside className="sidebar">
                     <div className="sidebar-logo">
@@ -80,6 +99,9 @@ export default function ProjectsDashboard() {
                     <div className="sidebar-tagline">Excellence in Exhibition Logistics</div>
 
                     <nav className="sidebar-nav">
+                        <Link to="/design" className="sidebar-item">
+                            <PenTool size={17} /> Design Management
+                        </Link>
                         <Link to="/projects" className="sidebar-item active">
                             <Briefcase size={17} /> Projects List
                         </Link>
@@ -111,7 +133,8 @@ export default function ProjectsDashboard() {
                             </div>
                         </div>
                         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {(filterStage !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || searchQuery !== '' || isProjectSelected) && (
+                            <GlobalDateRangePicker />
+                            {(filterStage !== 'All' || filterStatus !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || searchQuery !== '' || isProjectSelected || activeProjectCard) && (
                                 <button className="icon-btn btn-animate" onClick={resetFilters} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: 'var(--tx2)' }}>
                                     <X size={14} /> Disable Filters
                                 </button>
@@ -139,19 +162,19 @@ export default function ProjectsDashboard() {
                                 <div className="kpi-icon blue-icon"><Briefcase size={22} /></div>
                             </div>
 
-                            <div className={`kpi-card ${filterStage !== 'All' && filterStage !== 'Confirmed' ? 'active-kpi' : ''}`} 
-                                 onClick={() => !isProjectSelected && setActiveDropdown('open')}>
+                            <div className={`kpi-card ${filterStatus !== 'All' ? 'active-kpi' : ''}`} 
+                                 onClick={() => !isProjectSelected && setActiveDropdown('stage')}>
                                 <div className="kpi-left">
-                                    <div className="kpi-title">Open Briefs</div>
-                                    <div className="kpi-value" style={{ fontSize: displayOpen?.length > 8 ? '18px' : '36px' }}>{displayOpen}</div>
-                                    <div className="kpi-sub orange">Pending confirmation</div>
+                                    <div className="kpi-title">Board Stages</div>
+                                    <div className="kpi-value" style={{ fontSize: String(displayBoardStage)?.length > 8 ? '18px' : '36px' }}>{displayBoardStage}</div>
+                                    <div className="kpi-sub orange">Kanban workflow stages</div>
                                 </div>
-                                <div className="kpi-icon orange-icon"><RefreshCw size={22} /></div>
-                                {activeDropdown === 'open' && (
+                                <div className="kpi-icon orange-icon"><Layout size={22} /></div>
+                                {activeDropdown === 'stage' && (
                                     <div className="kpi-dropdown show">
-                                        {uniqueOpenStages.map(os => (
-                                            <div key={os} className="kpi-dropdown-item" onClick={(e) => { e.stopPropagation(); setFilterStage(os === 'All Open' ? 'Open' : os); setActiveDropdown(null); }}>
-                                                {os}
+                                        {uniqueBoardStages.map(stageName => (
+                                            <div key={stageName} className="kpi-dropdown-item" onClick={(e) => { e.stopPropagation(); setFilterStatus(stageName); setActiveDropdown(null); }}>
+                                                {stageName === 'All' ? 'All Stages' : stageName}
                                             </div>
                                         ))}
                                     </div>
@@ -160,9 +183,9 @@ export default function ProjectsDashboard() {
 
                             <div className={`kpi-card ${filterStage === 'Confirmed' ? 'active-kpi' : ''}`} onClick={() => !isProjectSelected && handleKPIClick('Confirmed')}>
                                 <div className="kpi-left">
-                                    <div className="kpi-title">Won Projects</div>
-                                    <div className="kpi-value">{displayWon}</div>
-                                    <div className="kpi-sub green">Confirmed stages</div>
+                                    <div className="kpi-title">Execution Projects</div>
+                                    <div className="kpi-value">{displayExecution}</div>
+                                    <div className="kpi-sub green">Promoted from Design</div>
                                 </div>
                                 <div className="kpi-icon green-icon"><CheckCircle size={22} /></div>
                             </div>
@@ -208,7 +231,7 @@ export default function ProjectsDashboard() {
                         <div className="tracking-toolbar" style={{ margin: '24px 0' }}>
                             <div className="toolbar-search">
                                 <Search size={14} className="ts-icon" />
-                                <input className="ts-input" placeholder="Search Project, Event, Manager..."
+                                <input className="ts-input" placeholder="Search Project ID, Project, Event, Manager..."
                                     value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                         </div>

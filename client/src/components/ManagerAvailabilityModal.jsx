@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { X, Calendar, Briefcase, CheckCircle, AlertCircle, Clock, ChevronRight } from 'lucide-react';
 import projectsService from '../api/projects';
 import { formatDateDisplay } from '../utils/dateUtils';
@@ -8,33 +9,23 @@ import { formatDateDisplay } from '../utils/dateUtils';
  * Shows manager workload, status, and timeline in a premium UI.
  */
 export default function ManagerAvailabilityModal({ managerId, managerName, onClose }) {
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        const loadManagerData = async () => {
-            if (!managerId) return;
-            try {
-                setLoading(true);
-                const data = await projectsService.fetchManagerProjects(managerId);
-                // Sort projects by date
-                const sorted = data.sort((a, b) => {
-                    const dateA = new Date(a.dispatch_date || '9999-12-31');
-                    const dateB = new Date(b.dispatch_date || '9999-12-31');
-                    return dateA - dateB;
-                });
-                setProjects(sorted);
-            } catch (err) {
-                console.error("Failed to load manager projects:", err);
-                setError("Could not load availability data.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadManagerData();
-    }, [managerId]);
+    const {
+        data: projects = [],
+        isLoading: loading,
+        error,
+    } = useQuery({
+        queryKey: ['managerProjects', managerId],
+        queryFn: async () => {
+            const data = await projectsService.fetchManagerProjects(managerId);
+            return [...data].sort((a, b) => {
+                const dateA = new Date(a.dispatch_date || a.event_start_date || '9999-12-31');
+                const dateB = new Date(b.dispatch_date || b.event_start_date || '9999-12-31');
+                return dateA - dateB;
+            });
+        },
+        enabled: Boolean(managerId),
+    });
+    const errorMessage = error?.response?.data?.detail || error?.message || null;
 
     // Calculate Current Status
     const availabilityData = useMemo(() => {
@@ -67,7 +58,7 @@ export default function ManagerAvailabilityModal({ managerId, managerName, onClo
     // Calculate free gaps
     const gaps = useMemo(() => {
         const g = [];
-        if (projects.length < 2) return g;
+        if (projects.length === 0) return g;
 
         for (let i = 0; i < projects.length - 1; i++) {
             const currentEnd = projects[i].dismantling_date ? new Date(projects[i].dismantling_date) : null;
@@ -79,13 +70,24 @@ export default function ManagerAvailabilityModal({ managerId, managerName, onClo
                 
                 if (diffDays > 0) {
                     g.push({
-                        from: currentEnd,
-                        to: nextStart,
+                        from: new Date(currentEnd.getTime() + (1000 * 60 * 60 * 24)),
+                        to: new Date(nextStart.getTime() - (1000 * 60 * 60 * 24)),
                         days: diffDays
                     });
                 }
             }
         }
+
+        const lastProject = projects[projects.length - 1];
+        const lastEnd = lastProject?.dismantling_date ? new Date(lastProject.dismantling_date) : null;
+        if (lastEnd) {
+            g.push({
+                from: new Date(lastEnd.getTime() + (1000 * 60 * 60 * 24)),
+                to: null,
+                days: null,
+            });
+        }
+
         return g;
     }, [projects]);
 
@@ -143,10 +145,10 @@ export default function ManagerAvailabilityModal({ managerId, managerName, onClo
                             <div className="spin" style={{ marginBottom: '12px' }}><Clock size={24} /></div>
                             Loading availability data...
                         </div>
-                    ) : error ? (
+                    ) : errorMessage ? (
                         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--red)' }}>
                             <AlertCircle size={24} style={{ marginBottom: '12px' }} />
-                            <div>{error}</div>
+                            <div>{errorMessage}</div>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

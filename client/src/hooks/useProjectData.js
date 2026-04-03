@@ -8,6 +8,14 @@ import projectsService from '../api/projects';
 export function useProjectData() {
     const queryClient = useQueryClient();
 
+    const invalidateProjectCaches = () => {
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+        queryClient.invalidateQueries({ queryKey: ['designProjects'] });
+        queryClient.invalidateQueries({ queryKey: ['designStats'] });
+        queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+    };
+
     // 1. Fetching Projects
     const projectsQuery = useQuery({
         queryKey: ['projects'],
@@ -49,8 +57,7 @@ export function useProjectData() {
         },
         // Always refetch after error or success:
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-            queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+            invalidateProjectCaches();
         },
     });
 
@@ -58,8 +65,7 @@ export function useProjectData() {
     const deleteProjectMutation = useMutation({
         mutationFn: (id) => projectsService.deleteProject(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-            queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+            invalidateProjectCaches();
         }
     });
 
@@ -67,8 +73,7 @@ export function useProjectData() {
     const createProjectMutation = useMutation({
         mutationFn: (data) => projectsService.createProject(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-            queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+            invalidateProjectCaches();
         }
     });
 

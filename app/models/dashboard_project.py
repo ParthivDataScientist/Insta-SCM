@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import date as py_date, datetime, timezone
 from sqlmodel import Field, Relationship, Column, SQLModel
-from sqlalchemy import Integer, ForeignKey, JSON, DateTime, func
+from sqlalchemy import DateTime, JSON, String, func
 from .base import AuditMixin
 
 class Client(AuditMixin, table=True):
@@ -33,6 +33,11 @@ class DashboardProject(AuditMixin, table=True):
     Consolidated to act as the single source of truth for the SCM system.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
+    crm_project_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String, unique=True, index=True, nullable=True),
+        description="Unique external project ID sourced from the CRM/design funnel.",
+    )
     project_name: str = Field(index=True, description="Descriptive name of the project.")
     
     # Metadata
