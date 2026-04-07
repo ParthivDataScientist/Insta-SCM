@@ -239,11 +239,6 @@ def _apply_design_state(project: DashboardProject, payload: dict[str, Any]) -> N
     status_source = getattr(project, "status", None) if ("status" in payload or "stage" not in payload) else None
     status = _derive_status(status_source, normalized_stage, revision_count, current_version)
 
-    if status == "changes":
-        revision_count = max(1, revision_count)
-    elif status in {"pending", "in_progress"}:
-        revision_count = max(0, revision_count)
-
     project.status = status
     if payload.get("status") is not None or payload.get("stage") is not None:
         project.stage = _stage_from_status(status)
@@ -257,21 +252,6 @@ def _apply_design_state(project: DashboardProject, payload: dict[str, Any]) -> N
         project.board_stage = "TBC"
     if payload.get("booking_date") == "":
         project.booking_date = None
-
-    if status in {"in_progress", "changes"} and current_version:
-        normalized_version_key = current_version.casefold()
-        has_entry = any(
-            ((entry.get("version") or "").strip().casefold() == normalized_version_key)
-            for entry in revision_history
-        )
-        if not has_entry:
-            revision_history.append(
-                {
-                    "version": current_version,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "notes": revision_note or _default_revision_note(status, current_version),
-                }
-            )
 
     project.revision_history = revision_history
 

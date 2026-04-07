@@ -60,9 +60,9 @@ def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
     return ShipmentResponse(**payload)
 
 
-def _validate_project_reference(db: Session, project_id: Optional[int]) -> DashboardProject:
+def _validate_project_reference(db: Session, project_id: Optional[int]) -> Optional[DashboardProject]:
     if project_id is None:
-        raise HTTPException(status_code=400, detail="project_id is required for shipments")
+        return None
 
     project = db.get(DashboardProject, project_id)
     if not project:
