@@ -111,12 +111,14 @@ def _sync_postgres_sequence(session: Session, table_name: str, column_name: str 
         return
 
     seq_stmt = text("SELECT pg_get_serial_sequence(:table_name, :column_name)")
-    sequence_name = session.exec(
+    result_row = session.exec(
         seq_stmt,
         params={"table_name": table_name, "column_name": column_name},
-    ).one()
-    if not sequence_name:
+    ).first()
+    if not result_row or not result_row[0]:
         return
+        
+    sequence_name = result_row[0]
 
     sync_stmt = text(
         f"SELECT setval('{sequence_name}', COALESCE((SELECT MAX({column_name}) FROM {table_name}), 0) + 1, false)"
