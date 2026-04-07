@@ -46,9 +46,10 @@ def _ensure_project_schema_compatibility() -> None:
         "status": "ALTER TABLE dashboardproject ADD COLUMN status VARCHAR DEFAULT 'pending'",
         "revision_count": "ALTER TABLE dashboardproject ADD COLUMN revision_count INTEGER DEFAULT 0",
         "current_version": "ALTER TABLE dashboardproject ADD COLUMN current_version VARCHAR",
-        "is_active": "ALTER TABLE dashboardproject ADD COLUMN is_active BOOLEAN DEFAULT 1",
+        "is_active": "ALTER TABLE dashboardproject ADD COLUMN is_active BOOLEAN DEFAULT TRUE",
         "booking_date": "ALTER TABLE dashboardproject ADD COLUMN booking_date DATE",
         "revision_history": "ALTER TABLE dashboardproject ADD COLUMN revision_history JSON",
+        "client_id": "ALTER TABLE dashboardproject ADD COLUMN client_id INTEGER",
     }
 
     shipment_columns = {}
@@ -66,12 +67,12 @@ def _ensure_project_schema_compatibility() -> None:
         }
     
     user_ddl = {
-        "mfa_secret": "ALTER TABLE user ADD COLUMN mfa_secret VARCHAR",
-        "mfa_enabled": "ALTER TABLE user ADD COLUMN mfa_enabled BOOLEAN DEFAULT 0",
-        "failed_login_attempts": "ALTER TABLE user ADD COLUMN failed_login_attempts INTEGER DEFAULT 0",
-        "locked_until": "ALTER TABLE user ADD COLUMN locked_until DATETIME",
-        "reset_token": "ALTER TABLE user ADD COLUMN reset_token VARCHAR",
-        "reset_token_expires": "ALTER TABLE user ADD COLUMN reset_token_expires DATETIME",
+        "mfa_secret": 'ALTER TABLE "user" ADD COLUMN mfa_secret VARCHAR',
+        "mfa_enabled": 'ALTER TABLE "user" ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE',
+        "failed_login_attempts": 'ALTER TABLE "user" ADD COLUMN failed_login_attempts INTEGER DEFAULT 0',
+        "locked_until": 'ALTER TABLE "user" ADD COLUMN locked_until TIMESTAMP',
+        "reset_token": 'ALTER TABLE "user" ADD COLUMN reset_token VARCHAR',
+        "reset_token_expires": 'ALTER TABLE "user" ADD COLUMN reset_token_expires TIMESTAMP',
     }
 
     with engine.begin() as connection:
