@@ -113,7 +113,7 @@ def _sync_postgres_sequence(session: Session, table_name: str, column_name: str 
     seq_stmt = text("SELECT pg_get_serial_sequence(:table_name, :column_name)")
     sequence_name = session.exec(
         seq_stmt,
-        {"table_name": table_name, "column_name": column_name},
+        params={"table_name": table_name, "column_name": column_name},
     ).one()
     if not sequence_name:
         return
