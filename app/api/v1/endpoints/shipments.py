@@ -177,12 +177,8 @@ def _process_excel_import(contents: bytes, db: Session):
 
         # Call track_and_save with correct arguments
         project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
-        if project_id is None:
-            failed += 1
-            errors.append(f"{tracking_num}: project_id is required")
-            continue
 
-        if not db.get(DashboardProject, project_id):
+        if project_id is not None and not db.get(DashboardProject, project_id):
             failed += 1
             errors.append(f"{tracking_num}: linked project not found")
             continue

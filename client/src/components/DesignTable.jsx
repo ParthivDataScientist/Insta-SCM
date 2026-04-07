@@ -87,8 +87,6 @@ export default function DesignTable({ projects, onUpdateStatus, onUpdateField = 
                     <th>Client</th>
                     <th>City</th>
                     <th>Version</th>
-                    <th>Revisions</th>
-                    <th>AWBs</th>
                     <th>Booking Date</th>
                     <th>Show Date</th>
                 </tr>
@@ -144,8 +142,6 @@ export default function DesignTable({ projects, onUpdateStatus, onUpdateField = 
                             <td>
                                 <VersionCell project={project} onUpdateField={onUpdateField} />
                             </td>
-                            <td>{project.revision_count ?? 0}</td>
-                            <td>{project.linked_awbs?.length ? project.linked_awbs.join(', ') : '—'}</td>
                             <td>{project.booking_date || '—'}</td>
                             <td>{project.event_start_date || '—'}</td>
                         </tr>
@@ -154,7 +150,7 @@ export default function DesignTable({ projects, onUpdateStatus, onUpdateField = 
 
                 {projects.length === 0 && (
                     <tr>
-                        <td colSpan="10" style={{ padding: '32px', textAlign: 'center', color: 'var(--tx3)', fontWeight: 600 }}>
+                        <td colSpan="8" style={{ padding: '32px', textAlign: 'center', color: 'var(--tx3)', fontWeight: 600 }}>
                             No design briefs match the current filters.
                         </td>
                     </tr>
