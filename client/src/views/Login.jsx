@@ -20,8 +20,14 @@ const Login = () => {
     const [quoteIndex, setQuoteIndex] = useState(0);
     const [mfaToken, setMfaToken] = useState(null);
     const [mfaCode, setMfaCode] = useState('');
-    const { login, verifyMfa } = useAuth();
+    const { login, verifyMfa, user } = useAuth();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (user) {
+            navigate('/design');
+        }
+    }, [user, navigate]);
 
     useEffect(() => {
         const interval = setInterval(() => {

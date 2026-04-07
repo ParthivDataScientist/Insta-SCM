@@ -11,15 +11,21 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Verify session on mount
+    // Verify session on mount (Bypassed for now)
     const verifySession = useCallback(async () => {
         setLoading(true);
         try {
-            const userData = await authService.getCurrentUser();
+            // Bypass Authentication for now - Grant free access
+            // const userData = await authService.getCurrentUser();
+            const userData = {
+                id: 1,
+                email: "admin@insta-scm.com",
+                role: "ADMIN",
+                full_name: "Admin User",
+                is_active: true
+            };
             setUser(userData);
         } catch (err) {
-            // If verification fails, clear local user state
-            // we don't need to clear localStorage anymore as we've moved to cookies
             setUser(null);
         } finally {
             setLoading(false);
