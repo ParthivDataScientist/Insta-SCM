@@ -1,49 +1,39 @@
-import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React from 'react';
 import {
-    Archive,
     Briefcase,
     CheckCircle2,
-    Layout,
-    LogOut,
-    Menu,
-    PenTool,
     RefreshCw,
     Search,
-    SlidersHorizontal,
-    TrendingDown,
-    TrendingUp,
+    TimerReset,
+    WandSparkles,
+    XCircle,
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 import { useDesignProjects } from '../hooks/useDesignProjects';
 import DesignTable from '../components/DesignTable';
-import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
-import { CardSkeleton } from '../components/SkeletonLoader';
+import AppShell from '../components/app/AppShell';
+import KpiCard from '../components/app/KpiCard';
 
 export default function DesignDashboard() {
-    const { user, logout } = useAuth();
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const isDark = localStorage.getItem('insta_theme') === 'dark';
-
     const {
-        filteredDesignProjects,
+        tableProjects,
         designStats,
         loading,
         syncing,
         error,
-        filterStatus,
-        setFilterStatus,
-        searchQuery,
+        filters,
+        clients,
+        cityOptions,
         setSearchQuery,
+        setFilterStatus,
+        setClientId,
+        setCity,
+        setDateField,
+        setActiveKpi,
+        clearFilters,
         updateDesignStatus,
         syncCrmFeed,
         loadData,
     } = useDesignProjects();
-
-    const statusOptions = useMemo(
-        () => ['All', 'In-Process', 'Design Change', 'Drop'],
-        []
-    );
 
     const handleSyncCrm = async () => {
         try {
@@ -61,179 +51,171 @@ export default function DesignDashboard() {
         }
     };
 
-    return (
-        <div className={isDark ? 'dark' : 'light'} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-            <div className={`app-layout ${sidebarOpen ? '' : 'sidebar-closed'}`}>
-                <aside className="sidebar">
-                    <div className="sidebar-logo">
-                        <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ width: '130px', height: 'auto' }} />
-                    </div>
-                    <div className="sidebar-tagline">Excellence in Exhibition Logistics</div>
-
-                    <nav className="sidebar-nav">
-                        <Link to="/design" className="sidebar-item active">
-                            <PenTool size={17} /> Design Management
-                        </Link>
-                        <Link to="/projects" className="sidebar-item">
-                            <Briefcase size={17} /> Projects List
-                        </Link>
-                        <Link to="/board" className="sidebar-item">
-                            <Layout size={17} /> Project Board
-                        </Link>
-                        <Link to="/timeline" className="sidebar-item">
-                            <RefreshCw size={17} /> Resource Timeline
-                        </Link>
-                        <Link to="/storage" className="sidebar-item">
-                            <Archive size={17} /> Storage
-                        </Link>
-                    </nav>
-                </aside>
-
-                <main className="main-content">
-                    <header className="main-header">
-                        <div className="header-welcome" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <button className="icon-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                                <Menu size={20} />
-                            </button>
-                            <div>
-                                <h1>Design <strong>Management</strong></h1>
-                                <p className="header-role">
-                                    Pre-sales CRM briefs and design-stage conversion for {user?.full_name || 'Operations'}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <GlobalDateRangePicker />
-                            <button
-                                className="icon-btn btn-animate"
-                                onClick={handleSyncCrm}
-                                disabled={syncing}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    padding: '6px 12px',
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    background: 'var(--green)',
-                                    color: 'white',
-                                }}
-                            >
-                                <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
-                                {syncing ? 'Syncing CRM...' : 'Sync CRM'}
-                            </button>
-                            <button
-                                className="icon-btn btn-animate"
-                                onClick={loadData}
-                                disabled={loading}
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600 }}
-                            >
-                                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-                                Refresh
-                            </button>
-                            <button className="icon-btn btn-animate" onClick={logout} style={{ marginLeft: '0.5rem', color: '#E53935' }}>
-                                <LogOut size={16} />
-                            </button>
-                        </div>
-                    </header>
-                    <div className="header-accent-bar" />
-
-                    <div className="tracking-body">
-                        {error && <div className="error-banner">{error}</div>}
-
-                        <div className="kpi-row kpi-row-5">
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Total Brief</div>
-                                    <div className="kpi-value">{designStats.total_brief ?? 0}</div>
-                                    <div className="kpi-sub muted">Win + in-process designs</div>
-                                </div>
-                                <div className="kpi-icon blue-icon"><Briefcase size={22} /></div>
-                            </div>
-
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Win Rate</div>
-                                    <div className="kpi-value">{designStats.win_rate ?? 0}%</div>
-                                    <div className="kpi-sub green">{designStats.win_count ?? 0} successful designs</div>
-                                </div>
-                                <div className="kpi-icon green-icon"><TrendingUp size={22} /></div>
-                            </div>
-
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Drop Rate</div>
-                                    <div className="kpi-value">{designStats.drop_rate ?? 0}%</div>
-                                    <div className="kpi-sub red">{designStats.drop_count ?? 0} discarded designs</div>
-                                </div>
-                                <div className="kpi-icon orange-icon"><TrendingDown size={22} /></div>
-                            </div>
-
-                            <div className="kpi-card active-kpi" onClick={() => setFilterStatus(filterStatus === 'Design Change' ? 'All' : 'Design Change')}>
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Design Iterations</div>
-                                    <div className="kpi-value">{designStats.design_iterations ?? 0}</div>
-                                    <div className="kpi-sub orange">Status: Design Change</div>
-                                </div>
-                                <div className="kpi-icon purple-icon"><CheckCircle2 size={22} /></div>
-                            </div>
-                        </div>
-
-                        <div className="tracking-toolbar" style={{ margin: '24px 0', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <div className="toolbar-search" style={{ flex: 1 }}>
-                                <Search size={14} className="ts-icon" />
-                                <input
-                                    className="ts-input"
-                                    placeholder="Search by CRM ID, project name, venue, or area..."
-                                    value={searchQuery}
-                                    onChange={(event) => setSearchQuery(event.target.value)}
-                                />
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)' }}>
-                                <SlidersHorizontal size={14} color="var(--tx3)" />
-                                <select
-                                    value={filterStatus}
-                                    onChange={(event) => setFilterStatus(event.target.value)}
-                                    style={{
-                                        border: 'none',
-                                        background: 'transparent',
-                                        color: 'var(--tx)',
-                                        fontWeight: 700,
-                                        fontSize: '12px',
-                                        outline: 'none',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    {statusOptions.map((option) => (
-                                        <option key={option} value={option}>
-                                            {option === 'All' ? 'All Statuses' : option}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="bottom-row">
-                            <div className="tracking-table-wrap" style={{ minHeight: '400px' }}>
-                                {loading && filteredDesignProjects.length === 0 ? (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', padding: '20px' }}>
-                                        <CardSkeleton />
-                                        <CardSkeleton />
-                                        <CardSkeleton />
-                                    </div>
-                                ) : (
-                                    <DesignTable
-                                        projects={filteredDesignProjects}
-                                        onUpdateStatus={handleUpdateStatus}
-                                    />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </main>
-            </div>
+    const headerSearch = (
+        <div className="premium-filter" style={{ minWidth: '320px', flex: 1 }}>
+            <Search size={15} color="var(--tx3)" />
+            <input
+                placeholder="Search project, client, or AWB"
+                value={filters.search}
+                onChange={(event) => setSearchQuery(event.target.value)}
+            />
         </div>
+    );
+
+    const filtersRow = (
+        <div className="premium-filter-group">
+            <div className="premium-filter" style={{ minWidth: '170px' }}>
+                <select value={filters.status} onChange={(event) => setFilterStatus(event.target.value)}>
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="changes">Changes</option>
+                    <option value="won">Won</option>
+                    <option value="lost">Lost</option>
+                </select>
+            </div>
+
+            <div className="premium-filter" style={{ minWidth: '170px' }}>
+                <select value={filters.clientId} onChange={(event) => setClientId(event.target.value)}>
+                    <option value="all">All Clients</option>
+                    {clients.map((client) => (
+                        <option key={client.id} value={String(client.id)}>{client.name}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="premium-filter" style={{ minWidth: '150px' }}>
+                <select value={filters.city} onChange={(event) => setCity(event.target.value)}>
+                    <option value="all">All Cities</option>
+                    {cityOptions.filter((city) => city !== 'all').map((city) => (
+                        <option key={city} value={city}>{city}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="premium-filter" style={{ minWidth: '150px' }}>
+                <select value={filters.dateField} onChange={(event) => setDateField(event.target.value)}>
+                    <option value="show">Show Date</option>
+                    <option value="booking">Booking Date</option>
+                </select>
+            </div>
+
+            <button type="button" className="premium-action-button" onClick={clearFilters}>
+                Reset
+            </button>
+        </div>
+    );
+
+    const shellActions = (
+        <>
+            <button
+                type="button"
+                className="premium-action-button"
+                onClick={loadData}
+                disabled={loading}
+            >
+                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                Refresh
+            </button>
+            <button
+                type="button"
+                className="premium-action-button premium-action-button--primary"
+                onClick={handleSyncCrm}
+                disabled={syncing}
+            >
+                <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+                {syncing ? 'Syncing' : 'Sync CRM'}
+            </button>
+        </>
+    );
+
+    return (
+        <AppShell
+            activeNav="design"
+            title="Design Dashboard"
+            subtitle="Premium brief tracking with canonical KPI logic, revision history, and AWB-linked search."
+            headerCenter={headerSearch}
+            actions={shellActions}
+            toolbar={filtersRow}
+        >
+            {error ? <div className="error-banner">{error}</div> : null}
+
+            <div className="premium-kpi-grid">
+                <KpiCard
+                    icon={Briefcase}
+                    label="Total Brief"
+                    value={designStats.total_brief ?? 0}
+                    detail="All briefs after current filters"
+                    active={filters.activeKpi === 'all'}
+                    onClick={() => setActiveKpi('all')}
+                />
+                <KpiCard
+                    icon={TimerReset}
+                    label="Pending"
+                    value={designStats.pending_count ?? 0}
+                    detail="Not yet started"
+                    tone="neutral"
+                    active={filters.activeKpi === 'pending'}
+                    onClick={() => setActiveKpi(filters.activeKpi === 'pending' ? 'all' : 'pending')}
+                />
+                <KpiCard
+                    icon={RefreshCw}
+                    label="In Progress"
+                    value={designStats.in_progress_count ?? 0}
+                    detail="Active design work"
+                    tone="blue"
+                    active={filters.activeKpi === 'in_progress'}
+                    onClick={() => setActiveKpi(filters.activeKpi === 'in_progress' ? 'all' : 'in_progress')}
+                />
+                <KpiCard
+                    icon={WandSparkles}
+                    label="Changes"
+                    value={designStats.changes_count ?? 0}
+                    detail="Revision cycles underway"
+                    tone="orange"
+                    active={filters.activeKpi === 'changes'}
+                    onClick={() => setActiveKpi(filters.activeKpi === 'changes' ? 'all' : 'changes')}
+                />
+                <KpiCard
+                    icon={CheckCircle2}
+                    label="Won"
+                    value={designStats.won_count ?? 0}
+                    detail="Approved briefs"
+                    tone="green"
+                    active={filters.activeKpi === 'won'}
+                    onClick={() => setActiveKpi(filters.activeKpi === 'won' ? 'all' : 'won')}
+                />
+                <KpiCard
+                    icon={XCircle}
+                    label="Lost"
+                    value={designStats.lost_count ?? 0}
+                    detail="Rejected or dropped"
+                    tone="red"
+                    active={filters.activeKpi === 'lost'}
+                    onClick={() => setActiveKpi(filters.activeKpi === 'lost' ? 'all' : 'lost')}
+                />
+                <KpiCard
+                    icon={RefreshCw}
+                    label="Open"
+                    value={designStats.open_count ?? 0}
+                    detail="Total minus won and lost"
+                    tone="blue"
+                    active={filters.activeKpi === 'open'}
+                    onClick={() => setActiveKpi(filters.activeKpi === 'open' ? 'all' : 'open')}
+                />
+            </div>
+
+            <div className="premium-panel" style={{ minHeight: '420px', overflow: 'auto' }}>
+                {loading && tableProjects.length === 0 ? (
+                    <div className="loading-row">Loading design briefs...</div>
+                ) : (
+                    <DesignTable
+                        projects={tableProjects}
+                        onUpdateStatus={handleUpdateStatus}
+                        onUpdateField={handleUpdateStatus}
+                    />
+                )}
+            </div>
+        </AppShell>
     );
 }

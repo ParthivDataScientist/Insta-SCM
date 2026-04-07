@@ -44,6 +44,29 @@ const authService = {
     logout: async () => {
         const response = await apiClient.post('/api/v1/auth/logout');
         return response.data;
+    },
+
+    /**
+     * MFA Verify
+     */
+    verifyMfa: async (mfa_token, code) => {
+        const response = await apiClient.post('/api/v1/auth/mfa/verify', { mfa_token, code });
+        return response.data;
+    },
+
+    setupMfa: async () => {
+        const response = await apiClient.post('/api/v1/auth/mfa/setup');
+        return response.data;
+    },
+
+    forgotPassword: async (email) => {
+        const response = await apiClient.post('/api/v1/auth/forgot-password', { email });
+        return response.data;
+    },
+
+    resetPassword: async (email, token, new_password) => {
+        const response = await apiClient.post('/api/v1/auth/reset-password', { email, token, new_password });
+        return response.data;
     }
 };
 

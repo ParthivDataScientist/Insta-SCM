@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, RefreshCw, AlertTriangle, ChevronRight, Briefcase, Truck, Archive, LogOut, Layout, Calendar, X, PenTool } from 'lucide-react';
+import { Menu, RefreshCw, AlertTriangle, ChevronRight, Briefcase, Truck, Archive, LogOut, Layout, Calendar, PenTool } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DndContext, PointerSensor, useSensor, useSensors, closestCorners } from '@dnd-kit/core';
 
 // Hooks & Context
 import { useProjects } from '../hooks/useProjects';
@@ -27,7 +29,7 @@ const BOARD_STAGES = [
 
 /**
  * ProjectBoard View
- * Production-grade Kanban implementation with React Query and Modular Architecture.
+ * Production-grade Kanban implementation with React Query, Framer Motion and dnd-kit.
  */
 export default function ProjectBoard() {
     const [isDark, setIsDark] = useState(() => localStorage.getItem('insta_theme') === 'dark');
@@ -59,16 +61,16 @@ export default function ProjectBoard() {
         });
     }, []);
 
-    // Deep-linking from Projects List - only runs once when data is ready
+    // Deep-linking from Projects List
     const hasLinked = React.useRef(false);
     useEffect(() => {
-        if (hasLinked.current) return; // Don't re-run if already linked
+        if (hasLinked.current) return; 
         const params = new URLSearchParams(location.search);
         const projectId = params.get('projectId');
         if (projectId && confirmedProjects.length > 0) {
             const proj = confirmedProjects.find(p => p.id === parseInt(projectId));
             if (proj) {
-                hasLinked.current = true; // Mark as handled
+                hasLinked.current = true; 
                 setSelectedProject(proj);
                 const timer = setTimeout(() => {
                     const card = document.getElementById(`board-card-${projectId}`);
@@ -79,15 +81,25 @@ export default function ProjectBoard() {
         }
     }, [location.search, confirmedProjects]);
 
-    // Drag and Drop optimized handlers
-    const handleDragOver = useCallback((e) => e.preventDefault(), []);
+    // Dnd-kit Configuration
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5, // Requires 5px movement before drag starts (prevent accidental clicks)
+            },
+        })
+    );
 
-    const handleDrop = useCallback((e, stage) => {
-        e.preventDefault();
-        const projectIdStr = e.dataTransfer.getData('text/plain');
-        if (!projectIdStr) return;
-        const projectId = parseInt(projectIdStr, 10);
-        updateBoardStage(projectId, stage);
+    const handleDragEnd = useCallback((event) => {
+        const { active, over } = event;
+        if (!over) return;
+
+        const projectId = active.data.current?.id;
+        const targetStage = over.id;
+
+        if (projectId && targetStage && active.data.current?.stage !== targetStage) {
+            updateBoardStage(projectId, targetStage);
+        }
     }, [updateBoardStage]);
 
     return (
@@ -95,15 +107,17 @@ export default function ProjectBoard() {
             <div className={`app-layout ${sidebarOpen ? '' : 'sidebar-closed'}`}>
 
                 {/* Secure & Lazy Modal */}
-                <Suspense fallback={null}>
+                <AnimatePresence>
                     {selectedProject && (
-                        <ProjectBoardModal 
-                            project={projects.find((p) => p.id === selectedProject.id) || selectedProject} 
-                            onClose={() => setSelectedProject(null)} 
-                            updateProjectFull={updateProjectFull}
-                        />
+                        <Suspense fallback={<div style={{position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999}}/>}>
+                            <ProjectBoardModal 
+                                project={projects.find((p) => p.id === selectedProject.id) || selectedProject} 
+                                onClose={() => setSelectedProject(null)} 
+                                updateProjectFull={updateProjectFull}
+                            />
+                        </Suspense>
                     )}
-                </Suspense>
+                </AnimatePresence>
 
                 {/* ═══════ SIDEBAR ═══════ */}
                 <aside className="sidebar">
@@ -179,8 +193,9 @@ export default function ProjectBoard() {
                                 />
                             </div>
 
-                            <button 
-                                className="icon-btn btn-animate" 
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                className="icon-btn" 
                                 onClick={loadData} 
                                 disabled={loading}
                                 title="Refresh Board"
@@ -195,7 +210,7 @@ export default function ProjectBoard() {
                             >
                                 <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none', flexShrink: 0 }} />
                                 {loading ? 'Loading...' : 'Refresh'}
-                            </button>
+                            </motion.button>
                             
                             <div className="theme-switch" style={{ height: '38px' }}>
                                 <span className={!isDark ? 'ts-label active' : 'ts-label'} style={{ fontSize: '11px' }}>Light</span>
@@ -203,14 +218,14 @@ export default function ProjectBoard() {
                                 <span className={isDark ? 'ts-label active' : 'ts-label'} style={{ fontSize: '11px' }}>Dark</span>
                             </div>
                             
-                            <button className="icon-btn btn-animate" onClick={logout} style={{ color: '#E53935' }}>
+                            <motion.button whileTap={{ scale: 0.95 }} className="icon-btn" onClick={logout} style={{ color: '#E53935' }}>
                                 <LogOut size={16} />
-                            </button>
+                            </motion.button>
                         </div>
                     </header>
                     <div className="header-accent-bar" style={{ flexShrink: 0 }} />
 
-                    {error && <div className="error-banner" style={{ margin: '10px 24px' }}>⚠️ {error}</div>}
+                    {error && <motion.div initial={{opacity:0, y:-10}} animate={{opacity:1, y:0}} className="error-banner" style={{ margin: '10px 24px' }}>⚠️ {error}</motion.div>}
 
                     {/* Toolbar / Filters */}
                     <div style={{ padding: '16px 24px' }}>
@@ -234,16 +249,16 @@ export default function ProjectBoard() {
                         {loading && projects.length === 0 ? (
                             <BoardSkeleton stages={BOARD_STAGES} />
                         ) : (
-                            BOARD_STAGES.map(stage => (
-                                <KanbanColumn 
-                                    key={stage}
-                                    stage={stage}
-                                    projects={confirmedProjects.filter(p => (p.board_stage || 'TBC') === stage)}
-                                    onProjectClick={setSelectedProject}
-                                    onDragOver={handleDragOver}
-                                    onDrop={handleDrop}
-                                />
-                            ))
+                            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                                {BOARD_STAGES.map(stage => (
+                                    <KanbanColumn 
+                                        key={stage}
+                                        stage={stage}
+                                        projects={confirmedProjects.filter(p => (p.board_stage || 'TBC') === stage)}
+                                        onProjectClick={setSelectedProject}
+                                    />
+                                ))}
+                            </DndContext>
                         )}
                     </div>
                 </main>

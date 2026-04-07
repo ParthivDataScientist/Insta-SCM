@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Truck, Loader, ArrowUpRight } from 'lucide-react';
 import shipmentsService from '../api/shipments';
+import projectsService from '../api/projects';
 
 const TrackModal = ({ onClose, onTracked }) => {
     const [trackingNum, setTrackingNum] = useState('');
@@ -12,6 +13,57 @@ const TrackModal = ({ onClose, onTracked }) => {
     const [loading, setLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
     const [error, setError] = useState('');
+    const [projects, setProjects] = useState([]);
+    const [projectLookup, setProjectLookup] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState('');
+
+    useEffect(() => {
+        let ignore = false;
+
+        const loadProjects = async () => {
+            try {
+                const projectRows = await projectsService.fetchProjects();
+                if (!ignore) {
+                    setProjects(projectRows);
+                }
+            } catch (err) {
+                if (!ignore) {
+                    setError(err.response?.data?.detail || err.message || 'Failed to load projects');
+                }
+            }
+        };
+
+        loadProjects();
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
+    const projectOptions = useMemo(
+        () => projects.map((project) => ({
+            ...project,
+            optionLabel: `${project.project_name} | ${project.client || 'No Client'} | ${project.crm_project_id || project.id}`,
+        })),
+        [projects]
+    );
+
+    const selectedProject = useMemo(
+        () => projectOptions.find((project) => String(project.id) === String(selectedProjectId)) || null,
+        [projectOptions, selectedProjectId]
+    );
+
+    useEffect(() => {
+        if (!selectedProject) return;
+        if (!exhibitionName && selectedProject.event_name) {
+            setExhibitionName(selectedProject.event_name);
+        }
+    }, [selectedProject, exhibitionName]);
+
+    const syncSelectedProject = (value) => {
+        setProjectLookup(value);
+        const matched = projectOptions.find((project) => project.optionLabel === value);
+        setSelectedProjectId(matched ? String(matched.id) : '');
+    };
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
@@ -55,6 +107,10 @@ const TrackModal = ({ onClose, onTracked }) => {
             setError('Please enter a tracking number');
             return;
         }
+        if (!selectedProjectId) {
+            setError('Please select a valid project');
+            return;
+        }
         if (!exhibition) {
             setError('Please enter an Exhibition Name');
             return;
@@ -68,7 +124,8 @@ const TrackModal = ({ onClose, onTracked }) => {
                 show_date: eventDate || null,
                 exhibition_name: exhibition,
                 cs: incoterm || null,
-                no_of_box: boxCount || null
+                no_of_box: boxCount || null,
+                project_id: Number(selectedProjectId),
             });
             onTracked();
             onClose();
@@ -91,6 +148,36 @@ const TrackModal = ({ onClose, onTracked }) => {
                     <button className="panel-close" onClick={onClose}><X size={20} /></button>
                 </div>
                 <div className="panel-body">
+                    <div className="form-group">
+                        <label className="form-label">Project</label>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Search and select a project"
+                            list="track-project-options"
+                            value={projectLookup}
+                            onChange={e => syncSelectedProject(e.target.value)}
+                        />
+                        <datalist id="track-project-options">
+                            {projectOptions.map((project) => (
+                                <option key={project.id} value={project.optionLabel} />
+                            ))}
+                        </datalist>
+                    </div>
+
+                    {selectedProject && (
+                        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                            <div className="form-group">
+                                <label className="form-label">Client</label>
+                                <input type="text" className="form-input" value={selectedProject.client || ''} readOnly />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Project ID</label>
+                                <input type="text" className="form-input" value={selectedProject.crm_project_id || selectedProject.id} readOnly />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="form-group">
                         <label className="form-label">Tracking Number</label>
                         <input
@@ -120,6 +207,11 @@ const TrackModal = ({ onClose, onTracked }) => {
                                 placeholder="e.g. Tech Expo 2026"
                                 value={exhibitionName}
                                 onChange={e => setExhibitionName(e.target.value)}
+                                onFocus={() => {
+                                    if (!exhibitionName && selectedProject?.event_name) {
+                                        setExhibitionName(selectedProject.event_name);
+                                    }
+                                }}
                             />
                         </div>
                         <div className="form-group">

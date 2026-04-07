@@ -4,14 +4,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './views/Login';
 import Register from './views/Register';
-import Storage from './views/Storage';
+import ForgotPassword from './views/ForgotPassword';
+import ResetPassword from './views/ResetPassword';
 import DesignDashboard from './views/DesignDashboard';
-import ProjectsDashboard from './views/ProjectsDashboard';
-import ProjectBoard from './views/ProjectBoard';
-import ManagerTimeline from './views/ManagerTimeline';
-import ShipmentDashboard from './views/ShipmentDashboard';
+import StoragePremium from './views/StoragePremium';
+import ProjectsDashboardPremium from './views/ProjectsDashboardPremium';
+import ProjectBoardPremium from './views/ProjectBoardPremium';
+import ManagerTimelinePremium from './views/ManagerTimelinePremium';
+import ShipmentDashboardPremium from './views/ShipmentDashboardPremium';
 import { GlobalDateRangeProvider } from './contexts/GlobalDateRangeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './styles.css';
+import './premium-theme.css';
 
 // Initialize React Query Client
 const queryClient = new QueryClient({
@@ -35,22 +39,26 @@ export default function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
-                <BrowserRouter>
-                    <GlobalDateRangeProvider>
-                        <Routes>
-                            <Route path="/login" element={<Login />} />
-                            <Route path="/register" element={<Register />} />
-                            <Route path="/" element={<Navigate to="/design" replace />} />
-                            <Route path="/design" element={<ProtectedRoute><DesignDashboard /></ProtectedRoute>} />
-                            <Route path="/storage" element={<ProtectedRoute><Storage /></ProtectedRoute>} />
-                            <Route path="/projects" element={<ProtectedRoute><ProjectsDashboard /></ProtectedRoute>} />
-                            <Route path="/board" element={<ProtectedRoute><ProjectBoard /></ProtectedRoute>} />
-                            <Route path="/timeline" element={<ProtectedRoute><ManagerTimeline /></ProtectedRoute>} />
-                            <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboard /></ProtectedRoute>} />
-                            <Route path="/*" element={<Navigate to="/design" replace />} />
-                        </Routes>
-                    </GlobalDateRangeProvider>
-                </BrowserRouter>
+                <ThemeProvider>
+                    <BrowserRouter>
+                        <GlobalDateRangeProvider>
+                            <Routes>
+                                <Route path="/login" element={<Login />} />
+                                <Route path="/register" element={<Register />} />
+                                <Route path="/forgot-password" element={<ForgotPassword />} />
+                                <Route path="/reset-password" element={<ResetPassword />} />
+                                <Route path="/" element={<Navigate to="/design" replace />} />
+                                <Route path="/design" element={<ProtectedRoute><DesignDashboard /></ProtectedRoute>} />
+                                <Route path="/storage" element={<ProtectedRoute><StoragePremium /></ProtectedRoute>} />
+                                <Route path="/projects" element={<ProtectedRoute><ProjectsDashboardPremium /></ProtectedRoute>} />
+                                <Route path="/board" element={<ProtectedRoute><ProjectBoardPremium /></ProtectedRoute>} />
+                                <Route path="/timeline" element={<ProtectedRoute><ManagerTimelinePremium /></ProtectedRoute>} />
+                                <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
+                                <Route path="/*" element={<Navigate to="/design" replace />} />
+                            </Routes>
+                        </GlobalDateRangeProvider>
+                    </BrowserRouter>
+                </ThemeProvider>
             </AuthProvider>
         </QueryClientProvider>
     );

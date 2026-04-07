@@ -15,6 +15,7 @@ from sqlmodel import Session, select
 
 from app.core.security import verify_api_key
 from app.db.session import get_session
+from app.models.dashboard_project import DashboardProject
 from app.models.shipment import Shipment
 from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
 from app.services.shipment_service import get_stats, track_and_save, preview_track, refresh_tracked_shipments
@@ -33,6 +34,7 @@ class TrackRequest(BaseModel):
     exhibition_name: Optional[str] = None
     cs: Optional[str] = None
     no_of_box: Optional[str] = None
+    project_id: Optional[int] = None
 
 
 class BatchRequest(BaseModel):
@@ -44,6 +46,28 @@ class BatchRequest(BaseModel):
 class RefreshRequest(BaseModel):
     """Request body for re-syncing saved shipment records."""
     shipment_ids: Optional[List[int]] = None
+
+
+def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
+    project = db.get(DashboardProject, shipment.project_id) if shipment.project_id else None
+    payload = ShipmentResponse.model_validate(shipment).model_dump()
+    payload["project_name"] = project.project_name if project else None
+    payload["project_client_name"] = (
+        project.client_relationship.name
+        if project and project.client_relationship
+        else None
+    )
+    return ShipmentResponse(**payload)
+
+
+def _validate_project_reference(db: Session, project_id: Optional[int]) -> DashboardProject:
+    if project_id is None:
+        raise HTTPException(status_code=400, detail="project_id is required for shipments")
+
+    project = db.get(DashboardProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Linked project not found")
+    return project
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +108,7 @@ def track_shipment(
     _key: str = Depends(verify_api_key),
 ):
     """Track a shipment via carrier API and save/update in DB."""
+    _validate_project_reference(db, body.project_id)
     result = track_and_save(
         tracking_number=tracking_number.upper(),
         recipient=body.recipient,
@@ -93,6 +118,7 @@ def track_shipment(
         db=db,
         cs=body.cs,
         no_of_box=body.no_of_box,
+        project_id=body.project_id,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -150,6 +176,17 @@ def _process_excel_import(contents: bytes, db: Session):
         no_of_box = str(row.get("no_of_box") or row.get("boxes") or "").strip() if pd.notna(row.get("no_of_box")) or pd.notna(row.get("boxes")) else None
 
         # Call track_and_save with correct arguments
+        project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
+        if project_id is None:
+            failed += 1
+            errors.append(f"{tracking_num}: project_id is required")
+            continue
+
+        if not db.get(DashboardProject, project_id):
+            failed += 1
+            errors.append(f"{tracking_num}: linked project not found")
+            continue
+
         res = track_and_save(
             tracking_number=tracking_num.upper(),
             recipient=recipient,
@@ -158,7 +195,8 @@ def _process_excel_import(contents: bytes, db: Session):
             exhibition_name=exhibition_name,
             db=db,
             cs=cs,
-            no_of_box=no_of_box
+            no_of_box=no_of_box,
+            project_id=project_id,
         )
         if "error" in res:
             err_msg = res["error"]
@@ -407,7 +445,8 @@ def list_shipments(
     db: Session = Depends(get_session),
 ):
     """List active (non-archived) shipments."""
-    return db.exec(select(Shipment).where(Shipment.is_archived == False).offset(skip).limit(limit)).all()
+    shipments = db.exec(select(Shipment).where(Shipment.is_archived == False).offset(skip).limit(limit)).all()
+    return [_serialize_shipment(db, shipment) for shipment in shipments]
 
 
 @router.get("/archived", response_model=List[ShipmentResponse])
@@ -418,7 +457,8 @@ def list_archived_shipments(
     _key: str = Depends(verify_api_key),
 ):
     """List archived shipments (Storage)."""
-    return db.exec(select(Shipment).where(Shipment.is_archived == True).offset(skip).limit(limit)).all()
+    shipments = db.exec(select(Shipment).where(Shipment.is_archived == True).offset(skip).limit(limit)).all()
+    return [_serialize_shipment(db, shipment) for shipment in shipments]
 
 
 @router.patch("/{shipment_id}/archive", response_model=ShipmentResponse)
@@ -432,7 +472,7 @@ def archive_shipment(
     updated = toggle_archive(shipment_id, db)
     if not updated:
         raise HTTPException(status_code=404, detail="Shipment not found")
-    return updated
+    return _serialize_shipment(db, updated)
 
 
 @router.get("/mps/{shipment_id}", response_model=MPSDetailResponse)
@@ -461,7 +501,20 @@ def get_shipment(shipment_id: int, db: Session = Depends(get_session)):
     shipment = db.get(Shipment, shipment_id)
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
-    return shipment
+    return _serialize_shipment(db, shipment)
+
+
+@router.get("/project/{project_id}", response_model=List[ShipmentResponse])
+def list_project_shipments(
+    project_id: int,
+    db: Session = Depends(get_session),
+):
+    shipments = db.exec(
+        select(Shipment)
+        .where(Shipment.project_id == project_id)
+        .where(Shipment.is_archived == False)
+    ).all()
+    return [_serialize_shipment(db, shipment) for shipment in shipments]
 
 
 # ---------------------------------------------------------------------------

@@ -1,102 +1,154 @@
 import React from 'react';
-import { User, Calendar, MapPin, Warehouse, Truck, Clock, MessageSquare, Activity } from 'lucide-react';
+import { CalendarDays, MapPin, User } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import { motion } from 'framer-motion';
+import { formatDateDisplay, formatDateRangeDisplay } from '../utils/dateUtils';
+import { getProjectCode } from '../utils/projectStatus';
+
+const resolvePrimaryWindow = (project) => {
+    const start =
+        project.dispatch_date ||
+        project.allocation_start_date ||
+        project.installation_start_date ||
+        project.event_start_date;
+
+    const end =
+        project.dismantling_date ||
+        project.allocation_end_date ||
+        project.installation_end_date ||
+        project.event_end_date ||
+        start;
+
+    return { start, end };
+};
 
 export default function ProjectKanbanCard({ project, onClick }) {
-    // Native drag start handler
-    const handleDragStart = (e) => {
-        e.dataTransfer.setData('text/plain', project.id);
-        e.dataTransfer.effectAllowed = 'move';
-        // Add a class for styling while dragging if needed
-        setTimeout(() => e.target.classList.add('dragging'), 0);
-    };
+    const { start, end } = resolvePrimaryWindow(project);
+    
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: `project-${project.id}`,
+        data: { id: project.id, stage: project.board_stage || 'TBC' }
+    });
 
-    const handleDragEnd = (e) => {
-        e.target.classList.remove('dragging');
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        zIndex: isDragging ? 9999 : 1,
+        opacity: isDragging ? 0.9 : 1,
+        width: '100%',
+        textAlign: 'left',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96))',
+        padding: '16px',
+        borderRadius: '20px',
+        boxShadow: isDragging 
+            ? '0 20px 40px rgba(15, 23, 42, 0.15)' 
+            : '0 10px 30px rgba(15, 23, 42, 0.06)',
+        border: isDragging ? '1px solid var(--blue)' : '1px solid rgba(148, 163, 184, 0.18)',
+        marginBottom: '12px',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        position: 'relative',
+        transition: isDragging ? 'none' : 'box-shadow 0.22s ease, border-color 0.22s ease',
     };
 
     return (
-        <div 
-            className="kanban-card animate-card" 
-            draggable="true"
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
+        <motion.button
+            type="button"
+            className="kanban-card"
+            ref={setNodeRef}
+            {...listeners}
+            {...attributes}
             onClick={() => onClick(project)}
-            style={{
-                background: 'var(--bg-card)', padding: '12px', borderRadius: 'var(--r-md)',
-                boxShadow: 'var(--sh)', border: '1px solid var(--bd)', marginBottom: '10px',
-                cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '8px',
-                position: 'relative', overflow: 'hidden',
-                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'
-            }}
+            style={style}
+            whileHover={{ y: -2, scale: 1.01 }}
+            whileTap={{ scale: 0.97 }}
+            layout
         >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--tx)', letterSpacing: '0.2px' }}>
-                        {project.client || 'No Client'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', width: '100%' }}>
+                <div style={{ minWidth: 0, textAlign: 'left' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tx3)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                        {getProjectCode(project)}
                     </div>
-                    <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--tx3)' }}>
-                        ID: <span style={{ color: 'var(--tx2)' }}>#{project.id}</span> | Project: <span style={{ color: 'var(--tx)' }}>{project.project_name}</span>
+                    <div style={{ marginTop: '8px', fontSize: '15px', fontWeight: 700, color: 'var(--tx)', lineHeight: 1.35 }}>
+                        {project.project_name || 'Untitled project'}
+                    </div>
+                    {project.event_name ? (
+                        <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--tx2)', lineHeight: 1.4 }}>
+                            {project.event_name}
+                        </div>
+                    ) : null}
+                </div>
+
+                {project.area ? (
+                    <div
+                        style={{
+                            flexShrink: 0,
+                            padding: '6px 10px',
+                            borderRadius: '999px',
+                            background: 'rgba(15, 23, 42, 0.04)',
+                            color: 'var(--tx2)',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                        }}
+                    >
+                        {project.area}
+                    </div>
+                ) : null}
+            </div>
+
+            <div
+                style={{
+                    display: 'grid',
+                    gap: '10px',
+                    padding: '12px 14px',
+                    borderRadius: '16px',
+                    background: 'rgba(248, 250, 252, 0.96)',
+                    border: '1px solid rgba(148, 163, 184, 0.12)',
+                    width: '100%'
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--tx)' }}>
+                    <User size={14} color="var(--tx3)" />
+                    <span style={{ color: 'var(--tx3)' }}>Manager</span>
+                    <strong style={{ fontWeight: 700, color: 'var(--tx)' }}>{project.project_manager || 'Unassigned'}</strong>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: 'var(--tx)', textAlign: 'left' }}>
+                    <CalendarDays size={14} color="var(--tx3)" style={{ marginTop: '1px' }} />
+                    <div>
+                        <div style={{ color: 'var(--tx3)', marginBottom: '2px' }}>Schedule</div>
+                        <div style={{ fontWeight: 700 }}>{start ? formatDateRangeDisplay(start, end) : 'Dates not set'}</div>
                     </div>
                 </div>
-                <div style={{ flexShrink: 0 }}>
-                     <Activity size={14} color="var(--org)" />
-                </div>
-            </div>
 
-            {project.event_name && (
-                <div style={{ fontSize: '11px', color: 'var(--tx2)', fontWeight: 600, marginTop: '4px' }}>
-                    {project.event_name}
-                </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx)' }}>
-                    <User size={12} color="var(--red)" /> Manager: <strong>{project.project_manager || 'Unassigned'}</strong>
-                </div>
-            </div>
-
-            <div style={{ marginTop: '8px', borderTop: '1px solid var(--bd-l)', paddingTop: '8px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--tx3)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Logistics Schedule
-                </div>
-                {project.dispatch_date && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)', marginBottom: '4px' }}>
-                        <Warehouse size={12} color="var(--tx3)" /> Dispatch: <strong>{project.dispatch_date}</strong>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: 'var(--tx)', textAlign: 'left' }}>
+                    <MapPin size={14} color="var(--tx3)" style={{ marginTop: '1px' }} />
+                    <div>
+                        <div style={{ color: 'var(--tx3)', marginBottom: '2px' }}>Location</div>
+                        <div style={{ fontWeight: 700 }}>
+                            {project.branch || project.venue || 'Not specified'}
+                        </div>
                     </div>
-                )}
-                {project.installation_start_date && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--tx2)', marginBottom: '4px' }}>
-                        <Truck size={12} color="var(--tx3)" /> Target Move-in: {project.installation_start_date}
-                    </div>
-                )}
+                </div>
             </div>
 
-            {/* Card Footer: Metadata */}
-            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1.5px dashed var(--bd)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: 'var(--tx3)' }}>
-                <Clock size={12} /> 
-                {(() => {
-                    let updatedStr = project.updated_at;
-                    if (updatedStr && !updatedStr.includes('Z') && !updatedStr.includes('+')) {
-                        updatedStr += 'Z';
-                    }
-                    const updated = updatedStr ? new Date(updatedStr) : new Date();
-                    const diff = Math.floor((new Date() - updated) / 1000);
-                    if (diff < 60) return <span>Last updated: <strong>just now</strong></span>;
-                    if (diff < 3600) return <span>Last updated: <strong>{Math.floor(Math.max(0, diff) / 60)}m ago</strong></span>;
-                    if (diff < 86400) return <span>Last updated: <strong>{Math.floor(Math.max(0, diff) / 3600)}h ago</strong></span>;
-                    return <span>Last updated: <strong>{updated.toLocaleDateString()}</strong></span>;
-                })()}
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    paddingTop: '2px',
+                    fontSize: '11px',
+                    color: 'var(--tx3)',
+                    width: '100%'
+                }}
+            >
+                <span>{project.installation_start_date ? `Install ${formatDateDisplay(project.installation_start_date)}` : 'Planning card'}</span>
+                <span>{project.updated_at ? `Updated ${formatDateDisplay(project.updated_at)}` : ''}</span>
             </div>
-
-            {/* Stage Badge mapping from the user's mock image */}
-            <div style={{
-                position: 'absolute', top: -10, right: -10, background: '#3b82f6', color: 'white',
-                fontSize: '9px', fontWeight: 700, padding: '16px 12px 6px', borderRadius: '50%',
-                width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                textAlign: 'center', lineHeight: 1.1, boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-            }}>
-                {project.board_stage || 'TBC'}
-            </div>
-        </div>
+        </motion.button>
     );
 }

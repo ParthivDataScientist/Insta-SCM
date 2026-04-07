@@ -3,7 +3,7 @@ import { Edit3, User } from 'lucide-react';
 import CalendarPicker from './CalendarPicker';
 import { formatDateDisplay, parseDateInput } from '../utils/dateUtils';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
-import { getProjectCode } from '../utils/projectStatus';
+import { getProjectCode, normalizeBoardStage } from '../utils/projectStatus';
 
 const DATE_PLACEHOLDER = '-';
 
@@ -117,7 +117,9 @@ export default function ProjectTable({
                     </tr>
                 </thead>
                 <tbody>
-                    {projects.map((project) => (
+                    {projects.map((project) => {
+                        const boardStage = normalizeBoardStage(project.board_stage);
+                        return (
                         <tr
                             key={project.id}
                             className={`table-row ${selectedProject?.id === project.id ? 'selected-row' : ''}`}
@@ -128,8 +130,8 @@ export default function ProjectTable({
                             <td className="fw-600">{getProjectCode(project)}</td>
                             <td className="fw-600">{project.project_name || DATE_PLACEHOLDER}</td>
                             <td>
-                                <span className={`status-badge ${(project.board_stage || 'TBC') === 'TBC' ? 'in-transit' : 'delivered'}`}>
-                                    {project.board_stage || 'TBC'}
+                                <span className={`status-badge ${boardStage === 'Design/ BOM' ? 'in-transit' : 'delivered'}`}>
+                                    {boardStage}
                                 </span>
                             </td>
                             <td>{project.event_name || DATE_PLACEHOLDER}</td>
@@ -163,7 +165,8 @@ export default function ProjectTable({
                             <DateCell project={project} field="dismantling_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
                             <td>{project.branch || DATE_PLACEHOLDER}</td>
                         </tr>
-                    ))}
+                        );
+                    })}
                 </tbody>
             </table>
 

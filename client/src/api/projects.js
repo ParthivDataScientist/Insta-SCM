@@ -23,16 +23,16 @@ const projectsService = {
     /**
      * Fetches design-stage projects that have not yet been promoted to Win.
      */
-    fetchDesignProjects: async () => {
-        const response = await apiClient.get('/api/v1/projects/designs');
+    fetchDesignProjects: async (params = {}) => {
+        const response = await apiClient.get('/api/v1/projects/designs', { params });
         return response.data;
     },
 
     /**
      * Fetches Design Management KPIs.
      */
-    fetchDesignStats: async () => {
-        const response = await apiClient.get('/api/v1/projects/designs/stats');
+    fetchDesignStats: async (params = {}) => {
+        const response = await apiClient.get('/api/v1/projects/designs/stats', { params });
         return response.data;
     },
 
@@ -65,6 +65,26 @@ const projectsService = {
      */
     updateProject: async (id, data) => {
         const response = await apiClient.put(`/api/v1/projects/${id}`, data);
+        return response.data;
+    },
+
+    fetchProjectLinks: async (projectId) => {
+        const response = await apiClient.get(`/api/v1/projects/${projectId}/links`);
+        return response.data;
+    },
+
+    createProjectLink: async (projectId, data) => {
+        const response = await apiClient.post(`/api/v1/projects/${projectId}/links`, data);
+        return response.data;
+    },
+
+    updateProjectLink: async (projectId, linkId, data) => {
+        const response = await apiClient.put(`/api/v1/projects/${projectId}/links/${linkId}`, data);
+        return response.data;
+    },
+
+    deleteProjectLink: async (projectId, linkId) => {
+        const response = await apiClient.delete(`/api/v1/projects/${projectId}/links/${linkId}`);
         return response.data;
     },
 

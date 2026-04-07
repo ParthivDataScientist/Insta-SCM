@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGlobalDateRange } from '../contexts/GlobalDateRangeContext';
 import { useProjectData } from './useProjectData';
-import { isWonProject, normalizeProjectStage } from '../utils/projectStatus';
+import { isWonProject, normalizeBoardStage, normalizeProjectStage } from '../utils/projectStatus';
 
 /**
  * Hook for managing Projects UI state (filters, search)
@@ -31,7 +31,10 @@ export function useProjects() {
             const matchesSearch = (p.project_name || '').toLowerCase().includes(q) ||
                                   (p.event_name || '').toLowerCase().includes(q) ||
                                   (p.crm_project_id || '').toLowerCase().includes(q) ||
-                                  (p.board_stage || '').toLowerCase().includes(q) ||
+                                  (p.venue || '').toLowerCase().includes(q) ||
+                                  (p.branch || '').toLowerCase().includes(q) ||
+                                  (p.city || '').toLowerCase().includes(q) ||
+                                  normalizeBoardStage(p.board_stage).toLowerCase().includes(q) ||
                                   (p.project_manager || '').toLowerCase().includes(q);
             if (!matchesSearch) return false;
         }
@@ -52,7 +55,7 @@ export function useProjects() {
         if (filterPM !== 'All' && p.project_manager !== filterPM) return false;
         if (filterCity !== 'All' && p.city !== filterCity) return false;
         if (filterClient !== 'All' && p.client !== filterClient) return false;
-        if (filterStatus !== 'All' && p.board_stage !== filterStatus) return false;
+        if (filterStatus !== 'All' && normalizeBoardStage(p.board_stage) !== filterStatus) return false;
 
         // Date Range
         if ((dateRange.start || dateRange.end) && !p.event_start_date) {

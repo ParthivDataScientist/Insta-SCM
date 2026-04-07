@@ -53,6 +53,12 @@ class DashboardProject(AuditMixin, table=True):
     # Dual-Stage Management
     stage: str = Field(default="Open", description="Sales stage (e.g., Open, Confirmed, Lost).")
     board_stage: str = Field(default="TBC", description="Kanban stage for confirmed projects.")
+    status: str = Field(default="pending", index=True, description="Canonical design lifecycle status.")
+    revision_count: int = Field(default=0, description="Number of client revision cycles completed after V1.")
+    current_version: Optional[str] = Field(default=None, description="Current design version, e.g. V1, V2.")
+    is_active: bool = Field(default=True, description="Whether the project is active in the design funnel.")
+    booking_date: Optional[py_date] = Field(default=None, description="Commercial booking date for the brief.")
+    revision_history: Optional[list] = Field(default=[], sa_column=Column(JSON))
     
     # Location Details
     venue: Optional[str] = Field(default=None, description="Location/Venue of the project event.")
@@ -86,3 +92,16 @@ class DashboardProject(AuditMixin, table=True):
     manager: Optional["User"] = Relationship(back_populates="managed_projects")
     client_relationship: Optional[Client] = Relationship(back_populates="projects")
     audit_logs: List[ProjectAuditLog] = Relationship()
+    project_links: List["ProjectLink"] = Relationship(back_populates="project")
+
+
+class ProjectLink(AuditMixin, table=True):
+    """Structured project resource links such as Drive folders, AutoCAD files, and renders."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="dashboardproject.id", index=True)
+    link_type: str = Field(default="other", index=True, description="drive, autocad, render, or other")
+    label: str = Field(description="Human-readable link label.")
+    url: str = Field(description="Validated external URL.")
+    created_by: Optional[int] = Field(default=None, foreign_key="user.id")
+
+    project: Optional[DashboardProject] = Relationship(back_populates="project_links")

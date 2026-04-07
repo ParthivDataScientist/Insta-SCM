@@ -92,8 +92,12 @@ class FedExService(CarrierService):
         """Fetch a new OAuth token. Caches at module level for ~1 hour."""
         global _fedex_token, _fedex_token_expiry
 
+        if not self.client_id or self.client_id == 'your_fedex_client_id_here':
+            logger.info('Using mock FedEx token for development.')
+            return 'mock_token'
+
         # Return cached token if still valid (with 60s buffer)
-        if _fedex_token and time.time() < _fedex_token_expiry - 60:
+        if self.client_id and self.client_secret and _fedex_token and time.time() < _fedex_token_expiry - 60:
             return _fedex_token
 
         auth_url = f"{self.base_url}/oauth/token"
@@ -169,6 +173,13 @@ class FedExService(CarrierService):
         }
 
     def _request_track(self, url: str, headers: Dict[str, str], body: Dict[str, Any], timeout: int = 15) -> Optional[Dict[str, Any]]:
+        if headers.get('Authorization') == 'Bearer mock_token':
+            try:
+                tracking_number = body['trackingInfo'][0]['trackingNumberInfo']['trackingNumber']
+            except (KeyError, IndexError):
+                tracking_number = '123456789012'
+            return {'output': {'completeTrackResults': [{'trackResults': [{'trackingNumberInfo': {'trackingNumber': tracking_number}, 'latestStatusDetail': {'statusByLocale': 'In Transit (Mock Data)'}, 'scanEvents': [{'date': '2026-04-07T10:00:00Z', 'eventType': 'PU', 'eventDescription': 'Picked up (Mock Data)', 'scanLocation': {'city': 'MEMPHIS', 'stateOrProvinceCode': 'TN', 'countryCode': 'US'}}], 'dateAndTimes': [{'type': 'ESTIMATED_DELIVERY', 'dateTime': '2026-04-10T12:00:00Z'}]}]}]}}
+
         response = requests.post(url, headers=headers, json=body, timeout=timeout)
         if response.status_code != 200:
             logger.warning("FedEx API returned %d for body %s", response.status_code, json.dumps(body)[:200])
@@ -296,8 +307,9 @@ class FedExService(CarrierService):
                         if assoc_resp.status_code == 200:
                             assoc_data = assoc_resp.json()
                             associated_results = assoc_data.get("output", {}).get("completeTrackResults", [])
-                            if not associated_results:
-                                associated_results = self._extract_track_results(assoc_data)
+                            extracted_results = self._extract_track_results(assoc_data)
+                            if extracted_results:
+                                associated_results = extracted_results
                         else:
                             logger.warning(f"Failed to fetch associated shipments for MPS {normalized_tracking_number}: {assoc_resp.status_code}")
 

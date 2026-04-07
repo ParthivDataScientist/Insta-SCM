@@ -24,6 +24,11 @@ const shipmentsService = {
         return response.data;
     },
 
+    fetchProjectShipments: async (projectId) => {
+        const response = await apiClient.get(`/api/v1/shipments/project/${projectId}`);
+        return response.data;
+    },
+
     previewTrackShipment: async (trackingNumber) => {
         const response = await apiClient.get(`/api/v1/shipments/track/${trackingNumber}/preview`);
         return response.data;

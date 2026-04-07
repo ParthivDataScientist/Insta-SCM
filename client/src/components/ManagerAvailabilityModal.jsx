@@ -206,7 +206,7 @@ export default function ManagerAvailabilityModal({ managerId, managerName, onClo
                                                             <span style={{ fontSize: '11px', padding: '2px 6px', background: 'var(--bg-in)', borderRadius: '4px', color: 'var(--tx3)', fontWeight: 600 }}>ID: {p.id}</span>
                                                         </div>
                                                         <div style={{ fontSize: '12px', color: 'var(--tx3)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> {formatDateDisplay(p.material_dispatch_date)} → {formatDateDisplay(p.dismantling_date) || 'TBD'}</span>
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> {formatDateDisplay(p.dispatch_date)} {' to '} {formatDateDisplay(p.dismantling_date) || 'TBD'}</span>
                                                             {p.event_name && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Briefcase size={12} /> {p.event_name}</span>}
                                                         </div>
                                                     </div>

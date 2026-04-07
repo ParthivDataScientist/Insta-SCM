@@ -70,3 +70,31 @@
     background: var(--red-ghost);
     color: var(--red-v);
 }
+
+/* Micro-Interactions & Haptic-like Effects */
+button, .btn, .icon-btn, .sidebar-item {
+    transition: transform 0.15s cubic-bezier(0.3, 0, 0.5, 1), background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:active:not(:disabled), .btn:active:not(:disabled), .icon-btn:active:not(:disabled), .sidebar-item:active {
+    transform: scale(0.97);
+}
+
+.hover-card {
+    transition: transform 0.2s cubic-bezier(0.3, 0, 0.5, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Skeleton Loading Pulse */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

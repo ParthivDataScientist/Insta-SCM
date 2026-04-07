@@ -47,6 +47,9 @@ class ShipmentResponse(BaseModel):
     recipient: Optional[str] = None
     exhibition_name: Optional[str] = None
     items: Optional[str] = None
+    project_id: Optional[int] = None
+    project_name: Optional[str] = None
+    project_client_name: Optional[str] = None
     eta: Optional[str] = None
     progress: Optional[int] = 0
     show_date: Optional[str] = None

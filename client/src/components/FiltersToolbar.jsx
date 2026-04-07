@@ -1,5 +1,11 @@
 import React, { useMemo } from 'react';
-import { Search, Filter, X, Calendar, User, ChevronDown } from 'lucide-react';
+import { Filter, MapPin, Search, User, X, ChevronDown } from 'lucide-react';
+
+const defaultAllLabel = (label) => {
+    if (label === 'Branch') return 'All Branches';
+    if (label === 'Project Manager') return 'All Managers';
+    return `All ${label}s`;
+};
 
 const FilterDropdown = ({ label, value, options, onChange, icon: Icon }) => (
     <div style={{ position: 'relative', flex: '1', minWidth: '150px' }}>
@@ -20,7 +26,7 @@ const FilterDropdown = ({ label, value, options, onChange, icon: Icon }) => (
                         padding: '0 20px 0 0', margin: 0, appearance: 'none', WebkitAppearance: 'none'
                     }}
                 >
-                    <option value="All">All {label}s</option>
+                    <option value="All">{defaultAllLabel(label)}</option>
                     {options.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                     ))}
@@ -34,23 +40,29 @@ const FilterDropdown = ({ label, value, options, onChange, icon: Icon }) => (
 export default function FiltersToolbar({ 
     projects, 
     filterPM, setFilterPM,
+    filterBranch = 'All', setFilterBranch,
     filterStatus, setFilterStatus,
     searchQuery, setSearchQuery,
-    boardStages
+    boardStages,
+    showSearch = true,
+    statusLabel = 'Stage',
 }) {
     const uniquePMs = useMemo(() => [...new Set(projects.map(p => p.project_manager).filter(Boolean))].sort(), [projects]);
+    const uniqueBranches = useMemo(() => [...new Set(projects.map((project) => project.branch).filter(Boolean))].sort(), [projects]);
 
     const activeFilters = useMemo(() => {
         const tags = [];
         if (filterPM !== 'All') tags.push({ id: 'pm', label: `PM: ${filterPM}`, clear: () => setFilterPM('All') });
-        if (filterStatus !== 'All') tags.push({ id: 'status', label: `Status: ${filterStatus}`, clear: () => setFilterStatus('All') });
+        if (filterBranch !== 'All') tags.push({ id: 'branch', label: `Branch: ${filterBranch}`, clear: () => setFilterBranch?.('All') });
+        if (filterStatus !== 'All') tags.push({ id: 'status', label: `${statusLabel}: ${filterStatus}`, clear: () => setFilterStatus('All') });
         return tags;
-    }, [filterPM, filterStatus, setFilterPM, setFilterStatus]);
+    }, [filterBranch, filterPM, filterStatus, setFilterBranch, setFilterPM, setFilterStatus, statusLabel]);
 
     const clearAll = () => {
         setFilterPM('All');
+        setFilterBranch?.('All');
         setFilterStatus('All');
-        setSearchQuery('');
+        setSearchQuery?.('');
     };
 
     return (
@@ -62,25 +74,30 @@ export default function FiltersToolbar({
             {/* Main Filters Row */}
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                 {/* Search Bar */}
-                <div style={{ position: 'relative', flex: '2', minWidth: '240px' }}>
-                    <Search style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--tx3)' }} size={14} />
-                    <input 
-                        type="text"
-                        placeholder="Search project name, client, or venue..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ 
-                            width: '100%', padding: '8px 12px 8px 34px', background: 'var(--bg-in)', 
-                            border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', fontSize: '13px', 
-                            color: 'var(--tx)', outline: 'none'
-                        }}
-                    />
-                </div>
+                {showSearch && setSearchQuery ? (
+                    <div style={{ position: 'relative', flex: '2', minWidth: '240px' }}>
+                        <Search style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--tx3)' }} size={14} />
+                        <input 
+                            type="text"
+                            placeholder="Search project, event, branch, or manager..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{ 
+                                width: '100%', padding: '8px 12px 8px 34px', background: 'var(--bg-in)', 
+                                border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', fontSize: '13px', 
+                                color: 'var(--tx)', outline: 'none'
+                            }}
+                        />
+                    </div>
+                ) : null}
 
                 <FilterDropdown label="Project Manager" value={filterPM} options={uniquePMs} onChange={setFilterPM} icon={User} />
-                <FilterDropdown label="Status" value={filterStatus} options={boardStages} onChange={setFilterStatus} icon={Filter} />
+                {setFilterBranch ? (
+                    <FilterDropdown label="Branch" value={filterBranch} options={uniqueBranches} onChange={setFilterBranch} icon={MapPin} />
+                ) : null}
+                <FilterDropdown label={statusLabel} value={filterStatus} options={boardStages} onChange={setFilterStatus} icon={Filter} />
 
-                {(activeFilters.length > 0 || searchQuery !== '') && (
+                {(activeFilters.length > 0 || Boolean(searchQuery)) && (
                     <button 
                         onClick={clearAll}
                         className="btn-animate"

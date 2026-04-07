@@ -1,57 +1,96 @@
-/**
- * Global Date Utilities for Insta-SCM
- * Handles formatting, parsing, and validation.
- */
+const PLACEHOLDER_VALUES = new Set(['-', '--', 'TBD', 'Unknown']);
 
-/**
- * Formats an ISO date string (YYYY-MM-DD) to Display format (DD-MM-YYYY)
- */
-export const formatDateDisplay = (dateStr) => {
-    if (!dateStr || dateStr === '—' || dateStr === 'TBD') return dateStr;
-    try {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return dateStr;
-        
-        const day = d.getDate().toString().padStart(2, '0');
-        const month = (d.getMonth() + 1).toString().padStart(2, '0');
-        const year = d.getFullYear();
-        
-        return `${day}-${month}-${year}`;
-    } catch (e) {
-        return dateStr;
+const pad = (value) => String(value).padStart(2, '0');
+
+const normalizeToDate = (value) => {
+    if (!value || PLACEHOLDER_VALUES.has(value)) {
+        return null;
     }
+
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        const [year, month, day] = trimmed.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
+        const [day, month, year] = trimmed.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-/**
- * Parses a display date (DD-MM-YYYY) to ISO format (YYYY-MM-DD)
- */
+export const formatDateDisplay = (value) => {
+    if (!value || PLACEHOLDER_VALUES.has(value)) return value;
+
+    const date = normalizeToDate(value);
+    if (!date) {
+        return value;
+    }
+
+    return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}`;
+};
+
+export const formatDateTimeDisplay = (value) => {
+    if (!value || PLACEHOLDER_VALUES.has(value)) return value;
+
+    const date = normalizeToDate(value);
+    if (!date) {
+        return value;
+    }
+
+    let hours = date.getHours();
+    const minutes = pad(date.getMinutes());
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    hours %= 12;
+    if (hours === 0) {
+        hours = 12;
+    }
+
+    return `${formatDateDisplay(date)} ${pad(hours)}:${minutes} ${suffix}`;
+};
+
+export const formatDateRangeDisplay = (start, end) => {
+    if (!start && !end) return '';
+
+    const startLabel = formatDateDisplay(start) || '-';
+    const endLabel = formatDateDisplay(end || start) || '-';
+    return `${startLabel} to ${endLabel}`;
+};
+
 export const parseDateInput = (displayStr) => {
     if (!displayStr) return null;
-    
-    // Check if it's already ISO
+
     if (/^\d{4}-\d{2}-\d{2}$/.test(displayStr)) return displayStr;
-    
-    // Match DD-MM-YYYY or DD/MM/YYYY
+
     const parts = displayStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
     if (!parts) return null;
-    
+
     const day = parts[1].padStart(2, '0');
     const month = parts[2].padStart(2, '0');
     const year = parts[3];
-    
+
     return `${year}-${month}-${day}`;
 };
 
-/**
- * Validates if the string is a valid display date
- */
 export const isValidDisplayDate = (str) => {
     return /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.test(str);
 };
 
-/**
- * Gets today in ISO format
- */
 export const getTodayISO = () => {
     return new Date().toISOString().split('T')[0];
 };

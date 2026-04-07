@@ -2,6 +2,19 @@
 import pytest
 
 
+def create_project(client, name="Shipment Project"):
+    response = client.post(
+        "/api/v1/projects/",
+        json={
+            "project_name": name,
+            "stage": "Win",
+            "board_stage": "TBC",
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 class TestHealthEndpoints:
     def test_root(self, client):
         resp = client.get("/")
@@ -33,7 +46,11 @@ class TestListShipments:
 class TestTrackShipment:
     def test_track_fedex_number(self, client):
         """Track a 12-digit FedEx number (mocked service in conftest)."""
-        resp = client.post("/api/v1/shipments/track/888598190302", json={"exhibition_name": "Test Exhibition"})
+        project = create_project(client, "FedEx Shipment Project")
+        resp = client.post(
+            "/api/v1/shipments/track/888598190302",
+            json={"exhibition_name": "Test Exhibition", "project_id": project["id"]},
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["status"] == "success"
@@ -42,7 +59,11 @@ class TestTrackShipment:
 
     def test_track_creates_db_record(self, client):
         """After tracking, shipment should appear in list."""
-        client.post("/api/v1/shipments/track/999000111222", json={"exhibition_name": "Test Expo"})
+        project = create_project(client, "List Shipment Project")
+        client.post(
+            "/api/v1/shipments/track/999000111222",
+            json={"exhibition_name": "Test Expo", "project_id": project["id"]},
+        )
         resp = client.get("/api/v1/shipments/")
         tracking_numbers = [s["tracking_number"] for s in resp.json()]
         assert "999000111222" in tracking_numbers
@@ -59,13 +80,21 @@ class TestTrackShipment:
 
     def test_track_unsupported_carrier(self, client):
         """Unknown format should return 400 with a helpful message."""
-        resp = client.post("/api/v1/shipments/track/UNKNOWNCARRIER1", json={"exhibition_name": "No Format"})
+        project = create_project(client, "Unsupported Carrier Project")
+        resp = client.post(
+            "/api/v1/shipments/track/UNKNOWNCARRIER1",
+            json={"exhibition_name": "No Format", "project_id": project["id"]},
+        )
         assert resp.status_code == 400
 
 
 class TestGetShipment:
     def test_get_existing(self, client):
-        client.post("/api/v1/shipments/track/111111111111", json={"exhibition_name": "Get Exists"})
+        project = create_project(client, "Get Shipment Project")
+        client.post(
+            "/api/v1/shipments/track/111111111111",
+            json={"exhibition_name": "Get Exists", "project_id": project["id"]},
+        )
         list_resp = client.get("/api/v1/shipments/")
         shipment = next(s for s in list_resp.json() if s["tracking_number"] == "111111111111")
         resp = client.get(f"/api/v1/shipments/{shipment['id']}")
@@ -79,7 +108,11 @@ class TestGetShipment:
 
 class TestDeleteShipment:
     def test_delete_existing(self, client):
-        client.post("/api/v1/shipments/track/222222222222", json={"exhibition_name": "Del Exists"})
+        project = create_project(client, "Delete Shipment Project")
+        client.post(
+            "/api/v1/shipments/track/222222222222",
+            json={"exhibition_name": "Del Exists", "project_id": project["id"]},
+        )
         list_resp = client.get("/api/v1/shipments/")
         shipment = next(s for s in list_resp.json() if s["tracking_number"] == "222222222222")
         resp = client.delete(f"/api/v1/shipments/{shipment['id']}")
@@ -90,7 +123,11 @@ class TestDeleteShipment:
         assert resp.status_code == 404
 
     def test_deleted_shipment_not_in_list(self, client):
-        client.post("/api/v1/shipments/track/333333333333", json={"exhibition_name": "Del Missing"})
+        project = create_project(client, "Delete Missing Shipment Project")
+        client.post(
+            "/api/v1/shipments/track/333333333333",
+            json={"exhibition_name": "Del Missing", "project_id": project["id"]},
+        )
         list_resp = client.get("/api/v1/shipments/")
         shipment = next(s for s in list_resp.json() if s["tracking_number"] == "333333333333")
         client.delete(f"/api/v1/shipments/{shipment['id']}")

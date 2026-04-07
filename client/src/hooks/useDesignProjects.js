@@ -1,26 +1,67 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import projectsService from '../api/projects';
+import { useSearchParams } from 'react-router-dom';
 import { useGlobalDateRange } from '../contexts/GlobalDateRangeContext';
-import { normalizeProjectStage } from '../utils/projectStatus';
+import projectsService from '../api/projects';
+
+const STATUS_FILTERS = ['all', 'pending', 'in_progress', 'changes', 'won', 'lost'];
+
+function buildParams(searchParams) {
+    const status = searchParams.get('status') || 'all';
+    const search = searchParams.get('q') || '';
+    const client_id = searchParams.get('clientId') || '';
+    const city = searchParams.get('city') || '';
+    const date_field = searchParams.get('dateField') || 'show';
+
+    return {
+        status,
+        search,
+        client_id: client_id || undefined,
+        city: city || undefined,
+        date_field,
+    };
+}
 
 export function useDesignProjects() {
     const queryClient = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { dateRange } = useGlobalDateRange();
-    const [filterStatus, setFilterStatus] = useState('All');
-    const [searchQuery, setSearchQuery] = useState('');
+    const apiParams = useMemo(() => ({
+        ...buildParams(searchParams),
+        start_date: dateRange.start || undefined,
+        end_date: dateRange.end || undefined,
+    }), [dateRange.end, dateRange.start, searchParams]);
+    const activeKpi = searchParams.get('kpi') || 'all';
 
     const designQuery = useQuery({
-        queryKey: ['designProjects'],
-        queryFn: projectsService.fetchDesignProjects,
+        queryKey: ['designProjects', apiParams],
+        queryFn: () => projectsService.fetchDesignProjects(apiParams),
         refetchInterval: 5000,
     });
 
     const designStatsQuery = useQuery({
-        queryKey: ['designStats'],
-        queryFn: projectsService.fetchDesignStats,
+        queryKey: ['designStats', apiParams],
+        queryFn: () => projectsService.fetchDesignStats(apiParams),
         refetchInterval: 10000,
     });
+
+    const clientsQuery = useQuery({
+        queryKey: ['clients'],
+        queryFn: projectsService.fetchClients,
+        staleTime: 60000,
+    });
+
+    const updateParams = (next) => {
+        const updated = new URLSearchParams(searchParams);
+        Object.entries(next).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '' || value === 'all') {
+                updated.delete(key);
+            } else {
+                updated.set(key, value);
+            }
+        });
+        setSearchParams(updated, { replace: true });
+    };
 
     const invalidateCaches = () => {
         queryClient.invalidateQueries({ queryKey: ['designProjects'] });
@@ -32,7 +73,7 @@ export function useDesignProjects() {
 
     const updateDesignMutation = useMutation({
         mutationFn: async ({ id, data }) => {
-            if (normalizeProjectStage(data.stage) === 'Win') {
+            if (data.status === 'won') {
                 return projectsService.convertDesignToProject(id);
             }
             return projectsService.updateProject(id, data);
@@ -46,53 +87,47 @@ export function useDesignProjects() {
     });
 
     const designProjects = designQuery.data || [];
+    const cityOptions = useMemo(
+        () => ['all', ...new Set(designProjects.map((project) => project.city).filter(Boolean).map((city) => city.trim()))],
+        [designProjects]
+    );
 
-    const filteredDesignProjects = useMemo(() => {
-        return designProjects.filter((project) => {
-            if (filterStatus !== 'All' && normalizeProjectStage(project.stage) !== filterStatus) {
-                return false;
-            }
-
-            if (searchQuery) {
-                const q = searchQuery.toLowerCase();
-                const matchesSearch =
-                    (project.crm_project_id || '').toLowerCase().includes(q) ||
-                    (project.project_name || '').toLowerCase().includes(q) ||
-                    (project.venue || '').toLowerCase().includes(q) ||
-                    (project.area || '').toLowerCase().includes(q);
-
-                if (!matchesSearch) return false;
-            }
-
-            if ((dateRange.start || dateRange.end) && !project.event_start_date) {
-                return false;
-            }
-            if (dateRange.start && new Date(project.event_start_date) < new Date(dateRange.start)) {
-                return false;
-            }
-            if (dateRange.end && new Date(project.event_start_date) > new Date(dateRange.end)) {
-                return false;
-            }
-
-            return true;
-        });
-    }, [dateRange.end, dateRange.start, designProjects, filterStatus, searchQuery]);
+    const tableProjects = useMemo(() => {
+        if (activeKpi === 'open') {
+            return designProjects.filter((project) => !['won', 'lost'].includes(project.status));
+        }
+        if (STATUS_FILTERS.includes(activeKpi) && activeKpi !== 'all') {
+            return designProjects.filter((project) => project.status === activeKpi);
+        }
+        return designProjects;
+    }, [activeKpi, designProjects]);
 
     return {
         designProjects,
-        filteredDesignProjects,
+        tableProjects,
         designStats: designStatsQuery.data || {},
+        clients: clientsQuery.data || [],
+        cityOptions,
         loading: designQuery.isLoading || designStatsQuery.isLoading,
         syncing: syncCrmMutation.isPending,
         error: designQuery.error?.message || designStatsQuery.error?.message || null,
-        filterStatus,
-        setFilterStatus,
-        searchQuery,
-        setSearchQuery,
+        filters: {
+            status: apiParams.status,
+            search: apiParams.search,
+            clientId: searchParams.get('clientId') || 'all',
+            city: searchParams.get('city') || 'all',
+            dateField: apiParams.date_field,
+            activeKpi,
+        },
+        setFilterStatus: (value) => updateParams({ status: value }),
+        setSearchQuery: (value) => updateParams({ q: value }),
+        setClientId: (value) => updateParams({ clientId: value }),
+        setCity: (value) => updateParams({ city: value }),
+        setDateField: (value) => updateParams({ dateField: value }),
+        setActiveKpi: (value) => updateParams({ kpi: value }),
+        clearFilters: () => setSearchParams(new URLSearchParams(), { replace: true }),
         updateDesignStatus: updateDesignMutation.mutateAsync,
         syncCrmFeed: syncCrmMutation.mutateAsync,
-        loadData: async () => {
-            await Promise.all([designQuery.refetch(), designStatsQuery.refetch()]);
-        },
+        loadData: async () => Promise.all([designQuery.refetch(), designStatsQuery.refetch()]),
     };
 }

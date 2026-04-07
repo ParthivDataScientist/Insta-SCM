@@ -164,6 +164,8 @@ export function useShipments() {
                 (item.carrier || '').toLowerCase().includes(q) ||
                 (item.recipient || '').toLowerCase().includes(q) ||
                 (item.exhibition_name || '').toLowerCase().includes(q) ||
+                (item.project_name || '').toLowerCase().includes(q) ||
+                (item.project_client_name || '').toLowerCase().includes(q) ||
                 (item.items || '').toLowerCase().includes(q) ||
                 (item.status || '').toLowerCase().includes(q);
 

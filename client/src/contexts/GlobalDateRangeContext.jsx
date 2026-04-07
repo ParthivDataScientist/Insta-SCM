@@ -1,54 +1,80 @@
-import React, { createContext, useCallback, useContext, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const GlobalDateRangeContext = createContext(null);
+const STORAGE_KEY = 'insta_global_date_range';
 
-const parseDateRangeFromSearch = (search) => {
-  const params = new URLSearchParams(search);
-  return {
-    start: params.get('startDate') || '',
-    end: params.get('endDate') || '',
-  };
+const EMPTY_RANGE = {
+  start: '',
+  end: '',
+};
+
+const normalizeDateRange = (value) => ({
+  start: typeof value?.start === 'string' ? value.start : '',
+  end: typeof value?.end === 'string' ? value.end : '',
+});
+
+const readStoredDateRange = () => {
+  if (typeof window === 'undefined') {
+    return EMPTY_RANGE;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return EMPTY_RANGE;
+    }
+
+    return normalizeDateRange(JSON.parse(raw));
+  } catch {
+    return EMPTY_RANGE;
+  }
 };
 
 export function GlobalDateRangeProvider({ children }) {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [dateRange, setDateRangeState] = useState(readStoredDateRange);
 
-  const dateRange = useMemo(
-    () => parseDateRangeFromSearch(location.search),
-    [location.search]
-  );
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(dateRange));
+  }, [dateRange]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleStorage = (event) => {
+      if (event.key !== STORAGE_KEY) {
+        return;
+      }
+
+      if (!event.newValue) {
+        setDateRangeState(EMPTY_RANGE);
+        return;
+      }
+
+      try {
+        setDateRangeState(normalizeDateRange(JSON.parse(event.newValue)));
+      } catch {
+        setDateRangeState(EMPTY_RANGE);
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const setDateRange = useCallback((nextValue) => {
-    const baseRange = parseDateRangeFromSearch(location.search);
-    const nextRange = typeof nextValue === 'function' ? nextValue(baseRange) : nextValue;
-    const params = new URLSearchParams(location.search);
-
-    if (nextRange?.start) {
-      params.set('startDate', nextRange.start);
-    } else {
-      params.delete('startDate');
-    }
-
-    if (nextRange?.end) {
-      params.set('endDate', nextRange.end);
-    } else {
-      params.delete('endDate');
-    }
-
-    const search = params.toString();
-    navigate(
-      {
-        pathname: location.pathname,
-        search: search ? `?${search}` : '',
-      },
-      { replace: true }
+    setDateRangeState((current) =>
+      normalizeDateRange(typeof nextValue === 'function' ? nextValue(current) : nextValue)
     );
-  }, [location.pathname, location.search, navigate]);
+  }, []);
 
   const clearDateRange = useCallback(() => {
-    setDateRange({ start: '', end: '' });
+    setDateRange(EMPTY_RANGE);
   }, [setDateRange]);
 
   const value = useMemo(

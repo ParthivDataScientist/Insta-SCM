@@ -20,6 +20,7 @@ class ShipmentBase(SQLModel):
     no_of_box: Optional[str] = None
     history: List[dict] = Field(default=[], sa_column=Column(JSON))
     master_tracking_number: Optional[str] = None
+    project_id: Optional[int] = Field(default=None, foreign_key="dashboardproject.id")
     is_master: bool = Field(default=False)
     is_archived: bool = Field(default=False)
     # Stores [{"tracking_number": str, "status": str, "raw_status": str}, ...]

@@ -36,18 +36,37 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         try {
             const data = await authService.login(email, password);
-            // The token is now in a secure cookie, but we might still get it in response
-            // for hybrid flows or if the user specifically asked for localStorage removal.
+            if (data.requires_mfa) {
+                return { requiresMfa: true, mfaToken: data.mfa_token };
+            }
+
             if (data.access_token) {
                 localStorage.setItem('access_token', data.access_token);
             }
             
-            // Re-fetch user data to ensure session is valid
             const userData = await authService.getCurrentUser();
             setUser(userData);
-            return userData;
+            return { success: true, user: userData };
         } catch (err) {
             const message = err.response?.data?.detail || "Login failed. Please check your credentials.";
+            throw new Error(message);
+        }
+    };
+
+    /**
+     * MFA Verification Handler
+     */
+    const verifyMfa = async (mfaToken, code) => {
+        try {
+            const data = await authService.verifyMfa(mfaToken, code);
+            if (data.access_token) {
+                localStorage.setItem('access_token', data.access_token);
+            }
+            const userData = await authService.getCurrentUser();
+            setUser(userData);
+            return { success: true, user: userData };
+        } catch (err) {
+            const message = err.response?.data?.detail || "Invalid MFA code.";
             throw new Error(message);
         }
     };
@@ -79,7 +98,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, register, loading }}>
+        <AuthContext.Provider value={{ user, login, verifyMfa, logout, register, loading }}>
             {children}
         </AuthContext.Provider>
     );

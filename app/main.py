@@ -17,6 +17,7 @@ from app.api.v1.api import api_router
 from app.models.dashboard_project import DashboardProject
 from app.models.user import User
 from app.models.shipment import Shipment
+from app.api.v1.endpoints.dashboard_projects_v2 import _apply_design_state
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan: create DB tables on startup."""
     SQLModel.metadata.create_all(engine)
     _ensure_project_schema_compatibility()
+    _backfill_project_canonical_fields()
     yield
 
 
@@ -39,11 +41,79 @@ def _ensure_project_schema_compatibility() -> None:
         for column in inspector.get_columns("dashboardproject")
     }
 
-    if "crm_project_id" not in existing_columns:
-        with engine.begin() as connection:
-            connection.execute(
-                text("ALTER TABLE dashboardproject ADD COLUMN crm_project_id VARCHAR")
+    dashboardproject_columns = {
+        "crm_project_id": "ALTER TABLE dashboardproject ADD COLUMN crm_project_id VARCHAR",
+        "status": "ALTER TABLE dashboardproject ADD COLUMN status VARCHAR DEFAULT 'pending'",
+        "revision_count": "ALTER TABLE dashboardproject ADD COLUMN revision_count INTEGER DEFAULT 0",
+        "current_version": "ALTER TABLE dashboardproject ADD COLUMN current_version VARCHAR",
+        "is_active": "ALTER TABLE dashboardproject ADD COLUMN is_active BOOLEAN DEFAULT 1",
+        "booking_date": "ALTER TABLE dashboardproject ADD COLUMN booking_date DATE",
+        "revision_history": "ALTER TABLE dashboardproject ADD COLUMN revision_history JSON",
+    }
+
+    shipment_columns = {}
+    if "shipment" in inspector.get_table_names():
+        shipment_columns = {
+            column["name"]
+            for column in inspector.get_columns("shipment")
+        }
+
+    user_columns = {}
+    if "user" in inspector.get_table_names():
+        user_columns = {
+            column["name"]
+            for column in inspector.get_columns("user")
+        }
+    
+    user_ddl = {
+        "mfa_secret": "ALTER TABLE user ADD COLUMN mfa_secret VARCHAR",
+        "mfa_enabled": "ALTER TABLE user ADD COLUMN mfa_enabled BOOLEAN DEFAULT 0",
+        "failed_login_attempts": "ALTER TABLE user ADD COLUMN failed_login_attempts INTEGER DEFAULT 0",
+        "locked_until": "ALTER TABLE user ADD COLUMN locked_until DATETIME",
+        "reset_token": "ALTER TABLE user ADD COLUMN reset_token VARCHAR",
+        "reset_token_expires": "ALTER TABLE user ADD COLUMN reset_token_expires DATETIME",
+    }
+
+    with engine.begin() as connection:
+        for column_name, ddl in dashboardproject_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(text(ddl))
+        if "shipment" in inspector.get_table_names() and "project_id" not in shipment_columns:
+            connection.execute(text("ALTER TABLE shipment ADD COLUMN project_id INTEGER"))
+        
+        for col_name, ddl in user_ddl.items():
+            if col_name not in user_columns:
+                connection.execute(text(ddl))
+
+
+def _backfill_project_canonical_fields() -> None:
+    with Session(engine) as session:
+        projects = session.exec(select(DashboardProject)).all()
+        changed = False
+        for project in projects:
+            before = (
+                project.status,
+                project.revision_count,
+                project.current_version,
+                project.is_active,
+                project.stage,
+                project.revision_history,
             )
+            _apply_design_state(project, {})
+            after = (
+                project.status,
+                project.revision_count,
+                project.current_version,
+                project.is_active,
+                project.stage,
+                project.revision_history,
+            )
+            if before != after:
+                session.add(project)
+                changed = True
+
+        if changed:
+            session.commit()
 
 
 app = FastAPI(
@@ -147,7 +217,6 @@ def admin_reseed(session: Session = Depends(get_session)):
 
                 p = DashboardProject(
                     project_name=safe_str(row.get('Project Name', 'Unknown')),
-                    client=safe_str(row.get('Client')), # Assuming Column in Excel
                     city=safe_str(row.get('City')),     # Assuming Column in Excel
                     event_name=safe_str(row.get('Event Name')),
                     venue=safe_str(row.get('Venue')),
@@ -166,6 +235,7 @@ def admin_reseed(session: Session = Depends(get_session)):
                     allocation_start_date=alloc_start,
                     allocation_end_date=alloc_end
                 )
+                _apply_design_state(p, {})
                 session.add(p)
                 
             session.commit()

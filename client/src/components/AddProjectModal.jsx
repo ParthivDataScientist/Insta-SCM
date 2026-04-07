@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Save, Briefcase, MapPin, Calendar, User, Info, CheckCircle2 } from 'lucide-react';
 import ManagerField from './ManagerField';
 import ClientField from './ClientField';
+import { getInitialBoardStage } from '../utils/projectStatus';
 
 /**
  * AddProjectModal Component
@@ -27,7 +28,7 @@ export default function AddProjectModal({ onClose, createProject, refetch }) {
         branch: null,
         manager_id: null,
         stage: 'Open',
-        board_stage: 'TBC',
+        board_stage: getInitialBoardStage(),
         event_start_date: null,
         event_end_date: null,
         dispatch_date: null,

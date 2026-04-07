@@ -26,6 +26,7 @@ def track_and_save(
     db: Session,
     cs: Optional[str] = None,
     no_of_box: Optional[str] = None,
+    project_id: Optional[int] = None,
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -67,6 +68,7 @@ def track_and_save(
             recipient=recipient or "",
             exhibition_name=exhibition_name,
             show_date=show_date,
+            project_id=project_id,
             origin=result.get("origin", "Unknown"),
             destination=result.get("destination", "Unknown"),
             eta=result.get("eta", "TBD"),
@@ -95,6 +97,8 @@ def track_and_save(
             shipment.cs = cs
         if no_of_box:
             shipment.no_of_box = no_of_box
+        if project_id is not None:
+            shipment.project_id = project_id
 
         # Only update fields if the API returned meaningful data
         if result.get("origin") and result.get("origin") != "Unknown":
@@ -239,6 +243,7 @@ def refresh_tracked_shipments(
             db=db,
             cs=shipment.cs,
             no_of_box=shipment.no_of_box,
+            project_id=shipment.project_id,
         )
         if "error" in result:
             errors.append(f"{shipment.tracking_number}: {result['error']}")

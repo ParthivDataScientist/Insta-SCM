@@ -18,7 +18,9 @@ const Login = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [quoteIndex, setQuoteIndex] = useState(0);
-    const { login } = useAuth();
+    const [mfaToken, setMfaToken] = useState(null);
+    const [mfaCode, setMfaCode] = useState('');
+    const { login, verifyMfa } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -33,10 +35,21 @@ const Login = () => {
         setError('');
         setIsSubmitting(true);
         try {
-            await login(email, password);
-            navigate('/');
+            if (mfaToken) {
+                // Verify MFA step
+                await verifyMfa(mfaToken, mfaCode);
+                navigate('/');
+            } else {
+                // Normal Login Step
+                const res = await login(email, password);
+                if (res?.requiresMfa) {
+                    setMfaToken(res.mfaToken);
+                } else {
+                    navigate('/');
+                }
+            }
         } catch (err) {
-            setError(err.message || 'Invalid email or password');
+            setError(err.message || (mfaToken ? 'Invalid MFA code' : 'Invalid email or password'));
         } finally {
             setIsSubmitting(false);
         }
@@ -62,56 +75,77 @@ const Login = () => {
                     {error && <div className="auth-error">{error}</div>}
 
                     <form onSubmit={handleSubmit} className="auth-form">
-                        <div className="input-group">
-                            <label>Email Address</label>
-                            <div className="input-wrapper">
-                                <Mail size={18} className="input-icon" />
-                                <input
-                                    type="email"
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
+                        {!mfaToken ? (
+                            <>
+                                <div className="input-group">
+                                    <label>Email Address</label>
+                                    <div className="input-wrapper">
+                                        <Mail size={18} className="input-icon" />
+                                        <input
+                                            type="email"
+                                            placeholder="Enter your email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="input-group">
-                            <label>Password</label>
-                            <div className="input-wrapper">
-                                <KeyRound size={18} className="input-icon" />
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    className="password-toggle"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                >
-                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                            </div>
-                        </div>
+                                <div className="input-group">
+                                    <label>Password</label>
+                                    <div className="input-wrapper">
+                                        <KeyRound size={18} className="input-icon" />
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="••••••••"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            className="password-toggle"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                        >
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
 
-                        <div className="auth-actions">
-                            <label className="remember-me">
-                                <input type="checkbox" /> Remember me
-                            </label>
-                            <a href="#" className="forgot-password" onClick={(e) => e.preventDefault()}>
-                                Forgot Password?
-                            </a>
-                        </div>
+                                <div className="auth-actions">
+                                    <label className="remember-me">
+                                        <input type="checkbox" /> Remember me
+                                    </label>
+                                    <Link to="/forgot-password" className="forgot-password">
+                                        Forgot Password?
+                                    </Link>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="input-group">
+                                <label>MFA Authenticator Code</label>
+                                <div className="input-wrapper">
+                                    <ShieldCheck size={18} className="input-icon" />
+                                    <input
+                                        type="text"
+                                        placeholder="000000"
+                                        value={mfaCode}
+                                        onChange={(e) => setMfaCode(e.target.value)}
+                                        required
+                                        maxLength={6}
+                                        style={{ letterSpacing: '0.5em', textAlign: 'center', fontSize: '1.2em' }}
+                                    />
+                                </div>
+                                <small style={{ color: '#6b7280', marginTop: '0.5rem', display: 'block' }}>Enter the 6-digit code from your authenticator app</small>
+                            </div>
+                        )}
 
                         <button
                             type="submit"
                             className="btn-primary auth-btn"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? <LoaderCircle className="spinner" size={18} /> : 'Login'}
+                            {isSubmitting ? <LoaderCircle className="spinner" size={18} /> : (mfaToken ? 'Verify Code' : 'Login')}
                         </button>
                     </form>
 

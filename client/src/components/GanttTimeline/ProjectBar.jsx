@@ -11,6 +11,9 @@ import {
 const DRAG_THRESHOLD_PX = 4;
 const TRACK_SELECTOR = '[data-gantt-track="true"]';
 const TRAY_SELECTOR = '[data-unassigned-tray="true"]';
+const SCROLL_CONTAINER_SELECTOR = '[data-gantt-scroll-container="true"]';
+const AUTO_SCROLL_EDGE_PX = 96;
+const AUTO_SCROLL_STEP_PX = 22;
 
 function getDropTarget(clientX, clientY) {
   const element = document.elementFromPoint(clientX, clientY);
@@ -61,7 +64,27 @@ function markDropTarget(target) {
   }
 }
 
-export default function ProjectBar({
+function getAutoScrollDelta(clientX, scrollContainer) {
+  if (!scrollContainer) return 0;
+
+  const rect = scrollContainer.getBoundingClientRect();
+  const leftDistance = clientX - rect.left;
+  const rightDistance = rect.right - clientX;
+
+  if (leftDistance < AUTO_SCROLL_EDGE_PX) {
+    const ratio = (AUTO_SCROLL_EDGE_PX - leftDistance) / AUTO_SCROLL_EDGE_PX;
+    return -Math.ceil(AUTO_SCROLL_STEP_PX * ratio);
+  }
+
+  if (rightDistance < AUTO_SCROLL_EDGE_PX) {
+    const ratio = (AUTO_SCROLL_EDGE_PX - rightDistance) / AUTO_SCROLL_EDGE_PX;
+    return Math.ceil(AUTO_SCROLL_STEP_PX * ratio);
+  }
+
+  return 0;
+}
+
+const ProjectBar = React.memo(({
   allocation,
   timelineStart,
   cellWidth,
@@ -70,7 +93,7 @@ export default function ProjectBar({
   currentManagerId = null,
   onClick,
   onAllocationCommit,
-}) {
+}) => {
   const project = allocation.project || allocation;
   const projectId = project.id || allocation.id;
   const startDate = allocation.allocation_start_date;
@@ -121,6 +144,11 @@ export default function ProjectBar({
       let preview = null;
 
       if (interaction.mode === 'drag') {
+        const autoScrollDelta = getAutoScrollDelta(event.clientX, interaction.scrollContainer);
+        if (autoScrollDelta !== 0 && interaction.scrollContainer) {
+          interaction.scrollContainer.scrollLeft += autoScrollDelta;
+        }
+
         const dropTarget = getDropTarget(event.clientX, event.clientY);
         if (dropTarget !== interaction.currentTarget) {
           clearDropTarget(interaction.currentTarget);
@@ -134,7 +162,9 @@ export default function ProjectBar({
 
         if (trackRect) {
           const rawStartPx = event.clientX - trackRect.left - interaction.pointerOffsetX;
-          const previewStartDate = pxToTimelineDate(rawStartPx, timelineStart, cellWidth, viewMode);
+          // SNAP TO GRID
+          const snappedStartPx = Math.round(rawStartPx / cellWidth) * cellWidth;
+          const previewStartDate = pxToTimelineDate(snappedStartPx, timelineStart, cellWidth, viewMode);
           const previewEndDate = addDaysUTC(previewStartDate, interaction.durationDays);
           const nextLayout = getBarLayout(
             previewStartDate,
@@ -149,13 +179,18 @@ export default function ProjectBar({
             endDate: previewEndDate,
             width: nextLayout.width,
             translateX: nextLayout.left - interaction.baseLayout.left,
-            translateY: event.clientY - interaction.pointerStartY,
+            translateY:
+              dropTarget?.kind === 'track' && dropTarget.row
+                ? dropTarget.row.getBoundingClientRect().top - interaction.originRowTop
+                : event.clientY - interaction.pointerStartY,
             dropTarget,
           };
         }
       } else if (interaction.mode === 'resize-left') {
+        const rawStartPx = interaction.baseLayout.left + (event.clientX - interaction.pointerStartX);
+        const snappedStartPx = Math.round(rawStartPx / cellWidth) * cellWidth;
         const resizedStart = pxToTimelineDate(
-          interaction.baseLayout.left + (event.clientX - interaction.pointerStartX),
+          snappedStartPx,
           timelineStart,
           cellWidth,
           viewMode
@@ -178,14 +213,16 @@ export default function ProjectBar({
           dropTarget: null,
         };
       } else if (interaction.mode === 'resize-right') {
+        const rawEndPx = Math.max(
+          interaction.baseLayout.left,
+          interaction.baseLayout.left +
+            interaction.baseLayout.width +
+            (event.clientX - interaction.pointerStartX) -
+            1
+        );
+        const snappedEndPx = Math.round(rawEndPx / cellWidth) * cellWidth;
         const resizedEnd = pxToTimelineDate(
-          Math.max(
-            interaction.baseLayout.left,
-            interaction.baseLayout.left +
-              interaction.baseLayout.width +
-              (event.clientX - interaction.pointerStartX) -
-              1
-          ),
+          snappedEndPx,
           timelineStart,
           cellWidth,
           viewMode
@@ -318,6 +355,8 @@ export default function ProjectBar({
 
     const wrapperRect = wrapperRef.current.getBoundingClientRect();
     const originTrack = wrapperRef.current.closest(TRACK_SELECTOR);
+    const originRow = wrapperRef.current.closest('.gantt-row');
+    const scrollContainer = wrapperRef.current.closest(SCROLL_CONTAINER_SELECTOR);
 
     interactionRef.current = {
       mode,
@@ -325,6 +364,8 @@ export default function ProjectBar({
       pointerStartY: event.clientY,
       pointerOffsetX: event.clientX - wrapperRect.left,
       originTrack,
+      scrollContainer,
+      originRowTop: originRow?.getBoundingClientRect().top || wrapperRect.top,
       baseLayout,
       durationDays: diffDaysUTC(startDate, endDate),
       startDate: parseUTCDate(startDate),
@@ -538,4 +579,6 @@ export default function ProjectBar({
       `}</style>
     </div>
   );
-}
+});
+
+export default ProjectBar;

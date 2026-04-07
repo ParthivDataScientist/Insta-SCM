@@ -16,7 +16,9 @@ const Register = () => {
         full_name: '',
         email: '',
         password: '',
-        confirm_password: ''
+        confirm_password: '',
+        role: 'Operator',
+        tos_accepted: false
     });
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -53,7 +55,8 @@ const Register = () => {
     const { label: strengthLabel, color: strengthColor } = getStrengthLabels();
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value, type, checked } = e.target;
+        setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
     };
 
     const handleSubmit = async (e) => {
@@ -155,9 +158,29 @@ const Register = () => {
                             </div>
                         </div>
 
+                        <div className="input-group">
+                            <label>Company Role</label>
+                            <div className="input-wrapper">
+                                <ShieldCheck size={18} className="input-icon" />
+                                <select 
+                                    name="role" 
+                                    value={formData.role} 
+                                    onChange={handleChange} 
+                                    required 
+                                    style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', padding: '0.5rem 0' }}
+                                >
+                                    <option value="Operator">Operator</option>
+                                    <option value="Dispatcher">Dispatcher</option>
+                                    <option value="Fleet Manager">Fleet Manager</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                            </div>
+                        </div>
+
+
                         <div className="auth-actions" style={{ justifyContent: 'flex-start' }}>
                             <label className="remember-me">
-                                <input type="checkbox" required /> I agree to the <a href="#">Terms & Conditions</a>
+                                <input type="checkbox" name="tos_accepted" checked={formData.tos_accepted} onChange={handleChange} required /> I agree to the <a href="#">Terms & Conditions</a>
                             </label>
                         </div>
 

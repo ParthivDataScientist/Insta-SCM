@@ -1,35 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Clock, User, MessageSquare, Maximize2, Minimize2, Plus, Image as ImageIcon, CheckCircle, Circle, Trash2, Camera } from 'lucide-react';
+import { X, Send, Clock, MessageSquare, Maximize2, Minimize2, Plus, CheckCircle, Circle, Trash2, Camera, ExternalLink, Copy, AlertTriangle, Link as LinkIcon, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { sanitize, stripTags } from '../utils/sanitizer';
 import CalendarPicker from './CalendarPicker';
-import { formatDateDisplay } from '../utils/dateUtils';
-import ManagerField from './ManagerField';
-import ClientField from './ClientField';
-import { getProjectCode } from '../utils/projectStatus';
+import { formatDateDisplay, formatDateTimeDisplay } from '../utils/dateUtils';
+import ManagerAssignmentPlanner from './ManagerAssignmentPlanner';
+import ProjectBrandAsset from './ProjectBrandAsset';
+import { EXECUTION_BOARD_STAGES, getProjectCode, normalizeBoardStage } from '../utils/projectStatus';
+import projectsService from '../api/projects';
 
-const BOARD_STAGE_OPTIONS = [
-    'TBC',
-    'Approved',
-    'Material management',
-    'upcoming Prebuild',
-    'Current Prebuild',
-    'QC Ready',
-    'Ready to ship',
-    'Shipped',
-    'Assembeled',
-    'Return to Inventory',
-];
+const LINK_TYPE_META = {
+    drive: { label: 'Drive', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.12)' },
+    autocad: { label: 'AutoCAD', color: '#C8792B', bg: 'rgba(200, 121, 43, 0.12)' },
+    render: { label: 'Render', color: '#238A5D', bg: 'rgba(35, 138, 93, 0.12)' },
+    other: { label: 'Other', color: 'var(--tx2)', bg: 'var(--bg-in)' },
+};
 
 export default function ProjectBoardModal({ project, onClose, updateProjectFull }) {
     const { user } = useAuth();
+    const projectId = project?.id;
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(true);
     const [activeTab, setActiveTab] = useState('Details');
     const [newComment, setNewComment] = useState("");
     const [hoveredPhoto, setHoveredPhoto] = useState(null);
     const [fullScreenPhoto, setFullScreenPhoto] = useState(null);
+    const [projectLinks, setProjectLinks] = useState([]);
+    const [linksLoading, setLinksLoading] = useState(false);
+    const [linksError, setLinksError] = useState('');
+    const [showLinkForm, setShowLinkForm] = useState(false);
+    const [editingLinkId, setEditingLinkId] = useState(null);
+    const [linkForm, setLinkForm] = useState({ label: '', link_type: 'drive', url: '' });
     const chatEndRef = useRef(null);
+    const canManageTabData = user?.role !== 'VIEWER';
 
     const scrollToBottom = () => {
         if (chatEndRef.current) {
@@ -51,7 +54,43 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
     const [newMaterial, setNewMaterial] = useState({ name: '', quantity: '', status: 'Pending', supplier: '', expected: '' });
     const [newQcStep, setNewQcStep] = useState("");
 
-    if (!project) return null;
+    useEffect(() => {
+        if (!projectId) return;
+        setProjectLinks([]);
+        setLinksError('');
+        setShowLinkForm(false);
+        setEditingLinkId(null);
+        setLinkForm({ label: '', link_type: 'drive', url: '' });
+    }, [projectId]);
+
+    useEffect(() => {
+        if (activeTab !== 'Design' || !projectId) return;
+        let ignore = false;
+
+        const loadLinks = async () => {
+            setLinksLoading(true);
+            setLinksError('');
+            try {
+                const data = await projectsService.fetchProjectLinks(projectId);
+                if (!ignore) {
+                    setProjectLinks(data);
+                }
+            } catch (err) {
+                if (!ignore) {
+                    setLinksError(err.response?.data?.detail || err.message || 'Unable to load project links');
+                }
+            } finally {
+                if (!ignore) {
+                    setLinksLoading(false);
+                }
+            }
+        };
+
+        loadLinks();
+        return () => {
+            ignore = true;
+        };
+    }, [activeTab, projectId]);
 
     // ----- Handlers for Chat -----
     const handleSendComment = async () => {
@@ -60,7 +99,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
         const newMsg = {
             initials: initials,
             name: user?.full_name || 'User',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute:'2-digit' }),
+            date: formatDateTimeDisplay(new Date()),
             text: stripTags(newComment), 
             color: '#D1FAE5',
             textCol: '#059669'
@@ -99,11 +138,87 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
         const reader = new FileReader();
         reader.onloadend = async () => {
             const base64String = reader.result;
-            const updatedPhotos = [{ id: Date.now(), url: base64String, added_at: new Date().toLocaleDateString() }, ...photos];
+            const updatedPhotos = [{ id: Date.now(), url: base64String, added_at: formatDateDisplay(new Date()) }, ...photos];
             await updateProjectFull(project.id, { photos: updatedPhotos });
         };
         // Quick visual/size optimization: read as data url but normally resize in prod.
         reader.readAsDataURL(file);
+    };
+
+    const resetLinkForm = () => {
+        setLinkForm({ label: '', link_type: 'drive', url: '' });
+        setEditingLinkId(null);
+        setShowLinkForm(false);
+    };
+
+    const isSafeHttpUrl = (value) => {
+        try {
+            const parsed = new URL(value);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    };
+
+    const handleSaveLink = async () => {
+        const payload = {
+            label: linkForm.label.trim(),
+            link_type: linkForm.link_type,
+            url: linkForm.url.trim(),
+        };
+
+        if (!payload.label) {
+            alert('Link label is required');
+            return;
+        }
+        if (!isSafeHttpUrl(payload.url)) {
+            alert('Please enter a valid http/https URL');
+            return;
+        }
+
+        try {
+            let saved;
+            if (editingLinkId) {
+                saved = await projectsService.updateProjectLink(project.id, editingLinkId, payload);
+                setProjectLinks((prev) => prev.map((link) => (link.id === editingLinkId ? saved : link)));
+            } else {
+                saved = await projectsService.createProjectLink(project.id, payload);
+                setProjectLinks((prev) => [saved, ...prev]);
+            }
+            resetLinkForm();
+        } catch (err) {
+            alert(err.response?.data?.detail || err.message || 'Unable to save project link');
+        }
+    };
+
+    const handleEditLink = (link) => {
+        setEditingLinkId(link.id);
+        setLinkForm({
+            label: link.label || '',
+            link_type: link.link_type || 'other',
+            url: link.url || '',
+        });
+        setShowLinkForm(true);
+    };
+
+    const handleDeleteLink = async (linkId) => {
+        const shouldDelete = window.confirm('Delete this project link?');
+        if (!shouldDelete) return;
+
+        try {
+            await projectsService.deleteProjectLink(project.id, linkId);
+            setProjectLinks((prev) => prev.filter((link) => link.id !== linkId));
+        } catch (err) {
+            alert(err.response?.data?.detail || err.message || 'Unable to delete project link');
+        }
+    };
+
+    const handleCopyLink = async (url) => {
+        try {
+            await navigator.clipboard.writeText(url);
+        } catch {
+            window.prompt('Copy link:', url);
+        }
     };
 
     // ----- Handlers for QC Steps -----
@@ -197,7 +312,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {Icon && <Icon size={14} color="var(--tx3)" />}
                             <select
-                                value={project[field] || ''}
+                                value={field === 'board_stage' ? normalizeBoardStage(project[field]) : (project[field] || '')}
                                 onChange={(event) => updateProjectFull(project.id, { [field]: event.target.value })}
                                 style={{
                                     flex: 1,
@@ -220,19 +335,14 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
 
                 return (
                     <>
-                        <div style={{
-                            width: '100%', height: '180px', background: '#1a1a1a', borderRadius: 'var(--r-md)',
-                            marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666',
-                            position: 'relative', overflow: 'hidden'
-                        }}>
-                             <img src="/logo.jpg" alt="Booth Render" style={{ opacity: 0.15, width: '200px' }} />
-                             <div style={{ position: 'absolute', bottom: '12px', right: '12px', fontSize: '10px', color: '#444' }}>[ Exhibition Booth Render Placeholder ]</div>
-                        </div>
+                        <ProjectBrandAsset
+                            project={project}
+                            variant="hero"
+                            style={{ width: '100%', height: '220px', marginBottom: '20px' }}
+                        />
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                            <ManagerField label="Project Manager" field="manager_id" project={project} updateProjectFull={updateProjectFull} icon={User} />
-                            <ClientField label="Client" field="client_id" project={project} updateProjectFull={updateProjectFull} />
-                            <SelectField label="Board Stage" field="board_stage" options={BOARD_STAGE_OPTIONS} icon={CheckCircle} />
+                        <div style={{ marginBottom: '20px' }}>
+                            <ManagerAssignmentPlanner project={project} updateProjectFull={updateProjectFull} />
                         </div>
 
                         <div style={{ padding: '24px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
@@ -312,6 +422,140 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                );
+
+            case 'Design':
+                return (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '16px' }}>Design Resources</h3>
+                                <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--tx3)' }}>
+                                    Structured links for Drive folders, AutoCAD layouts, renders, and reference files.
+                                </p>
+                            </div>
+                            {canManageTabData && (
+                                <button
+                                    onClick={() => {
+                                        if (showLinkForm && !editingLinkId) {
+                                            resetLinkForm();
+                                        } else {
+                                            setShowLinkForm(true);
+                                        }
+                                    }}
+                                    style={{ padding: '10px 16px', background: 'var(--tx)', color: 'var(--bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                    <Plus size={16} /> Add Link
+                                </button>
+                            )}
+                        </div>
+
+                        {showLinkForm && (
+                            <div style={{ padding: '18px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)', marginBottom: '18px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1.6fr auto', gap: '12px', alignItems: 'end' }}>
+                                    <div>
+                                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>Label</div>
+                                        <input
+                                            value={linkForm.label}
+                                            onChange={(event) => setLinkForm((prev) => ({ ...prev, label: event.target.value }))}
+                                            placeholder="AutoCAD Layout V2"
+                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--bd)', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--tx)' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>Type</div>
+                                        <select
+                                            value={linkForm.link_type}
+                                            onChange={(event) => setLinkForm((prev) => ({ ...prev, link_type: event.target.value }))}
+                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--bd)', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--tx)' }}
+                                        >
+                                            <option value="drive">Drive</option>
+                                            <option value="autocad">AutoCAD</option>
+                                            <option value="render">Render</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>URL</div>
+                                        <input
+                                            value={linkForm.url}
+                                            onChange={(event) => setLinkForm((prev) => ({ ...prev, url: event.target.value }))}
+                                            placeholder="https://..."
+                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--bd)', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--tx)' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button onClick={handleSaveLink} style={{ padding: '10px 14px', background: 'var(--tx)', color: 'var(--bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                                            <Save size={15} /> Save
+                                        </button>
+                                        <button onClick={resetLinkForm} style={{ padding: '10px 14px', background: 'transparent', color: 'var(--tx2)', border: '1px solid var(--bd)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {linksError && (
+                            <div style={{ padding: '12px 14px', borderRadius: '8px', background: 'var(--red-ghost)', color: 'var(--red)', marginBottom: '16px', fontSize: '13px', fontWeight: 600 }}>
+                                {linksError}
+                            </div>
+                        )}
+
+                        {linksLoading ? (
+                            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--tx3)' }}>Loading project links...</div>
+                        ) : projectLinks.length === 0 ? (
+                            <div style={{ padding: '40px', border: '1px dashed var(--bd)', borderRadius: 'var(--r-md)', textAlign: 'center', color: 'var(--tx3)' }}>
+                                No design links yet. {canManageTabData ? 'Add the first Drive, AutoCAD, or render resource.' : ''}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                {projectLinks.map((link) => {
+                                    const meta = LINK_TYPE_META[link.link_type] || LINK_TYPE_META.other;
+                                    const isSafeLink = isSafeHttpUrl(link.url);
+
+                                    return (
+                                        <div key={link.id} style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--tx)', marginBottom: '6px' }}>{link.label}</div>
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '999px', background: meta.bg, color: meta.color, fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+                                                        <LinkIcon size={12} /> {meta.label}
+                                                    </div>
+                                                </div>
+                                                {!isSafeLink && <AlertTriangle size={16} color="var(--red)" />}
+                                            </div>
+
+                                            <div style={{ fontSize: '12px', color: 'var(--tx3)', wordBreak: 'break-all' }}>{link.url}</div>
+
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                <button onClick={() => handleCopyLink(link.url)} style={{ padding: '8px 12px', border: '1px solid var(--bd)', background: 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                                    <Copy size={14} /> Copy
+                                                </button>
+                                                <button
+                                                    onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
+                                                    disabled={!isSafeLink}
+                                                    style={{ padding: '8px 12px', border: 'none', background: 'var(--accent)', color: 'white', borderRadius: '8px', cursor: isSafeLink ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, opacity: isSafeLink ? 1 : 0.5 }}
+                                                >
+                                                    <ExternalLink size={14} /> Open
+                                                </button>
+                                                {canManageTabData && (
+                                                    <>
+                                                        <button onClick={() => handleEditLink(link)} style={{ padding: '8px 12px', border: '1px solid var(--bd)', background: 'transparent', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                                                            Edit
+                                                        </button>
+                                                        <button onClick={() => handleDeleteLink(link.id)} style={{ padding: '8px 12px', border: '1px solid var(--exc-bd)', background: 'var(--red-ghost)', color: 'var(--red)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
+                                                            Delete
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 );
 
@@ -404,6 +648,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
         }
     };
 
+    if (!project) return null;
 
     return (
         <div 
@@ -434,12 +679,31 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                     alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
                 }}>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {getProjectCode(project)} | {project.project_name} | {project.area || 'Size TBD'} | {project.event_name}
+                        <div style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                            {getProjectCode(project)}
+                        </div>
+                        <h2 style={{ margin: '8px 0 0', fontSize: '22px', color: 'var(--tx)', lineHeight: 1.25 }}>
+                            {project.project_name || 'Untitled project'}
                         </h2>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                            <span style={{ padding: '4px 10px', background: '#10B981', color: 'white', fontSize: '11px', borderRadius: '99px', fontWeight: 600 }}>{project.stage || 'Status TBD'}</span>
-                            <span style={{ padding: '4px 10px', background: '#3B82F6', color: 'white', fontSize: '11px', borderRadius: '99px', fontWeight: 600 }}>I&D: Inhouse</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                            {project.event_name ? (
+                                <span style={{ fontSize: '13px', color: 'var(--tx2)', fontWeight: 500 }}>
+                                    {project.event_name}
+                                </span>
+                            ) : null}
+                            {project.area ? (
+                                <span style={{ fontSize: '13px', color: 'var(--tx3)' }}>
+                                    {project.area}
+                                </span>
+                            ) : null}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
+                            <span style={{ padding: '6px 10px', background: 'rgba(16, 185, 129, 0.1)', color: '#047857', fontSize: '11px', borderRadius: '999px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.16)' }}>
+                                {project.stage || 'Status TBD'}
+                            </span>
+                            <span style={{ padding: '6px 10px', background: 'rgba(15, 23, 42, 0.05)', color: 'var(--tx2)', fontSize: '11px', borderRadius: '999px', fontWeight: 700, border: '1px solid rgba(148, 163, 184, 0.16)' }}>
+                                {normalizeBoardStage(project.board_stage)}
+                            </span>
                         </div>
                     </div>
                     
@@ -467,7 +731,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                     {/* Main Content Area */}
                     <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }} className="no-scrollbar">
                         <div style={{ display: 'flex', borderBottom: '1px solid var(--bd)', marginBottom: '20px' }}>
-                            {['Details', 'Materials', 'Files', 'Shipments', 'Photos', 'QC'].map((tab) => (
+                            {['Details', 'Design', 'Materials', 'Photos', 'QC'].map((tab) => (
                                 <button key={tab} onClick={() => setActiveTab(tab)} className="btn-animate" style={{
                                     padding: '10px 20px', borderBottom: activeTab === tab ? '2px solid var(--tx)' : '2px solid transparent',
                                     fontWeight: activeTab === tab ? 600 : 500, color: activeTab === tab ? 'var(--tx)' : 'var(--tx3)',

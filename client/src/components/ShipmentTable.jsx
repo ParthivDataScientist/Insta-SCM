@@ -170,7 +170,7 @@ const ShipmentTable = ({
                                     </div>
                                 </FilterPopover>
 
-                                <FilterPopover title="Exhibition Name" isActive={exhibitionFilter.length > 0} onClear={() => setExhibitionFilter([])}>
+                                <FilterPopover title="Project / Exhibition" isActive={exhibitionFilter.length > 0} onClear={() => setExhibitionFilter([])}>
                                     <div className="fp-check-list">
                                         {allExhibitions.length === 0 ? <div className="fp-empty">No data</div> : allExhibitions.map(ex => (
                                             <label key={ex} className="fp-check-item">
@@ -349,9 +349,9 @@ const ShipmentRowGroup = ({
                         )}
                         <div className="tid-icon"><Package size={14} /></div>
                         <div>
-                            <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
-                            <div className="tid-num">
-                                {s.tracking_number}
+                    <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
+                    <div className="tid-num">
+                        {s.tracking_number}
                                 {hasChildren && (
                                     <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
                                         📦 +{s.child_parcels.length} Child
@@ -362,7 +362,14 @@ const ShipmentRowGroup = ({
                     </div>
                 </td>
                 <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
-                    {s.exhibition_name || 'N/A'}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span>{s.project_name || s.exhibition_name || 'N/A'}</span>
+                        {(s.project_client_name || s.exhibition_name) ? (
+                            <span style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 500 }}>
+                                {s.project_client_name || s.exhibition_name}
+                            </span>
+                        ) : null}
+                    </div>
                 </td>
                 <td>
                     <StatusBadge status={s.status} />
@@ -426,7 +433,14 @@ const ShipmentRowGroup = ({
                         </div>
                     </td>
                     <td style={{ fontWeight: 600, color: 'var(--tx)', opacity: 0.7 }}>
-                        {s.exhibition_name || 'N/A'}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span>{s.project_name || s.exhibition_name || 'N/A'}</span>
+                            {(s.project_client_name || s.exhibition_name) ? (
+                                <span style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 500 }}>
+                                    {s.project_client_name || s.exhibition_name}
+                                </span>
+                            ) : null}
+                        </div>
                     </td>
                     <td>
                         <StatusBadge status={child.status} />
