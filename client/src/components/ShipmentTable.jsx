@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, Fragment } from 'react';
-import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2, FolderInput } from 'lucide-react';
+import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2 } from 'lucide-react';
 import { Loader } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
@@ -23,7 +23,7 @@ function useOnClickOutside(ref, handler) {
 
 /* ── Helpers ── */
 const formatDateTime = (dateStr) => {
-    if (!dateStr || dateStr === 'TBD' || dateStr === '—' || dateStr === 'Unknown' || dateStr === 'Pending') return '—';
+    if (!dateStr || dateStr === 'TBD' || dateStr === '—' || dateStr === 'Unknown' || dateStr === 'Pending') return '-';
     try {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
@@ -351,10 +351,10 @@ const ShipmentRowGroup = ({
                         <div>
                     <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
                     <div className="tid-num">
-                        {s.tracking_number}
+                                {s.tracking_number}
                                 {hasChildren && (
-                                    <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
-                                        📦 +{s.child_parcels.length} Child
+                                    <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
+                                        +{s.child_parcels.length} child
                                     </span>
                                 )}
                             </div>
@@ -382,14 +382,14 @@ const ShipmentRowGroup = ({
                         {s.history && s.history.length > 0 ? s.history[0].description : s.status}
                     </div>
                 </td>
-                <td className="carrier-cell">{s.carrier || '—'}</td>
+                <td className="carrier-cell">{s.carrier || '-'}</td>
                 <td>
                     {s.origin ? (
                         <div className="route-mini">
                             <span className="rm-label">FROM </span>{s.origin.split(',')[0]}<br />
-                            <span className="rm-label">TO </span>{s.destination.split(',')[0]}
+                            <span className="rm-label">TO </span>{(s.destination || '').split(',')[0] || '-'}
                         </div>
-                    ) : '—'}
+                    ) : '-'}
                 </td>
                 <td className="eta-cell">
                     {(() => {
@@ -428,7 +428,7 @@ const ShipmentRowGroup = ({
                     <td>
                         <div className="child-indicator">
                             <div className="tid-num" style={{ fontWeight: 600 }}>
-                                ↳ {child.tracking_number}
+                                Child {child.tracking_number}
                             </div>
                         </div>
                     </td>
@@ -452,12 +452,12 @@ const ShipmentRowGroup = ({
                                 : (s.history && s.history.length > 0 ? s.history[0].description : (child.raw_status || child.status))}
                         </div>
                     </td>
-                    <td className="carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
+                    <td className="carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '-'}</td>
                     <td style={{ opacity: 0.7 }}>
                         {child.origin ? (
                             <div className="route-mini">
                                 <span className="rm-label">FROM </span>{child.origin.split(',')[0]}<br />
-                                <span className="rm-label">TO </span>{child.destination.split(',')[0]}
+                                <span className="rm-label">TO </span>{(child.destination || '').split(',')[0] || '-'}
                             </div>
                         ) : (
                             <div className="route-mini" style={{ opacity: 0.5 }}>

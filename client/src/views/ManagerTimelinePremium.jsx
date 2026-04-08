@@ -445,45 +445,54 @@ export default function ManagerTimelinePremium() {
     const toolbar = (
         <div className="premium-filter-group" style={{ justifyContent: 'space-between', width: '100%' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                <label className="premium-filter" style={{ minWidth: '220px' }}>
-                    <Layout size={14} color="var(--tx3)" />
-                    <select value={filterStage} onChange={(event) => setFilterStage(event.target.value)}>
-                        <option value="All">All stages</option>
-                        {EXECUTION_BOARD_STAGES.map((stage) => (
-                            <option key={stage} value={stage}>
-                                {stage}
-                            </option>
-                        ))}
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Stage</span>
+                    <span className="premium-filter">
+                        <Layout size={14} color="var(--tx3)" />
+                        <select value={filterStage} onChange={(event) => setFilterStage(event.target.value)}>
+                            <option value="All">All</option>
+                            {EXECUTION_BOARD_STAGES.map((stage) => (
+                                <option key={stage} value={stage}>
+                                    {stage}
+                                </option>
+                            ))}
+                        </select>
+                    </span>
                 </label>
 
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <MapPin size={14} color="var(--tx3)" />
-                    <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                        {uniqueBranches.map((branch) => (
-                            <option key={branch} value={branch}>
-                                {branch === 'All' ? 'All branches' : branch}
-                            </option>
-                        ))}
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Branch</span>
+                    <span className="premium-filter">
+                        <MapPin size={14} color="var(--tx3)" />
+                        <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
+                            {uniqueBranches.map((branch) => (
+                                <option key={branch} value={branch}>
+                                    {branch === 'All' ? 'All' : branch}
+                                </option>
+                            ))}
+                        </select>
+                    </span>
                 </label>
 
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <Users size={14} color="var(--tx3)" />
-                    <select value={filterManager} onChange={(event) => setFilterManager(event.target.value)}>
-                        {uniqueManagers.map((manager) => (
-                            <option key={manager} value={manager}>
-                                {manager === 'All' ? 'All managers' : manager}
-                            </option>
-                        ))}
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Manager</span>
+                    <span className="premium-filter">
+                        <Users size={14} color="var(--tx3)" />
+                        <select value={filterManager} onChange={(event) => setFilterManager(event.target.value)}>
+                            {uniqueManagers.map((manager) => (
+                                <option key={manager} value={manager}>
+                                    {manager === 'All' ? 'All' : manager}
+                                </option>
+                            ))}
+                        </select>
+                    </span>
                 </label>
 
-                <div className="premium-filter" style={{ gap: '8px', minWidth: '320px', justifyContent: 'space-between' }}>
+                <div className="premium-range-picker">
                     <button type="button" className="premium-icon-button" onClick={() => shiftTimeline(-1)}>
                         <ChevronLeft size={16} />
                     </button>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--tx2)', whiteSpace: 'nowrap' }}>
+                    <span className="premium-range-picker__label">
                         {rangeLabel(timeWindow.start, timeWindow.end)}
                     </span>
                     <button type="button" className="premium-icon-button" onClick={() => shiftTimeline(1)}>
@@ -498,13 +507,12 @@ export default function ManagerTimelinePremium() {
                     Add Manager
                 </button>
 
-                <div className="premium-filter" style={{ padding: '6px', gap: '6px' }}>
+                <div className="premium-segmented">
                     {VIEW_MODES.map((mode) => (
                         <button
                             key={mode}
                             type="button"
-                            className={`premium-action-button${viewMode === mode ? ' premium-action-button--primary' : ''}`}
-                            style={{ minHeight: '36px' }}
+                            className={`premium-segmented__button${viewMode === mode ? ' is-active' : ''}`}
                             onClick={() => setViewMode(mode)}
                         >
                             {mode}
@@ -542,7 +550,7 @@ export default function ManagerTimelinePremium() {
             <AppShell
                 activeNav="timeline"
                 title="Resource Timeline"
-                subtitle="Gantt-style planning for project managers, installations and workload balancing."
+                subtitle="Manager allocation, workload, and schedule balancing."
                 headerCenter={headerCenter}
                 actions={actions}
                 toolbar={toolbar}
@@ -582,12 +590,12 @@ export default function ManagerTimelinePremium() {
                     </div>
                 ) : null}
 
-                <div className="premium-panel" style={{ overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', minHeight: '720px', maxHeight: '72vh' }}>
+                <div className="premium-panel premium-timeline-shell">
+                    <div className="premium-timeline-shell__body">
                         <div
                             ref={parentRef}
                             data-gantt-scroll-container="true"
-                            style={{ flex: 1, overflow: 'auto', background: 'var(--bg-ralt)', position: 'relative' }}
+                            className="premium-timeline-window"
                         >
                             {isLoading ? (
                                 <div style={{ padding: '40px' }}>

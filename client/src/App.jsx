@@ -16,6 +16,7 @@ import { GlobalDateRangeProvider } from './contexts/GlobalDateRangeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './styles.css';
 import './premium-theme.css';
+import './minimal-theme.css';
 
 // Initialize React Query Client
 const queryClient = new QueryClient({

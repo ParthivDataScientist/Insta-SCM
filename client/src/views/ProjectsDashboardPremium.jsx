@@ -98,38 +98,47 @@ export default function ProjectsDashboardPremium() {
 
     const toolbar = (
         <div className="premium-filter-group">
-            <label className="premium-filter" style={{ minWidth: '220px' }}>
-                <Layout size={14} color="var(--tx3)" />
-                <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                    <option value="All">All stages</option>
-                    {EXECUTION_BOARD_STAGES.map((stage) => (
-                        <option key={stage} value={stage}>
-                            {stage}
-                        </option>
-                    ))}
-                </select>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">Stage</span>
+                <span className="premium-filter">
+                    <Layout size={14} color="var(--tx3)" />
+                    <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
+                        <option value="All">All</option>
+                        {EXECUTION_BOARD_STAGES.map((stage) => (
+                            <option key={stage} value={stage}>
+                                {stage}
+                            </option>
+                        ))}
+                    </select>
+                </span>
             </label>
 
-            <label className="premium-filter" style={{ minWidth: '180px' }}>
-                <MapPin size={14} color="var(--tx3)" />
-                <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                    {uniqueBranches.map((branch) => (
-                        <option key={branch} value={branch}>
-                            {branch === 'All' ? 'All branches' : branch}
-                        </option>
-                    ))}
-                </select>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">Branch</span>
+                <span className="premium-filter">
+                    <MapPin size={14} color="var(--tx3)" />
+                    <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
+                        {uniqueBranches.map((branch) => (
+                            <option key={branch} value={branch}>
+                                {branch === 'All' ? 'All' : branch}
+                            </option>
+                        ))}
+                    </select>
+                </span>
             </label>
 
-            <label className="premium-filter" style={{ minWidth: '180px' }}>
-                <Users size={14} color="var(--tx3)" />
-                <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
-                    {uniquePMs.map((pm) => (
-                        <option key={pm} value={pm}>
-                            {pm === 'All' ? 'All managers' : pm}
-                        </option>
-                    ))}
-                </select>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">Manager</span>
+                <span className="premium-filter">
+                    <Users size={14} color="var(--tx3)" />
+                    <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
+                        {uniquePMs.map((pm) => (
+                            <option key={pm} value={pm}>
+                                {pm === 'All' ? 'All' : pm}
+                            </option>
+                        ))}
+                    </select>
+                </span>
             </label>
         </div>
     );
@@ -149,7 +158,7 @@ export default function ProjectsDashboardPremium() {
             <AppShell
                 activeNav="projects"
                 title="Projects"
-                subtitle="Execution projects in one clean operating view."
+                subtitle="Execution list for planning, ownership, and delivery dates."
                 headerCenter={headerCenter}
                 actions={actions}
                 toolbar={toolbar}
@@ -182,7 +191,7 @@ export default function ProjectsDashboardPremium() {
                 </div>
 
                 {error ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', color: 'var(--red)' }}>
+                    <div className="premium-banner">
                         {error}
                     </div>
                 ) : null}

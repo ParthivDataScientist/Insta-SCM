@@ -7,58 +7,30 @@ export default function GlobalDateRangePicker({ compact = false }) {
   const hasActiveRange = Boolean(dateRange.start || dateRange.end);
 
   return (
-    <div
-      className="animate-card"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: compact ? '6px' : '8px',
-        padding: compact ? '6px 10px' : '8px 12px',
-        background: 'var(--bg-in)',
-        border: '1px solid var(--bd)',
-        borderRadius: 'var(--r-md)',
-      }}
-    >
+    <div className="premium-range-picker">
       <Calendar size={14} color="var(--tx3)" />
-      <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--tx3)' }}>
-        Master Date
-      </span>
-      <input
-        type="date"
-        value={dateRange.start}
-        onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          font: 'inherit',
-          fontSize: '11px',
-          color: 'var(--tx)',
-          outline: 'none',
-          width: '110px',
-        }}
-      />
-      <span style={{ color: 'var(--tx3)', fontSize: '11px' }}>to</span>
-      <input
-        type="date"
-        value={dateRange.end}
-        onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          font: 'inherit',
-          fontSize: '11px',
-          color: 'var(--tx)',
-          outline: 'none',
-          width: '110px',
-        }}
-      />
+      {!compact ? <span className="premium-range-picker__label">Date</span> : null}
+      <label className="premium-inline-input" style={{ minHeight: compact ? '36px' : '40px' }}>
+        <input
+          type="date"
+          value={dateRange.start}
+          onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))}
+        />
+      </label>
+      <span style={{ color: 'var(--tx3)', fontSize: '12px' }}>to</span>
+      <label className="premium-inline-input" style={{ minHeight: compact ? '36px' : '40px' }}>
+        <input
+          type="date"
+          value={dateRange.end}
+          onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))}
+        />
+      </label>
       {hasActiveRange && (
         <button
           type="button"
-          className="icon-btn"
+          className="premium-icon-button"
           onClick={clearDateRange}
           title="Clear master date range"
-          style={{ width: '24px', height: '24px', color: 'var(--tx3)' }}
         >
           <X size={14} />
         </button>

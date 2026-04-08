@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Archive, Briefcase, Layout, LogOut, Menu, Moon, PenTool, RefreshCw, Sun, Truck } from 'lucide-react';
+import { Archive, Briefcase, Layout, LogOut, Menu, PenTool, RefreshCw, Truck, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
 import GlobalDateRangePicker from '../GlobalDateRangePicker';
 
 const NAV_ITEMS = [
@@ -25,26 +24,40 @@ export default function AppShell({
     children,
 }) {
     const { logout } = useAuth();
-    const { theme, isDark, toggleTheme } = useTheme();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const nav = useMemo(() => NAV_ITEMS, []);
 
     return (
-        <div className={`${theme} premium-app`}>
+        <div className="premium-app">
             <div className={`premium-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
+                <button
+                    type="button"
+                    className={`premium-sidebar-overlay${sidebarOpen ? ' is-visible' : ''}`}
+                    onClick={() => setSidebarOpen(false)}
+                    aria-label="Close navigation"
+                />
+
                 <aside className="premium-sidebar">
                     <div className="premium-sidebar__brand">
                         <img src="/logo.jpg" alt="Insta SCM" className="premium-sidebar__logo" />
                         <div>
                             <div className="premium-sidebar__title">Insta SCM</div>
-                            <div className="premium-sidebar__subtitle">Design to delivery</div>
+                            <div className="premium-sidebar__subtitle">Operations workspace</div>
                         </div>
+                        <button type="button" className="premium-icon-button premium-icon-button--ghost mobile-only" onClick={() => setSidebarOpen(false)}>
+                            <X size={16} />
+                        </button>
                     </div>
 
                     <nav className="premium-sidebar__nav">
                         {nav.map(({ to, label, icon: Icon, key }) => (
-                            <Link key={key} to={to} className={`premium-nav-link${activeNav === key ? ' is-active' : ''}`}>
+                            <Link
+                                key={key}
+                                to={to}
+                                className={`premium-nav-link${activeNav === key ? ' is-active' : ''}`}
+                                onClick={() => setSidebarOpen(false)}
+                            >
                                 <Icon size={16} />
                                 <span>{label}</span>
                             </Link>
@@ -75,9 +88,6 @@ export default function AppShell({
                         <div className="premium-header__actions">
                             {showGlobalDate ? <GlobalDateRangePicker compact /> : null}
                             {actions}
-                            <button type="button" className="premium-icon-button" onClick={toggleTheme} title="Toggle theme">
-                                {isDark ? <Sun size={16} /> : <Moon size={16} />}
-                            </button>
                             <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
                                 <LogOut size={16} />
                             </button>

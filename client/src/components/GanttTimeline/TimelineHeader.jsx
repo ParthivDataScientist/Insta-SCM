@@ -14,35 +14,29 @@ export default function TimelineHeader({ units, cellWidth, viewMode }) {
   }, {});
 
   return (
-    <div className="gantt-header-sticky" style={{ 
-      display: 'flex', flexDirection: 'column', 
-      position: 'sticky', top: 0, zIndex: 100, 
-      background: 'var(--bg-card)', borderBottom: '1px solid var(--bd)' 
-    }}>
-      {/* Month/Year Row */}
+    <div className="gantt-header-sticky" style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', borderBottom: '1px solid var(--bd-l)' }}>
         <div style={{ width: '240px', flexShrink: 0, borderRight: '1px solid var(--bd)' }} />
         {Object.entries(monthGroups).map(([name, count]) => (
           <div key={name} style={{ 
             width: count * cellWidth, flexShrink: 0, 
-            padding: '8px 12px', fontSize: '11px', fontWeight: 800, 
+            padding: '8px 12px', fontSize: '11px', fontWeight: 600, 
             color: 'var(--tx3)', borderRight: '1px solid var(--bd-l)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            textTransform: 'uppercase', letterSpacing: '0.5px'
+            letterSpacing: '0.02em'
           }}>
             {name}
           </div>
         ))}
       </div>
 
-      {/* Unit Row (Day/Week/Month) */}
       <div style={{ display: 'flex' }}>
         <div style={{ 
           width: '240px', flexShrink: 0, borderRight: '1px solid var(--bd)', 
-          padding: '10px 16px', fontSize: '11px', fontWeight: 800, 
-          color: 'var(--tx)', textTransform: 'uppercase' 
+          padding: '10px 16px', fontSize: '11px', fontWeight: 700, 
+          color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.06em' 
         }}>
-          Resources / Managers
+          Managers
         </div>
         {units.map((date, idx) => {
           const isCurrentUnit = viewMode === 'Day' ? false : 
@@ -68,13 +62,13 @@ export default function TimelineHeader({ units, cellWidth, viewMode }) {
             <div key={idx} style={{ 
               width: cellWidth, flexShrink: 0, 
               padding: '8px 0', textAlign: 'center', 
-              fontSize: '10px', color: isCurrentUnit ? 'var(--red)' : 'var(--tx2)',
-              background: isCurrentUnit ? 'var(--red-ghost)' : 'transparent',
-              borderRight: '1px solid var(--bd-l)', fontWeight: isCurrentUnit ? 800 : 500,
+              fontSize: '10px', color: isCurrentUnit ? 'var(--accent)' : 'var(--tx2)',
+              background: isCurrentUnit ? 'var(--accent-soft)' : 'transparent',
+              borderRight: '1px solid var(--bd-l)', fontWeight: isCurrentUnit ? 700 : 500,
               display: 'flex', flexDirection: 'column', justifyContent: 'center'
             }}>
               <div>{label}</div>
-              <div style={{ fontSize: '11px', fontWeight: isCurrentUnit ? 900 : 700 }}>{subLabel}</div>
+              <div style={{ fontSize: '11px', fontWeight: isCurrentUnit ? 700 : 600 }}>{subLabel}</div>
             </div>
           );
         })}

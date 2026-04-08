@@ -149,31 +149,18 @@ export default function ManagerRow({
       }}
     >
       <div
-        style={{
-          width: '240px',
-          flexShrink: 0,
-          padding: '12px 16px',
-          borderRight: '1px solid var(--bd)',
-          background: 'var(--bg-card)',
-          position: 'sticky',
-          left: 0,
-          zIndex: 10,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
+        className="premium-manager-header"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--tx)' }}>{managerLabel}</div>
-          <div style={{ fontSize: '10px', color: 'var(--tx3)', fontWeight: 600 }}>
-            Next: <span style={{ color: 'var(--green)' }}>{nextAvailableStr}</span>
+          <div className="premium-manager-header__name">{managerLabel}</div>
+          <div className="premium-manager-header__next">
+            Next <strong>{nextAvailableStr}</strong>
           </div>
         </div>
 
         <button
-          className="icon-btn"
+          className="premium-icon-button premium-icon-button--danger"
           onClick={() => onRemoveManager(managerId || managerLabel)}
-          style={{ color: 'var(--red)', padding: '4px' }}
         >
           <Trash2 size={12} />
         </button>

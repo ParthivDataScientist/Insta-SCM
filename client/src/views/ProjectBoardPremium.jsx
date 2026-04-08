@@ -99,43 +99,52 @@ export default function ProjectBoardPremium() {
     const toolbar = (
             <div className="premium-filter-group" style={{ justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <label className="premium-filter" style={{ minWidth: '220px' }}>
-                    <Layout size={14} color="var(--tx3)" />
-                    <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                        <option value="All">All stages</option>
-                        {EXECUTION_BOARD_STAGES.map((stage) => (
-                            <option key={stage} value={stage}>
-                                {stage}
-                            </option>
-                        ))}
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Stage</span>
+                    <span className="premium-filter">
+                        <Layout size={14} color="var(--tx3)" />
+                        <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
+                            <option value="All">All</option>
+                            {EXECUTION_BOARD_STAGES.map((stage) => (
+                                <option key={stage} value={stage}>
+                                    {stage}
+                                </option>
+                            ))}
+                        </select>
+                    </span>
                 </label>
 
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <MapPin size={14} color="var(--tx3)" />
-                    <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                        {uniqueBranches.map((branch) => (
-                            <option key={branch} value={branch}>
-                                {branch === 'All' ? 'All branches' : branch}
-                            </option>
-                        ))}
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Branch</span>
+                    <span className="premium-filter">
+                        <MapPin size={14} color="var(--tx3)" />
+                        <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
+                            {uniqueBranches.map((branch) => (
+                                <option key={branch} value={branch}>
+                                    {branch === 'All' ? 'All' : branch}
+                                </option>
+                            ))}
+                        </select>
+                    </span>
                 </label>
 
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <Users size={14} color="var(--tx3)" />
-                    <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
-                        {uniqueManagers.map((manager) => (
-                            <option key={manager} value={manager}>
-                                {manager === 'All' ? 'All managers' : manager}
-                            </option>
-                        ))}
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Manager</span>
+                    <span className="premium-filter">
+                        <Users size={14} color="var(--tx3)" />
+                        <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
+                            {uniqueManagers.map((manager) => (
+                                <option key={manager} value={manager}>
+                                    {manager === 'All' ? 'All' : manager}
+                                </option>
+                            ))}
+                        </select>
+                    </span>
                 </label>
             </div>
 
-            <div style={{ color: 'var(--tx3)', fontSize: '12px', fontWeight: 600 }}>
-                Clean execution view with drag-and-drop stage planning.
+            <div className="premium-toolbar__meta">
+                Drag projects between stages to update the live plan.
             </div>
         </div>
     );
@@ -155,30 +164,27 @@ export default function ProjectBoardPremium() {
             <AppShell
                 activeNav="board"
                 title="Project Board"
-                subtitle="A cleaner execution board for planning, movement, and manager context."
+                subtitle="Live execution flow across confirmed projects."
                 headerCenter={headerCenter}
                 actions={actions}
                 toolbar={toolbar}
             >
                 {error ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', color: 'var(--red)' }}>
+                    <div className="premium-banner">
                         {error}
                     </div>
                 ) : null}
 
-                <div className="premium-panel" style={{ padding: '22px', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95))' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-                        <div style={{ width: '38px', height: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '14px', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--accent)' }}>
-                            <Layout size={18} />
-                        </div>
+                <div className="premium-panel premium-board-shell">
+                    <div className="premium-board-shell__header">
                         <div>
-                            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--tx)' }}>Execution pipeline</div>
-                            <div style={{ fontSize: '12px', color: 'var(--tx3)' }}>{confirmedProjects.length} projects in active flow across the current filters.</div>
+                            <div className="premium-board-shell__title">Execution pipeline</div>
+                            <div className="premium-board-shell__meta">{confirmedProjects.length} projects in the current view.</div>
                         </div>
                     </div>
 
                     <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
-                        <div style={{ display: 'flex', gap: '20px', minWidth: 'max-content', alignItems: 'stretch' }}>
+                        <div className="premium-board-columns">
                             {loading && projects.length === 0 ? (
                                 <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
                             ) : (

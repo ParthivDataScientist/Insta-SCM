@@ -61,17 +61,8 @@ function VersionCell({ project, onUpdateField }) {
                 }
             }}
             placeholder="v1 / Final / Custom"
-            style={{
-                width: '100%',
-                minWidth: '140px',
-                border: '1px solid var(--bd)',
-                background: 'var(--bg-card)',
-                color: 'var(--tx)',
-                borderRadius: '10px',
-                padding: '8px 10px',
-                fontSize: '12px',
-                fontWeight: 600,
-            }}
+            className="premium-inline-select"
+            style={{ minWidth: '140px' }}
         />
     );
 }
@@ -93,47 +84,31 @@ export default function DesignTable({ projects, onUpdateStatus, onUpdateField = 
             </thead>
             <tbody>
                 {projects.map((project) => {
-                    const meta = STATUS_META[project.status] || STATUS_META.pending;
-                    const Icon = meta.icon;
+                    const toneClass = project.status === 'won'
+                        ? 'status-dot--green'
+                        : project.status === 'lost'
+                            ? 'status-dot--red'
+                            : project.status === 'changes'
+                                ? 'status-dot--amber'
+                                : project.status === 'in_progress'
+                                    ? 'status-dot--blue'
+                                    : 'status-dot--neutral';
 
                     return (
                         <tr key={project.id} className="table-row" style={{ cursor: 'default' }}>
                             <td className="fw-600">{getProjectCode(project)}</td>
                             <td>
-                                <div
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 10px',
-                                        borderRadius: '999px',
-                                        ...meta.style,
-                                    }}
-                                >
-                                    <Icon size={12} />
+                                <div className={`status-select-inline status-dot ${toneClass}`}>
                                     <select
+                                        className="status-select-inline__control"
                                         value={project.status}
                                         onChange={(event) => onUpdateStatus(project.id, { status: event.target.value })}
-                                        style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            color: 'inherit',
-                                            font: 'inherit',
-                                            fontSize: '11px',
-                                            fontWeight: 800,
-                                            textTransform: 'uppercase',
-                                            outline: 'none',
-                                            cursor: 'pointer',
-                                            appearance: 'none',
-                                            WebkitAppearance: 'none',
-                                            paddingRight: '16px',
-                                        }}
                                     >
                                         {STATUS_OPTIONS.map((option) => (
                                             <option key={option} value={option}>{STATUS_META[option].label}</option>
                                         ))}
                                     </select>
-                                    <ChevronDown size={12} style={{ pointerEvents: 'none', marginLeft: '-14px' }} />
+                                    <ChevronDown size={12} className="status-select-inline__caret" />
                                 </div>
                             </td>
                             <td>{project.project_name || '-'}</td>

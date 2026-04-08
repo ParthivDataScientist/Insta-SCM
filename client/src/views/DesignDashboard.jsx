@@ -52,7 +52,7 @@ export default function DesignDashboard() {
     };
 
     const headerSearch = (
-        <div className="premium-filter" style={{ minWidth: '320px', flex: 1 }}>
+        <div className="premium-search" style={{ minWidth: '320px', flex: 1 }}>
             <Search size={15} color="var(--tx3)" />
             <input
                 placeholder="Search project, client, or AWB"
@@ -64,41 +64,53 @@ export default function DesignDashboard() {
 
     const filtersRow = (
         <div className="premium-filter-group">
-            <div className="premium-filter" style={{ minWidth: '170px' }}>
-                <select value={filters.status} onChange={(event) => setFilterStatus(event.target.value)}>
-                    <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="changes">Changes</option>
-                    <option value="won">Won</option>
-                    <option value="lost">Lost</option>
-                </select>
-            </div>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">Status</span>
+                <span className="premium-filter">
+                    <select value={filters.status} onChange={(event) => setFilterStatus(event.target.value)}>
+                        <option value="all">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="changes">Changes</option>
+                        <option value="won">Won</option>
+                        <option value="lost">Lost</option>
+                    </select>
+                </span>
+            </label>
 
-            <div className="premium-filter" style={{ minWidth: '170px' }}>
-                <select value={filters.clientId} onChange={(event) => setClientId(event.target.value)}>
-                    <option value="all">All Clients</option>
-                    {clients.map((client) => (
-                        <option key={client.id} value={String(client.id)}>{client.name}</option>
-                    ))}
-                </select>
-            </div>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">Client</span>
+                <span className="premium-filter">
+                    <select value={filters.clientId} onChange={(event) => setClientId(event.target.value)}>
+                        <option value="all">All</option>
+                        {clients.map((client) => (
+                            <option key={client.id} value={String(client.id)}>{client.name}</option>
+                        ))}
+                    </select>
+                </span>
+            </label>
 
-            <div className="premium-filter" style={{ minWidth: '150px' }}>
-                <select value={filters.city} onChange={(event) => setCity(event.target.value)}>
-                    <option value="all">All Cities</option>
-                    {cityOptions.filter((city) => city !== 'all').map((city) => (
-                        <option key={city} value={city}>{city}</option>
-                    ))}
-                </select>
-            </div>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">City</span>
+                <span className="premium-filter">
+                    <select value={filters.city} onChange={(event) => setCity(event.target.value)}>
+                        <option value="all">All</option>
+                        {cityOptions.filter((city) => city !== 'all').map((city) => (
+                            <option key={city} value={city}>{city}</option>
+                        ))}
+                    </select>
+                </span>
+            </label>
 
-            <div className="premium-filter" style={{ minWidth: '150px' }}>
-                <select value={filters.dateField} onChange={(event) => setDateField(event.target.value)}>
-                    <option value="show">Show Date</option>
-                    <option value="booking">Booking Date</option>
-                </select>
-            </div>
+            <label className="premium-inline-filter">
+                <span className="premium-inline-filter__label">Date</span>
+                <span className="premium-filter">
+                    <select value={filters.dateField} onChange={(event) => setDateField(event.target.value)}>
+                        <option value="show">Show</option>
+                        <option value="booking">Booking</option>
+                    </select>
+                </span>
+            </label>
 
             <button type="button" className="premium-action-button" onClick={clearFilters}>
                 Reset
@@ -132,13 +144,13 @@ export default function DesignDashboard() {
     return (
         <AppShell
             activeNav="design"
-            title="Design Dashboard"
-            subtitle="Premium brief tracking with canonical KPI logic, revision history, and AWB-linked search."
+            title="Design"
+            subtitle="Brief flow, workload, and client-ready status."
             headerCenter={headerSearch}
             actions={shellActions}
             toolbar={filtersRow}
         >
-            {error ? <div className="error-banner">{error}</div> : null}
+            {error ? <div className="premium-banner">{error}</div> : null}
 
             <div className="premium-kpi-grid">
                 <KpiCard

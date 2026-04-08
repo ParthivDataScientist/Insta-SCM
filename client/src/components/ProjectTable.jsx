@@ -7,6 +7,15 @@ import { getProjectCode, normalizeBoardStage } from '../utils/projectStatus';
 
 const DATE_PLACEHOLDER = '-';
 
+const getStageTone = (stage) => {
+    const normalized = (stage || '').toLowerCase();
+    if (normalized.includes('inventory')) return 'status-dot--green';
+    if (normalized.includes('design')) return 'status-dot--amber';
+    if (normalized.includes('dispatch') || normalized.includes('install') || normalized.includes('production')) return 'status-dot--blue';
+    if (normalized.includes('hold') || normalized.includes('issue')) return 'status-dot--red';
+    return 'status-dot--neutral';
+};
+
 const DateCell = ({ project, field, editingCell, setEditingCell, updateProjectFull }) => {
     const isEditing = editingCell?.id === project.id && editingCell?.field === field;
     const value = project[field] || '';
@@ -130,7 +139,7 @@ export default function ProjectTable({
                             <td className="fw-600">{getProjectCode(project)}</td>
                             <td className="fw-600">{project.project_name || DATE_PLACEHOLDER}</td>
                             <td>
-                                <span className={`status-badge ${boardStage === 'Design/ BOM' ? 'in-transit' : 'delivered'}`}>
+                                <span className={`status-dot ${getStageTone(boardStage)}`}>
                                     {boardStage}
                                 </span>
                             </td>
@@ -148,7 +157,7 @@ export default function ProjectTable({
                                 style={{
                                     cursor: project.project_manager ? 'pointer' : 'default',
                                     fontWeight: 500,
-                                    color: project.project_manager ? 'var(--red)' : 'var(--tx2)',
+                                    color: project.project_manager ? 'var(--tx)' : 'var(--tx2)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px'

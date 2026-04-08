@@ -63,21 +63,17 @@ export default function StoragePremium() {
                 actions={actions}
             >
                 {error ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', color: 'var(--red)' }}>
+                    <div className="premium-banner">
                         {error}
                     </div>
                 ) : null}
 
-                <div className="premium-panel" style={{ padding: '20px 22px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '44px', height: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', background: 'var(--bg-in)', color: 'var(--tx2)' }}>
-                            <Archive size={18} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--tx)' }}>Archived Shipments</div>
-                            <div style={{ fontSize: '12px', color: 'var(--tx3)' }}>{filteredShipments.length} shipment records in storage.</div>
-                        </div>
+                <div className="premium-inline-card">
+                    <div>
+                        <div className="premium-inline-card__title">Archived shipments</div>
+                        <div className="premium-inline-card__meta">{filteredShipments.length} shipment records in storage.</div>
                     </div>
+                    <Archive size={18} color="var(--tx3)" />
                 </div>
 
                 <div className="premium-panel" style={{ overflow: 'hidden' }}>
@@ -105,8 +101,8 @@ export default function StoragePremium() {
                 </div>
 
                 {selectedIds.length > 0 ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--tx)' }}>
+                    <div className="premium-bulkbar">
+                        <div className="premium-bulkbar__count">
                             {selectedIds.length} archived shipment{selectedIds.length > 1 ? 's' : ''} selected
                         </div>
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
