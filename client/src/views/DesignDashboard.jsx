@@ -21,15 +21,8 @@ export default function DesignDashboard() {
         syncing,
         error,
         filters,
-        clients,
-        cityOptions,
         setSearchQuery,
-        setFilterStatus,
-        setClientId,
-        setCity,
-        setDateField,
         setActiveKpi,
-        clearFilters,
         updateDesignStatus,
         syncCrmFeed,
         loadData,
@@ -62,62 +55,6 @@ export default function DesignDashboard() {
         </div>
     );
 
-    const filtersRow = (
-        <div className="premium-filter-group">
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">Status</span>
-                <span className="premium-filter">
-                    <select value={filters.status} onChange={(event) => setFilterStatus(event.target.value)}>
-                        <option value="all">All</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="changes">Changes</option>
-                        <option value="won">Won</option>
-                        <option value="lost">Lost</option>
-                    </select>
-                </span>
-            </label>
-
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">Client</span>
-                <span className="premium-filter">
-                    <select value={filters.clientId} onChange={(event) => setClientId(event.target.value)}>
-                        <option value="all">All</option>
-                        {clients.map((client) => (
-                            <option key={client.id} value={String(client.id)}>{client.name}</option>
-                        ))}
-                    </select>
-                </span>
-            </label>
-
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">City</span>
-                <span className="premium-filter">
-                    <select value={filters.city} onChange={(event) => setCity(event.target.value)}>
-                        <option value="all">All</option>
-                        {cityOptions.filter((city) => city !== 'all').map((city) => (
-                            <option key={city} value={city}>{city}</option>
-                        ))}
-                    </select>
-                </span>
-            </label>
-
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">Date</span>
-                <span className="premium-filter">
-                    <select value={filters.dateField} onChange={(event) => setDateField(event.target.value)}>
-                        <option value="show">Show</option>
-                        <option value="booking">Booking</option>
-                    </select>
-                </span>
-            </label>
-
-            <button type="button" className="premium-action-button" onClick={clearFilters}>
-                Reset
-            </button>
-        </div>
-    );
-
     const shellActions = (
         <>
             <button
@@ -145,10 +82,8 @@ export default function DesignDashboard() {
         <AppShell
             activeNav="design"
             title="Design"
-            subtitle="Brief flow, workload, and client-ready status."
             headerCenter={headerSearch}
             actions={shellActions}
-            toolbar={filtersRow}
         >
             {error ? <div className="premium-banner">{error}</div> : null}
 

@@ -1,13 +1,31 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
-import { Briefcase, CheckCircle2, Clock3, Layout, MapPin, RefreshCw, Search, Users, X } from 'lucide-react';
+import { Briefcase, RefreshCw, Search, X } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import ProjectTable from '../components/ProjectTable';
 import { CardSkeleton } from '../components/SkeletonLoader';
 import AppShell from '../components/app/AppShell';
 import KpiCard from '../components/app/KpiCard';
-import { EXECUTION_BOARD_STAGES, normalizeBoardStage } from '../utils/projectStatus';
+import { EXECUTION_BOARD_STAGES } from '../utils/projectStatus';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
+
+function FilterMetricCard({ label, value, detail, options, onChange }) {
+    return (
+        <div className="premium-kpi premium-kpi--neutral">
+            <div className="premium-kpi__meta">
+                <span className="premium-kpi__label">{label}</span>
+                <div className="premium-kpi-select-wrap">
+                    <select className="premium-kpi-select" value={value} onChange={(event) => onChange(event.target.value)}>
+                        {options.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                </div>
+                <span className="premium-kpi__detail">{detail}</span>
+            </div>
+        </div>
+    );
+}
 
 export default function ProjectsDashboardPremium() {
     const [selectedProject, setSelectedProject] = useState(null);
@@ -39,17 +57,9 @@ export default function ProjectsDashboardPremium() {
         () => ['All', ...new Set(projects.map((project) => project.project_manager).filter(Boolean))].sort(),
         [projects]
     );
-    const summary = useMemo(() => {
-        const completedProjects = filteredProjects.filter(
-            (project) => normalizeBoardStage(project.board_stage) === 'Inventory'
-        );
-
-        return {
-            totalProjects: filteredProjects.length,
-            completedProjects: completedProjects.length,
-            activeProjects: Math.max(filteredProjects.length - completedProjects.length, 0),
-        };
-    }, [filteredProjects]);
+    const summary = useMemo(() => ({
+        totalProjects: filteredProjects.length,
+    }), [filteredProjects]);
 
     const latestActiveProject = projects.find((project) => project.id === activeProjectCard?.id) || activeProjectCard;
     const hasActiveFilters =
@@ -96,53 +106,6 @@ export default function ProjectsDashboardPremium() {
         </>
     );
 
-    const toolbar = (
-        <div className="premium-filter-group">
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">Stage</span>
-                <span className="premium-filter">
-                    <Layout size={14} color="var(--tx3)" />
-                    <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                        <option value="All">All</option>
-                        {EXECUTION_BOARD_STAGES.map((stage) => (
-                            <option key={stage} value={stage}>
-                                {stage}
-                            </option>
-                        ))}
-                    </select>
-                </span>
-            </label>
-
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">Branch</span>
-                <span className="premium-filter">
-                    <MapPin size={14} color="var(--tx3)" />
-                    <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                        {uniqueBranches.map((branch) => (
-                            <option key={branch} value={branch}>
-                                {branch === 'All' ? 'All' : branch}
-                            </option>
-                        ))}
-                    </select>
-                </span>
-            </label>
-
-            <label className="premium-inline-filter">
-                <span className="premium-inline-filter__label">Manager</span>
-                <span className="premium-filter">
-                    <Users size={14} color="var(--tx3)" />
-                    <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
-                        {uniquePMs.map((pm) => (
-                            <option key={pm} value={pm}>
-                                {pm === 'All' ? 'All' : pm}
-                            </option>
-                        ))}
-                    </select>
-                </span>
-            </label>
-        </div>
-    );
-
     return (
         <>
             <Suspense fallback={null}>
@@ -158,12 +121,10 @@ export default function ProjectsDashboardPremium() {
             <AppShell
                 activeNav="projects"
                 title="Projects"
-                subtitle="Execution list for planning, ownership, and delivery dates."
                 headerCenter={headerCenter}
                 actions={actions}
-                toolbar={toolbar}
             >
-                <div className="premium-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                <div className="premium-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
                     <KpiCard
                         icon={Briefcase}
                         label="Total Projects"
@@ -172,21 +133,29 @@ export default function ProjectsDashboardPremium() {
                         tone="blue"
                         onClick={resetFilters}
                     />
-                    <KpiCard
-                        icon={Clock3}
-                        label="Active"
-                        value={summary.activeProjects}
-                        detail="In-flight execution work"
-                        tone="orange"
+                    <FilterMetricCard
+                        label="Stage"
+                        value={filterStatus}
+                        detail="Filter the table by board stage."
+                        onChange={setFilterStatus}
+                        options={[
+                            { value: 'All', label: 'All stages' },
+                            ...EXECUTION_BOARD_STAGES.map((stage) => ({ value: stage, label: stage })),
+                        ]}
                     />
-                    <KpiCard
-                        icon={CheckCircle2}
-                        label="Completed"
-                        value={summary.completedProjects}
-                        detail="Moved to Inventory"
-                        tone="green"
-                        active={filterStatus === 'Inventory'}
-                        onClick={() => setFilterStatus((current) => (current === 'Inventory' ? 'All' : 'Inventory'))}
+                    <FilterMetricCard
+                        label="Manager"
+                        value={filterPM}
+                        detail="Focus on one project manager."
+                        onChange={setFilterPM}
+                        options={uniquePMs.map((pm) => ({ value: pm, label: pm === 'All' ? 'All managers' : pm }))}
+                    />
+                    <FilterMetricCard
+                        label="Branch"
+                        value={filterBranch}
+                        detail="Limit results to one branch."
+                        onChange={setFilterBranch}
+                        options={uniqueBranches.map((branch) => ({ value: branch, label: branch === 'All' ? 'All branches' : branch }))}
                     />
                 </div>
 
@@ -196,7 +165,7 @@ export default function ProjectsDashboardPremium() {
                     </div>
                 ) : null}
 
-                <div className="premium-panel" style={{ minHeight: '420px' }}>
+                <div className="premium-panel premium-table-scroll" style={{ minHeight: '420px' }}>
                     {loading && projects.length === 0 ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', padding: '24px' }}>
                             <CardSkeleton />

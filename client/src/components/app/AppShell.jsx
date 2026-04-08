@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Archive, Briefcase, Layout, LogOut, Menu, PenTool, RefreshCw, Truck, X } from 'lucide-react';
+import { Archive, Briefcase, ChevronLeft, ChevronRight, Layout, LogOut, Menu, PenTool, RefreshCw, Truck, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import GlobalDateRangePicker from '../GlobalDateRangePicker';
@@ -16,7 +16,6 @@ const NAV_ITEMS = [
 export default function AppShell({
     activeNav,
     title,
-    subtitle,
     headerCenter = null,
     actions = null,
     toolbar = null,
@@ -25,12 +24,29 @@ export default function AppShell({
 }) {
     const { logout } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => (
+        typeof window !== 'undefined' && window.localStorage.getItem('insta_sidebar_collapsed') === 'true'
+    ));
 
     const nav = useMemo(() => NAV_ITEMS, []);
+    const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth <= 980;
+
+    const toggleSidebar = () => {
+        if (isMobileViewport()) {
+            setSidebarOpen((open) => !open);
+            return;
+        }
+
+        setSidebarCollapsed((current) => {
+            const next = !current;
+            window.localStorage.setItem('insta_sidebar_collapsed', String(next));
+            return next;
+        });
+    };
 
     return (
         <div className="premium-app">
-            <div className={`premium-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
+            <div className={`premium-shell${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
                 <button
                     type="button"
                     className={`premium-sidebar-overlay${sidebarOpen ? ' is-visible' : ''}`}
@@ -41,7 +57,7 @@ export default function AppShell({
                 <aside className="premium-sidebar">
                     <div className="premium-sidebar__brand">
                         <img src="/logo.jpg" alt="Insta SCM" className="premium-sidebar__logo" />
-                        <div>
+                        <div className="premium-sidebar__brand-copy">
                             <div className="premium-sidebar__title">Insta SCM</div>
                             <div className="premium-sidebar__subtitle">Operations workspace</div>
                         </div>
@@ -57,6 +73,7 @@ export default function AppShell({
                                 to={to}
                                 className={`premium-nav-link${activeNav === key ? ' is-active' : ''}`}
                                 onClick={() => setSidebarOpen(false)}
+                                title={label}
                             >
                                 <Icon size={16} />
                                 <span>{label}</span>
@@ -68,12 +85,11 @@ export default function AppShell({
                 <main className="premium-main">
                     <header className="premium-header">
                         <div className="premium-header__title">
-                            <button type="button" className="premium-icon-button mobile-only" onClick={() => setSidebarOpen((open) => !open)}>
-                                <Menu size={18} />
+                            <button type="button" className="premium-icon-button" onClick={toggleSidebar} title={sidebarCollapsed ? 'Show menu' : 'Hide menu'}>
+                                {isMobileViewport() ? <Menu size={18} /> : (sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
                             </button>
                             <div>
                                 <h1>{title}</h1>
-                                {subtitle ? <p>{subtitle}</p> : null}
                             </div>
                         </div>
 

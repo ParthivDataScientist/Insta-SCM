@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { closestCorners, DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { Layout, MapPin, RefreshCw, Search, Users } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
@@ -13,6 +14,7 @@ export default function ProjectBoardPremium() {
     const [selectedProject, setSelectedProject] = useState(null);
     const location = useLocation();
     const hasLinked = useRef(false);
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
     const {
         projects,
@@ -66,15 +68,12 @@ export default function ProjectBoardPremium() {
         return () => window.clearTimeout(timer);
     }, [confirmedProjects, location.search]);
 
-    const handleDragOver = (event) => {
-        event.preventDefault();
-    };
-
-    const handleDrop = (event, stage) => {
-        event.preventDefault();
-        const projectId = Number(event.dataTransfer.getData('text/plain'));
-        if (!projectId) return;
-        updateBoardStage(projectId, stage);
+    const handleDragEnd = ({ active, over }) => {
+        if (!over) return;
+        const projectId = active?.data?.current?.id;
+        const nextStage = over?.id;
+        if (!projectId || !nextStage) return;
+        updateBoardStage(projectId, nextStage);
     };
 
     const actions = (
@@ -164,7 +163,6 @@ export default function ProjectBoardPremium() {
             <AppShell
                 activeNav="board"
                 title="Project Board"
-                subtitle="Live execution flow across confirmed projects."
                 headerCenter={headerCenter}
                 actions={actions}
                 toolbar={toolbar}
@@ -175,33 +173,33 @@ export default function ProjectBoardPremium() {
                     </div>
                 ) : null}
 
-                <div className="premium-panel premium-board-shell">
-                    <div className="premium-board-shell__header">
-                        <div>
-                            <div className="premium-board-shell__title">Execution pipeline</div>
-                            <div className="premium-board-shell__meta">{confirmedProjects.length} projects in the current view.</div>
+                <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                    <div className="premium-panel premium-board-shell">
+                        <div className="premium-board-shell__header">
+                            <div>
+                                <div className="premium-board-shell__title">Execution pipeline</div>
+                                <div className="premium-board-shell__meta">{confirmedProjects.length} projects in the current view.</div>
+                            </div>
                         </div>
-                    </div>
 
-                    <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
-                        <div className="premium-board-columns">
-                            {loading && projects.length === 0 ? (
-                                <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
-                            ) : (
-                                EXECUTION_BOARD_STAGES.map((stage) => (
-                                    <KanbanColumn
-                                        key={stage}
-                                        stage={stage}
-                                        projects={confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === stage)}
-                                        onProjectClick={setSelectedProject}
-                                        onDragOver={handleDragOver}
-                                        onDrop={handleDrop}
-                                    />
-                                ))
-                            )}
+                        <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+                            <div className="premium-board-columns">
+                                {loading && projects.length === 0 ? (
+                                    <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
+                                ) : (
+                                    EXECUTION_BOARD_STAGES.map((stage) => (
+                                        <KanbanColumn
+                                            key={stage}
+                                            stage={stage}
+                                            projects={confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === stage)}
+                                            onProjectClick={setSelectedProject}
+                                        />
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                </DndContext>
             </AppShell>
         </>
     );
