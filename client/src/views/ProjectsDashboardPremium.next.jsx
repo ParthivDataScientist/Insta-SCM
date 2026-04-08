@@ -69,15 +69,28 @@ function filterProjects(projects, filters, options = {}) {
     });
 }
 
-function buildCountMap(items, values, readValue) {
-    return values.map((value) => ({
-        value,
-        label: value,
-        count: items.filter((item) => readValue(item) === value).length,
-    }));
+function buildCountOptions(items, values, readValue, allLabel) {
+    return [
+        { value: 'All', label: allLabel, count: items.length },
+        ...values.map((value) => ({
+            value,
+            label: value,
+            count: items.filter((item) => readValue(item) === value).length,
+        })),
+    ];
 }
 
-function DropdownKpiCard({ icon: Icon, label, selectedValue, options, totalCount, active, open, onToggle, onSelect }) {
+function DropdownKpiCard({
+    icon: Icon,
+    label,
+    selectedValue,
+    options,
+    totalCount,
+    active,
+    open,
+    onToggle,
+    onSelect,
+}) {
     const rootRef = useRef(null);
     const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
     const displayCount = selectedValue === 'All' ? totalCount : (selectedOption?.count ?? 0);
@@ -192,8 +205,8 @@ export default function ProjectsDashboardPremium() {
         [projects]
     );
 
-    const projectsMatchingBranchContext = useMemo(
-        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignoreBranch: true }),
+    const projectsMatchingStageContext = useMemo(
+        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignoreStatus: true }),
         [projects, searchQuery, filterBranch, filterPM, filterStatus, dateRange]
     );
 
@@ -202,25 +215,40 @@ export default function ProjectsDashboardPremium() {
         [projects, searchQuery, filterBranch, filterPM, filterStatus, dateRange]
     );
 
-    const projectsMatchingStageContext = useMemo(
-        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignoreStatus: true }),
+    const projectsMatchingBranchContext = useMemo(
+        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignoreBranch: true }),
         [projects, searchQuery, filterBranch, filterPM, filterStatus, dateRange]
     );
 
-    const branchOptions = useMemo(() => ([
-        { value: 'All', label: 'All branches', count: projectsMatchingBranchContext.length },
-        ...buildCountMap(projectsMatchingBranchContext, allBranches, (project) => project.branch),
-    ]), [allBranches, projectsMatchingBranchContext]);
+    const stageOptions = useMemo(
+        () => buildCountOptions(
+            projectsMatchingStageContext,
+            EXECUTION_BOARD_STAGES,
+            (project) => normalizeBoardStage(project.board_stage),
+            'All stages'
+        ),
+        [projectsMatchingStageContext]
+    );
 
-    const managerOptions = useMemo(() => ([
-        { value: 'All', label: 'All managers', count: projectsMatchingManagerContext.length },
-        ...buildCountMap(projectsMatchingManagerContext, allManagers, (project) => project.project_manager),
-    ]), [allManagers, projectsMatchingManagerContext]);
+    const managerOptions = useMemo(
+        () => buildCountOptions(
+            projectsMatchingManagerContext,
+            allManagers,
+            (project) => project.project_manager,
+            'All managers'
+        ),
+        [allManagers, projectsMatchingManagerContext]
+    );
 
-    const stageOptions = useMemo(() => ([
-        { value: 'All', label: 'All stages', count: projectsMatchingStageContext.length },
-        ...buildCountMap(projectsMatchingStageContext, EXECUTION_BOARD_STAGES, (project) => normalizeBoardStage(project.board_stage)),
-    ]), [projectsMatchingStageContext]);
+    const branchOptions = useMemo(
+        () => buildCountOptions(
+            projectsMatchingBranchContext,
+            allBranches,
+            (project) => project.branch,
+            'All branches'
+        ),
+        [allBranches, projectsMatchingBranchContext]
+    );
 
     const summary = useMemo(() => ({
         totalProjects: filteredProjects.length,
@@ -242,7 +270,7 @@ export default function ProjectsDashboardPremium() {
         }
     }, [filteredProjects, selectedProject]);
 
-    const resetFilters = () => {
+    const resetView = () => {
         setFilterStatus('All');
         setFilterBranch('All');
         setFilterPM('All');
@@ -296,7 +324,7 @@ export default function ProjectsDashboardPremium() {
                         value={summary.totalProjects}
                         detail="Visible after current filters"
                         tone="blue"
-                        onClick={resetFilters}
+                        onClick={resetView}
                     />
                     <DropdownKpiCard
                         icon={Layout}
@@ -346,7 +374,7 @@ export default function ProjectsDashboardPremium() {
                                 <div className="project-dashboard-actionbar__summary">
                                     {selectedProject ? '1 project selected' : `Showing ${filteredProjects.length} of ${projects.length} projects`}
                                 </div>
-                                <button type="button" className="premium-action-button" onClick={resetFilters}>
+                                <button type="button" className="premium-action-button" onClick={resetView}>
                                     <X size={14} />
                                     Reset view
                                 </button>

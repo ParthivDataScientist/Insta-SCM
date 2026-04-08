@@ -10,7 +10,7 @@ export default function GlobalDateRangePicker({ compact = false }) {
     <div className="premium-range-picker">
       <Calendar size={14} color="var(--tx3)" />
       {!compact ? <span className="premium-range-picker__label">Date</span> : null}
-      <label className="premium-inline-input" style={{ minHeight: compact ? '36px' : '40px' }}>
+      <label className="premium-inline-input" style={{ minHeight: '40px' }}>
         <input
           type="date"
           value={dateRange.start}
@@ -18,7 +18,7 @@ export default function GlobalDateRangePicker({ compact = false }) {
         />
       </label>
       <span style={{ color: 'var(--tx3)', fontSize: '12px' }}>to</span>
-      <label className="premium-inline-input" style={{ minHeight: compact ? '36px' : '40px' }}>
+      <label className="premium-inline-input" style={{ minHeight: '40px' }}>
         <input
           type="date"
           value={dateRange.end}

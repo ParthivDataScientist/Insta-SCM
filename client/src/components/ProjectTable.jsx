@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, User } from 'lucide-react';
+import { Edit3, UserCircle2 } from 'lucide-react';
 import CalendarPicker from './CalendarPicker';
 import { formatDateDisplay, parseDateInput } from '../utils/dateUtils';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
@@ -9,11 +9,11 @@ const DATE_PLACEHOLDER = '-';
 
 const getStageTone = (stage) => {
     const normalized = (stage || '').toLowerCase();
-    if (normalized.includes('inventory')) return 'status-dot--green';
-    if (normalized.includes('design')) return 'status-dot--amber';
-    if (normalized.includes('dispatch') || normalized.includes('install') || normalized.includes('production')) return 'status-dot--blue';
-    if (normalized.includes('hold') || normalized.includes('issue')) return 'status-dot--red';
-    return 'status-dot--neutral';
+    if (normalized.includes('inventory')) return 'green';
+    if (normalized.includes('design') || normalized.includes('bom')) return 'amber';
+    if (normalized.includes('dispatch') || normalized.includes('install') || normalized.includes('production') || normalized.includes('qc')) return 'blue';
+    if (normalized.includes('hold') || normalized.includes('issue')) return 'red';
+    return 'neutral';
 };
 
 const DateCell = ({ project, field, editingCell, setEditingCell, updateProjectFull }) => {
@@ -59,7 +59,7 @@ const DateCell = ({ project, field, editingCell, setEditingCell, updateProjectFu
             className="hover-edit project-date-cell"
             style={{ cursor: 'pointer', position: 'relative' }}
         >
-            <div className="project-date-cell__content">
+            <div className="project-date-cell__content project-date-cell__content--mono">
                 {isEditing ? (
                     <input
                         autoFocus
@@ -139,7 +139,7 @@ export default function ProjectTable({
                             <td className="fw-600">{getProjectCode(project)}</td>
                             <td className="fw-600">{project.project_name || DATE_PLACEHOLDER}</td>
                             <td>
-                                <span className={`status-dot ${getStageTone(boardStage)}`}>
+                                <span className={`project-stage-pill project-stage-pill--${getStageTone(boardStage)}`}>
                                     {boardStage}
                                 </span>
                             </td>
@@ -154,17 +154,12 @@ export default function ProjectTable({
                                     }
                                 }}
                                 className="pm-clickable"
-                                style={{
-                                    cursor: project.project_manager ? 'pointer' : 'default',
-                                    fontWeight: 500,
-                                    color: project.project_manager ? 'var(--tx)' : 'var(--tx2)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
-                                }}
+                                style={{ cursor: project.project_manager ? 'pointer' : 'default' }}
                             >
-                                <User size={12} />
-                                {project.project_manager || DATE_PLACEHOLDER}
+                                <div className="project-manager-cell">
+                                    <UserCircle2 size={14} />
+                                    <span>{project.project_manager || DATE_PLACEHOLDER}</span>
+                                </div>
                             </td>
                             <DateCell project={project} field="event_start_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
                             <DateCell project={project} field="dispatch_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />

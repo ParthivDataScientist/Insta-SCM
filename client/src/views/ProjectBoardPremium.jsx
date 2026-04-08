@@ -1,10 +1,11 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { closestCorners, DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Layout, MapPin, RefreshCw, Search, Users } from 'lucide-react';
+import { closestCorners, DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { RefreshCw, Search } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import AppShell from '../components/app/AppShell';
 import KanbanColumn from '../components/KanbanColumn';
+import ProjectKanbanCard from '../components/ProjectKanbanCard';
 import { BoardSkeleton } from '../components/SkeletonLoader';
 import { EXECUTION_BOARD_STAGES, isWonProject, normalizeBoardStage } from '../utils/projectStatus';
 
@@ -12,6 +13,7 @@ const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 
 export default function ProjectBoardPremium() {
     const [selectedProject, setSelectedProject] = useState(null);
+    const [activeDragProjectId, setActiveDragProjectId] = useState(null);
     const location = useLocation();
     const hasLinked = useRef(false);
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -24,12 +26,6 @@ export default function ProjectBoardPremium() {
         loadData,
         updateBoardStage,
         updateProjectFull,
-        filterBranch,
-        setFilterBranch,
-        filterPM,
-        setFilterPM,
-        filterStatus,
-        setFilterStatus,
         searchQuery,
         setSearchQuery,
     } = useProjects();
@@ -38,13 +34,9 @@ export default function ProjectBoardPremium() {
         () => filteredProjects.filter((project) => isWonProject(project.stage)),
         [filteredProjects]
     );
-    const uniqueBranches = useMemo(
-        () => ['All', ...new Set(projects.map((project) => project.branch).filter(Boolean))].sort(),
-        [projects]
-    );
-    const uniqueManagers = useMemo(
-        () => ['All', ...new Set(projects.map((project) => project.project_manager).filter(Boolean))].sort(),
-        [projects]
+    const activeDragProject = useMemo(
+        () => confirmedProjects.find((project) => project.id === activeDragProjectId) || null,
+        [activeDragProjectId, confirmedProjects]
     );
 
     useEffect(() => {
@@ -68,11 +60,23 @@ export default function ProjectBoardPremium() {
         return () => window.clearTimeout(timer);
     }, [confirmedProjects, location.search]);
 
+    const handleDragStart = ({ active }) => {
+        const projectId = active?.data?.current?.id;
+        setActiveDragProjectId(projectId || null);
+    };
+
+    const clearDragState = () => {
+        setActiveDragProjectId(null);
+    };
+
     const handleDragEnd = ({ active, over }) => {
+        clearDragState();
         if (!over) return;
         const projectId = active?.data?.current?.id;
+        const currentStage = active?.data?.current?.stage;
         const nextStage = over?.id;
         if (!projectId || !nextStage) return;
+        if (currentStage === nextStage) return;
         updateBoardStage(projectId, nextStage);
     };
 
@@ -84,7 +88,7 @@ export default function ProjectBoardPremium() {
     );
 
     const headerCenter = (
-        <label className="premium-search">
+        <label className="premium-search design-header-search">
             <Search size={16} color="var(--tx3)" />
             <input
                 type="search"
@@ -93,59 +97,6 @@ export default function ProjectBoardPremium() {
                 onChange={(event) => setSearchQuery(event.target.value)}
             />
         </label>
-    );
-
-    const toolbar = (
-            <div className="premium-filter-group" style={{ justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <label className="premium-inline-filter">
-                    <span className="premium-inline-filter__label">Stage</span>
-                    <span className="premium-filter">
-                        <Layout size={14} color="var(--tx3)" />
-                        <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                            <option value="All">All</option>
-                            {EXECUTION_BOARD_STAGES.map((stage) => (
-                                <option key={stage} value={stage}>
-                                    {stage}
-                                </option>
-                            ))}
-                        </select>
-                    </span>
-                </label>
-
-                <label className="premium-inline-filter">
-                    <span className="premium-inline-filter__label">Branch</span>
-                    <span className="premium-filter">
-                        <MapPin size={14} color="var(--tx3)" />
-                        <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                            {uniqueBranches.map((branch) => (
-                                <option key={branch} value={branch}>
-                                    {branch === 'All' ? 'All' : branch}
-                                </option>
-                            ))}
-                        </select>
-                    </span>
-                </label>
-
-                <label className="premium-inline-filter">
-                    <span className="premium-inline-filter__label">Manager</span>
-                    <span className="premium-filter">
-                        <Users size={14} color="var(--tx3)" />
-                        <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
-                            {uniqueManagers.map((manager) => (
-                                <option key={manager} value={manager}>
-                                    {manager === 'All' ? 'All' : manager}
-                                </option>
-                            ))}
-                        </select>
-                    </span>
-                </label>
-            </div>
-
-            <div className="premium-toolbar__meta">
-                Drag projects between stages to update the live plan.
-            </div>
-        </div>
     );
 
     return (
@@ -163,9 +114,9 @@ export default function ProjectBoardPremium() {
             <AppShell
                 activeNav="board"
                 title="Project Board"
+                subtitle="Execution pipeline and live stage handoffs."
                 headerCenter={headerCenter}
                 actions={actions}
-                toolbar={toolbar}
             >
                 {error ? (
                     <div className="premium-banner">
@@ -173,7 +124,13 @@ export default function ProjectBoardPremium() {
                     </div>
                 ) : null}
 
-                <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCorners}
+                    onDragStart={handleDragStart}
+                    onDragCancel={clearDragState}
+                    onDragEnd={handleDragEnd}
+                >
                     <div className="premium-panel premium-board-shell">
                         <div className="premium-board-shell__header">
                             <div>
@@ -182,7 +139,7 @@ export default function ProjectBoardPremium() {
                             </div>
                         </div>
 
-                        <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+                        <div className="premium-board-scroll">
                             <div className="premium-board-columns">
                                 {loading && projects.length === 0 ? (
                                     <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
@@ -199,6 +156,16 @@ export default function ProjectBoardPremium() {
                             </div>
                         </div>
                     </div>
+
+                    <DragOverlay dropAnimation={null}>
+                        {activeDragProject ? (
+                            <ProjectKanbanCard
+                                project={activeDragProject}
+                                onClick={() => {}}
+                                dragOverlay
+                            />
+                        ) : null}
+                    </DragOverlay>
                 </DndContext>
             </AppShell>
         </>

@@ -16,6 +16,7 @@ const NAV_ITEMS = [
 export default function AppShell({
     activeNav,
     title,
+    subtitle = null,
     headerCenter = null,
     actions = null,
     toolbar = null,
@@ -47,6 +48,16 @@ export default function AppShell({
     return (
         <div className="premium-app">
             <div className={`premium-shell${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+                <button
+                    type="button"
+                    className="premium-icon-button premium-shell__nav-toggle"
+                    onClick={toggleSidebar}
+                    title={sidebarCollapsed ? 'Show menu' : 'Hide menu'}
+                    aria-label={sidebarCollapsed ? 'Show navigation menu' : 'Hide navigation menu'}
+                >
+                    {isMobileViewport() ? <Menu size={14} /> : (sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />)}
+                </button>
+
                 <button
                     type="button"
                     className={`premium-sidebar-overlay${sidebarOpen ? ' is-visible' : ''}`}
@@ -86,11 +97,9 @@ export default function AppShell({
                     <header className="premium-header">
                         <div className="premium-header__lead">
                             <div className="premium-header__title">
-                                <button type="button" className="premium-icon-button premium-header__nav-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? 'Show menu' : 'Hide menu'}>
-                                    {isMobileViewport() ? <Menu size={18} /> : (sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
-                                </button>
                                 <div>
                                     <h1>{title}</h1>
+                                    {subtitle ? <p>{subtitle}</p> : null}
                                 </div>
                             </div>
 

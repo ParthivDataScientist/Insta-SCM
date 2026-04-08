@@ -7,19 +7,43 @@ import ProjectKanbanCard from './ProjectKanbanCard';
  * Represents a single stage in the project workflow.
  * Handles drag and drop events for its area via dnd-kit.
  */
-const KanbanColumn = ({ 
-    stage, 
-    projects, 
-    onProjectClick 
+const resolveStageTone = (stage) => {
+    switch (stage) {
+    case 'Design/ BOM':
+        return 'blue';
+    case 'Procuement (Material management)':
+        return 'purple';
+    case 'Production':
+        return 'amber';
+    case 'QC':
+        return 'green';
+    case 'Dispatch':
+        return 'cyan';
+    case 'Event Installation':
+        return 'pink';
+    case 'Dismantle':
+        return 'red';
+    case 'Inventory':
+        return 'slate';
+    default:
+        return 'slate';
+    }
+};
+
+const KanbanColumn = ({
+    stage,
+    projects,
+    onProjectClick
 }) => {
     const { isOver, setNodeRef } = useDroppable({
         id: stage,
     });
+    const tone = resolveStageTone(stage);
 
     return (
-        <div 
+        <div
             ref={setNodeRef}
-            className={`premium-column${isOver ? ' is-over' : ''}`}
+            className={`premium-column premium-column--${tone}${isOver ? ' is-over' : ''}`}
         >
             <div className="premium-column__header">
                 <span className="premium-column__title">{stage}</span>

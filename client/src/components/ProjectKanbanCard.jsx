@@ -1,9 +1,9 @@
 import React from 'react';
-import { CalendarDays, MapPin, User } from 'lucide-react';
+import { CalendarDays, MapPin, UserCircle2 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { formatDateDisplay, formatDateRangeDisplay } from '../utils/dateUtils';
-import { getProjectCode } from '../utils/projectStatus';
+import { getProjectCode, normalizeBoardStage } from '../utils/projectStatus';
 
 const resolvePrimaryWindow = (project) => {
     const start =
@@ -22,94 +22,116 @@ const resolvePrimaryWindow = (project) => {
     return { start, end };
 };
 
-export default function ProjectKanbanCard({ project, onClick }) {
+function ProjectKanbanCardSurface({ project, onClick, className, style, cardProps = {}, isButton = true }) {
     const { start, end } = resolvePrimaryWindow(project);
-    
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: `project-${project.id}`,
-        data: { id: project.id, stage: project.board_stage || 'TBC' }
-    });
-
-    const style = {
-        transform: CSS.Translate.toString(transform),
-        zIndex: isDragging ? 9999 : 1,
-        opacity: isDragging ? 0.9 : 1,
-        width: '100%',
-        textAlign: 'left',
-        padding: '14px',
-        boxShadow: isDragging ? '0 12px 30px rgba(17, 24, 39, 0.12)' : 'none',
-        borderColor: isDragging ? 'var(--accent)' : 'var(--bd)',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        position: 'relative',
-        transition: isDragging ? 'none' : 'border-color 0.16s ease',
-    };
+    const CardTag = isButton ? 'button' : 'article';
 
     return (
-        <button
-            type="button"
-            className="kanban-card"
-            ref={setNodeRef}
-            {...listeners}
-            {...attributes}
-            onClick={() => onClick(project)}
+        <CardTag
+            type={isButton ? 'button' : undefined}
+            className={className}
             style={style}
+            {...cardProps}
         >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', width: '100%' }}>
-                <div style={{ minWidth: 0, textAlign: 'left' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--tx3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <div className="kanban-card__head">
+                <div className="kanban-card__identity">
+                    <div className="kanban-card__code">
                         {getProjectCode(project)}
                     </div>
-                    <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700, color: 'var(--tx)', lineHeight: 1.35 }}>
+                    <div className="kanban-card__title">
                         {project.project_name || 'Untitled project'}
                     </div>
                     {project.event_name ? (
-                        <div style={{ marginTop: '3px', fontSize: '12px', color: 'var(--tx3)', lineHeight: 1.4 }}>
+                        <div className="kanban-card__event">
                             {project.event_name}
                         </div>
                     ) : null}
                 </div>
 
                 {project.area ? (
-                    <div
-                        style={{
-                            flexShrink: 0,
-                            color: 'var(--tx3)',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                        }}
-                    >
+                    <div className="kanban-card__area">
                         {project.area}
                     </div>
                 ) : null}
             </div>
 
-            <div className="premium-card-meta">
+            <div className="premium-card-meta kanban-card__meta">
                 <div className="premium-card-meta__row">
-                    <User size={14} color="var(--tx3)" />
+                    <UserCircle2 size={12} className="kanban-card__meta-icon" />
                     <span className="premium-card-meta__label">Manager</span>
-                    <strong style={{ fontWeight: 600, color: 'var(--tx)' }}>{project.project_manager || 'Unassigned'}</strong>
+                    <strong className="kanban-card__meta-value">{project.project_manager || 'Unassigned'}</strong>
                 </div>
 
                 <div className="premium-card-meta__row">
-                    <CalendarDays size={14} color="var(--tx3)" style={{ marginTop: '1px' }} />
+                    <CalendarDays size={12} className="kanban-card__meta-icon" />
                     <span className="premium-card-meta__label">Schedule</span>
-                    <strong style={{ fontWeight: 600, color: 'var(--tx)' }}>{start ? formatDateRangeDisplay(start, end) : 'Dates not set'}</strong>
+                    <strong className="kanban-card__meta-value">{start ? formatDateRangeDisplay(start, end) : 'Dates not set'}</strong>
                 </div>
 
                 <div className="premium-card-meta__row">
-                    <MapPin size={14} color="var(--tx3)" style={{ marginTop: '1px' }} />
+                    <MapPin size={12} className="kanban-card__meta-icon" />
                     <span className="premium-card-meta__label">Location</span>
-                    <strong style={{ fontWeight: 600, color: 'var(--tx)' }}>{project.branch || project.venue || 'Not specified'}</strong>
+                    <strong className="kanban-card__meta-value">{project.branch || project.venue || 'Not specified'}</strong>
                 </div>
             </div>
 
-            <div className="premium-card-foot">
+            <div className="premium-card-foot kanban-card__foot">
                 <span>{project.installation_start_date ? `Install ${formatDateDisplay(project.installation_start_date)}` : 'Planning card'}</span>
                 <span>{project.updated_at ? `Updated ${formatDateDisplay(project.updated_at)}` : ''}</span>
             </div>
-        </button>
+        </CardTag>
     );
+}
+
+function DraggableProjectKanbanCard({ project, onClick }) {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: `project-${project.id}`,
+        data: { id: project.id, stage: normalizeBoardStage(project.board_stage) }
+    });
+
+    return (
+        <ProjectKanbanCardSurface
+            project={project}
+            onClick={onClick}
+            isButton
+            className={`kanban-card${isDragging ? ' is-dragging' : ''}`}
+            style={{
+                position: 'relative',
+                width: '100%',
+                zIndex: isDragging ? 9999 : 1,
+                transform: CSS.Translate.toString(transform),
+            }}
+            cardProps={{
+                ref: setNodeRef,
+                ...listeners,
+                ...attributes,
+                onClick: () => onClick(project),
+            }}
+        />
+    );
+}
+
+function ProjectKanbanCardOverlay({ project }) {
+    return (
+        <ProjectKanbanCardSurface
+            project={project}
+            onClick={() => {}}
+            isButton={false}
+            className="kanban-card is-drag-overlay"
+            style={{
+                position: 'relative',
+                width: '300px',
+                zIndex: 9999,
+                transform: 'rotate(2.5deg)',
+            }}
+        />
+    );
+}
+
+export default function ProjectKanbanCard({ project, onClick, dragOverlay = false }) {
+    if (dragOverlay) {
+        return <ProjectKanbanCardOverlay project={project} />;
+    }
+
+    return <DraggableProjectKanbanCard project={project} onClick={onClick} />;
 }
