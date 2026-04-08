@@ -45,7 +45,7 @@ export default function DesignDashboard() {
     };
 
     const headerSearch = (
-        <div className="premium-search" style={{ minWidth: '320px', flex: 1 }}>
+        <div className="premium-search design-header-search">
             <Search size={15} color="var(--tx3)" />
             <input
                 placeholder="Search project, client, or AWB"
@@ -87,7 +87,7 @@ export default function DesignDashboard() {
         >
             {error ? <div className="premium-banner">{error}</div> : null}
 
-            <div className="premium-kpi-grid">
+            <div className="premium-kpi-strip" role="group" aria-label="Design KPI filters">
                 <KpiCard
                     icon={Briefcase}
                     label="Total Brief"
@@ -95,6 +95,7 @@ export default function DesignDashboard() {
                     detail="All briefs after current filters"
                     active={filters.activeKpi === 'all'}
                     onClick={() => setActiveKpi('all')}
+                    compact
                 />
                 <KpiCard
                     icon={TimerReset}
@@ -104,6 +105,7 @@ export default function DesignDashboard() {
                     tone="neutral"
                     active={filters.activeKpi === 'pending'}
                     onClick={() => setActiveKpi(filters.activeKpi === 'pending' ? 'all' : 'pending')}
+                    compact
                 />
                 <KpiCard
                     icon={RefreshCw}
@@ -113,6 +115,7 @@ export default function DesignDashboard() {
                     tone="blue"
                     active={filters.activeKpi === 'in_progress'}
                     onClick={() => setActiveKpi(filters.activeKpi === 'in_progress' ? 'all' : 'in_progress')}
+                    compact
                 />
                 <KpiCard
                     icon={WandSparkles}
@@ -122,6 +125,7 @@ export default function DesignDashboard() {
                     tone="orange"
                     active={filters.activeKpi === 'changes'}
                     onClick={() => setActiveKpi(filters.activeKpi === 'changes' ? 'all' : 'changes')}
+                    compact
                 />
                 <KpiCard
                     icon={CheckCircle2}
@@ -131,6 +135,7 @@ export default function DesignDashboard() {
                     tone="green"
                     active={filters.activeKpi === 'won'}
                     onClick={() => setActiveKpi(filters.activeKpi === 'won' ? 'all' : 'won')}
+                    compact
                 />
                 <KpiCard
                     icon={XCircle}
@@ -140,6 +145,7 @@ export default function DesignDashboard() {
                     tone="red"
                     active={filters.activeKpi === 'lost'}
                     onClick={() => setActiveKpi(filters.activeKpi === 'lost' ? 'all' : 'lost')}
+                    compact
                 />
                 <KpiCard
                     icon={RefreshCw}
@@ -149,6 +155,7 @@ export default function DesignDashboard() {
                     tone="blue"
                     active={filters.activeKpi === 'open'}
                     onClick={() => setActiveKpi(filters.activeKpi === 'open' ? 'all' : 'open')}
+                    compact
                 />
             </div>
 

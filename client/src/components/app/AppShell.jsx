@@ -84,22 +84,22 @@ export default function AppShell({
 
                 <main className="premium-main">
                     <header className="premium-header">
-                        <div className="premium-header__title">
-                            <button type="button" className="premium-icon-button" onClick={toggleSidebar} title={sidebarCollapsed ? 'Show menu' : 'Hide menu'}>
-                                {isMobileViewport() ? <Menu size={18} /> : (sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
-                            </button>
-                            <div>
-                                <h1>{title}</h1>
+                        <div className="premium-header__lead">
+                            <div className="premium-header__title">
+                                <button type="button" className="premium-icon-button premium-header__nav-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? 'Show menu' : 'Hide menu'}>
+                                    {isMobileViewport() ? <Menu size={18} /> : (sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
+                                </button>
+                                <div>
+                                    <h1>{title}</h1>
+                                </div>
                             </div>
-                        </div>
 
-                        {headerCenter ? (
-                            <div className="premium-header__center">
-                                {headerCenter}
-                            </div>
-                        ) : (
-                            <div className="premium-header__center premium-header__center--empty" />
-                        )}
+                            {headerCenter ? (
+                                <div className="premium-header__center">
+                                    {headerCenter}
+                                </div>
+                            ) : null}
+                        </div>
 
                         <div className="premium-header__actions">
                             {showGlobalDate ? <GlobalDateRangePicker compact /> : null}

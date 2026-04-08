@@ -1,10 +1,10 @@
 import React from 'react';
 
-export default function KpiCard({ icon: Icon, label, value, detail, tone = 'neutral', active = false, onClick }) {
+export default function KpiCard({ icon: Icon, label, value, detail, tone = 'neutral', active = false, onClick, compact = false, className = '' }) {
     return (
         <button
             type="button"
-            className={`premium-kpi premium-kpi--${tone}${active ? ' is-active' : ''}`}
+            className={`premium-kpi premium-kpi--${tone}${active ? ' is-active' : ''}${compact ? ' premium-kpi--compact' : ''}${className ? ` ${className}` : ''}`}
             onClick={onClick}
         >
             <div className="premium-kpi__meta">

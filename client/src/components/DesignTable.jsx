@@ -85,20 +85,20 @@ export default function DesignTable({ projects, onUpdateStatus, onUpdateField = 
             <tbody>
                 {projects.map((project) => {
                     const toneClass = project.status === 'won'
-                        ? 'status-dot--green'
+                        ? 'design-status-badge--green'
                         : project.status === 'lost'
-                            ? 'status-dot--red'
+                            ? 'design-status-badge--red'
                             : project.status === 'changes'
-                                ? 'status-dot--amber'
+                                ? 'design-status-badge--amber'
                                 : project.status === 'in_progress'
-                                    ? 'status-dot--blue'
-                                    : 'status-dot--neutral';
+                                    ? 'design-status-badge--blue'
+                                    : 'design-status-badge--neutral';
 
                     return (
                         <tr key={project.id} className="table-row" style={{ cursor: 'default' }}>
                             <td className="fw-600">{getProjectCode(project)}</td>
                             <td>
-                                <div className={`status-select-inline status-dot ${toneClass}`}>
+                                <div className={`status-select-inline design-status-badge ${toneClass}`}>
                                     <select
                                         className="status-select-inline__control"
                                         value={project.status}
