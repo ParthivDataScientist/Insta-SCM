@@ -6,8 +6,6 @@ import {
     ChevronLeft,
     ChevronRight,
     Clock3,
-    Layout,
-    MapPin,
     Plus,
     RefreshCw,
     Search,
@@ -23,7 +21,6 @@ import UnassignedTray from '../components/GanttTimeline/UnassignedTray';
 import { BoardSkeleton } from '../components/SkeletonLoader';
 import { buildConflictWarningMessage, resolveProjectSchedule } from '../utils/managerScheduling';
 import { formatDateRangeDisplay } from '../utils/dateUtils';
-import { EXECUTION_BOARD_STAGES, normalizeBoardStage } from '../utils/projectStatus';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 const VIEW_MODES = ['Day', 'Week', 'Month'];
@@ -85,8 +82,6 @@ export default function ManagerTimelinePremium() {
     const [viewMode, setViewMode] = useState('Week');
     const [anchorDate, setAnchorDate] = useState(() => new Date());
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterStage, setFilterStage] = useState('All');
-    const [filterBranch, setFilterBranch] = useState('All');
     const [filterManager, setFilterManager] = useState('All');
     const [selectedProject, setSelectedProject] = useState(null);
     const [showAddManager, setShowAddManager] = useState(false);
@@ -249,18 +244,6 @@ export default function ManagerTimelinePremium() {
                 return false;
             }
 
-            if (filterStage !== 'All' && normalizeBoardStage(project.board_stage) !== filterStage) {
-                return false;
-            }
-
-            if (filterBranch !== 'All') {
-                const branchValue = project.branch || '';
-                const venueValue = project.venue || '';
-                if (branchValue !== filterBranch && !venueValue.includes(filterBranch)) {
-                    return false;
-                }
-            }
-
             return true;
         };
 
@@ -283,7 +266,6 @@ export default function ManagerTimelinePremium() {
                 const managerName = getManagerName(managerData);
                 const normalizedManagerName = managerName.toLowerCase();
                 const normalizedQuery = searchQuery.toLowerCase();
-                const hasProjectFilters = filterStage !== 'All' || filterBranch !== 'All';
                 const allocationMatch = managerData.allocations.some((allocation) => {
                     const project = getProjectFromAllocation(allocation);
                     return (
@@ -296,12 +278,11 @@ export default function ManagerTimelinePremium() {
 
                 if (!nameMatch) return false;
                 if (filterManager !== 'All' && managerName !== filterManager) return false;
-                if (!hasProjectFilters) return true;
                 return managerData.allocations.length > 0 || filterManager === managerName;
             });
 
         return { filteredData: managers, unassignedProjects: unassigned };
-    }, [filterBranch, filterManager, filterStage, searchQuery, timelineData, dateRange.start, dateRange.end]);
+    }, [filterManager, searchQuery, timelineData, dateRange.start, dateRange.end]);
 
     const modalProject = useMemo(() => {
         if (!selectedProject) return null;
@@ -309,16 +290,6 @@ export default function ManagerTimelinePremium() {
         return projectsData.find((project) => project.id === selectedProject.id) || selectedProject;
     }, [projectsData, selectedProject]);
 
-    const uniqueBranches = useMemo(() => {
-        const branches = new Set(['All']);
-        timelineData.forEach((managerData) => {
-            getManagerAllocations(managerData).forEach((allocation) => {
-                const project = getProjectFromAllocation(allocation);
-                if (project.branch) branches.add(project.branch);
-            });
-        });
-        return Array.from(branches).sort();
-    }, [timelineData]);
     const uniqueManagers = useMemo(
         () => ['All', ...new Set(timelineData
             .filter((managerData) => getManagerName(managerData) !== 'Unassigned')
@@ -444,36 +415,7 @@ export default function ManagerTimelinePremium() {
 
     const toolbar = (
         <div className="premium-filter-group" style={{ justifyContent: 'space-between', width: '100%' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                <label className="premium-inline-filter">
-                    <span className="premium-inline-filter__label">Stage</span>
-                    <span className="premium-filter">
-                        <Layout size={14} color="var(--tx3)" />
-                        <select value={filterStage} onChange={(event) => setFilterStage(event.target.value)}>
-                            <option value="All">All</option>
-                            {EXECUTION_BOARD_STAGES.map((stage) => (
-                                <option key={stage} value={stage}>
-                                    {stage}
-                                </option>
-                            ))}
-                        </select>
-                    </span>
-                </label>
-
-                <label className="premium-inline-filter">
-                    <span className="premium-inline-filter__label">Branch</span>
-                    <span className="premium-filter">
-                        <MapPin size={14} color="var(--tx3)" />
-                        <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                            {uniqueBranches.map((branch) => (
-                                <option key={branch} value={branch}>
-                                    {branch === 'All' ? 'All' : branch}
-                                </option>
-                            ))}
-                        </select>
-                    </span>
-                </label>
-
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                 <label className="premium-inline-filter">
                     <span className="premium-inline-filter__label">Manager</span>
                     <span className="premium-filter">
@@ -499,9 +441,7 @@ export default function ManagerTimelinePremium() {
                         <ChevronRight size={16} />
                     </button>
                 </div>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <button type="button" className="premium-action-button" onClick={() => setShowAddManager((open) => !open)}>
                     <Plus size={14} />
                     Add Manager
@@ -554,6 +494,8 @@ export default function ManagerTimelinePremium() {
                 headerCenter={headerCenter}
                 actions={actions}
                 toolbar={toolbar}
+                showGlobalDate={false}
+                pageClassName="premium-page--timeline"
             >
                 <div className="premium-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
                     <KpiCard icon={Users} label="Managers" value={summary.totalManagers} detail="Visible in current filters" tone="blue" />

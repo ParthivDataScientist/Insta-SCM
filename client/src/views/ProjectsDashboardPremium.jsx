@@ -135,6 +135,60 @@ export default function ProjectsDashboardPremium() {
         updateProjectFull,
     } = useProjects();
 
+    const projectMatchesFilters = (project, overrides = {}) => {
+        const {
+            status = filterStatus,
+            branch = filterBranch,
+            manager = filterPM,
+            query = searchQuery,
+            startDate = dateRange.start,
+            endDate = dateRange.end,
+        } = overrides;
+
+        if (query) {
+            const normalizedQuery = query.toLowerCase();
+            const matchesSearch =
+                (project.project_name || '').toLowerCase().includes(normalizedQuery) ||
+                (project.event_name || '').toLowerCase().includes(normalizedQuery) ||
+                (project.crm_project_id || '').toLowerCase().includes(normalizedQuery) ||
+                (project.venue || '').toLowerCase().includes(normalizedQuery) ||
+                (project.branch || '').toLowerCase().includes(normalizedQuery) ||
+                (project.city || '').toLowerCase().includes(normalizedQuery) ||
+                normalizeBoardStage(project.board_stage).toLowerCase().includes(normalizedQuery) ||
+                (project.project_manager || '').toLowerCase().includes(normalizedQuery);
+
+            if (!matchesSearch) {
+                return false;
+            }
+        }
+
+        if (branch !== 'All' && project.branch !== branch) {
+            return false;
+        }
+
+        if (manager !== 'All' && project.project_manager !== manager) {
+            return false;
+        }
+
+        if (status !== 'All' && normalizeBoardStage(project.board_stage) !== status) {
+            return false;
+        }
+
+        if ((startDate || endDate) && !project.event_start_date) {
+            return false;
+        }
+
+        if (startDate && project.event_start_date && new Date(project.event_start_date) < new Date(startDate)) {
+            return false;
+        }
+
+        if (endDate && project.event_start_date && new Date(project.event_start_date) > new Date(endDate)) {
+            return false;
+        }
+
+        return true;
+    };
+
     const allBranches = useMemo(
         () => [...new Set(projects.map((project) => project.branch).filter(Boolean))].sort(),
         [projects]
@@ -145,54 +199,43 @@ export default function ProjectsDashboardPremium() {
         [projects]
     );
 
+    const stageScopedProjects = useMemo(
+        () => projects.filter((project) => projectMatchesFilters(project, { status: 'All' })),
+        [projects, filterBranch, filterPM, searchQuery, dateRange.start, dateRange.end]
+    );
+
+    const managerScopedProjects = useMemo(
+        () => projects.filter((project) => projectMatchesFilters(project, { manager: 'All' })),
+        [projects, filterStatus, filterBranch, searchQuery, dateRange.start, dateRange.end]
+    );
+
+    const branchScopedProjects = useMemo(
+        () => projects.filter((project) => projectMatchesFilters(project, { branch: 'All' })),
+        [projects, filterStatus, filterPM, searchQuery, dateRange.start, dateRange.end]
+    );
+
     const branchOptions = useMemo(() => ([
-        { value: 'All', label: 'All branches', count: allBranches.length },
-        ...buildCountMap(projects, allBranches, (project) => project.branch),
-    ]), [allBranches, projects]);
+        { value: 'All', label: 'All branches', count: branchScopedProjects.length },
+        ...buildCountMap(branchScopedProjects, allBranches, (project) => project.branch),
+    ]), [allBranches, branchScopedProjects]);
 
     const managerOptions = useMemo(() => ([
-        { value: 'All', label: 'All managers', count: allManagers.length },
-        ...buildCountMap(projects, allManagers, (project) => project.project_manager),
-    ]), [allManagers, projects]);
+        { value: 'All', label: 'All managers', count: managerScopedProjects.length },
+        ...buildCountMap(managerScopedProjects, allManagers, (project) => project.project_manager),
+    ]), [allManagers, managerScopedProjects]);
 
     const stageOptions = useMemo(() => ([
         {
             value: 'All',
             label: 'All stages',
-            count: new Set(projects.map((project) => normalizeBoardStage(project.board_stage)).filter(Boolean)).size,
+            count: stageScopedProjects.length,
         },
-        ...buildCountMap(projects, EXECUTION_BOARD_STAGES, (project) => normalizeBoardStage(project.board_stage)),
-    ]), [projects]);
+        ...buildCountMap(stageScopedProjects, EXECUTION_BOARD_STAGES, (project) => normalizeBoardStage(project.board_stage)),
+    ]), [stageScopedProjects]);
 
-    const stageScopedProjects = useMemo(
-        () => (filterStatus === 'All' ? projects : projects.filter((project) => normalizeBoardStage(project.board_stage) === filterStatus)),
-        [projects, filterStatus]
-    );
-
-    const managerScopedProjects = useMemo(
-        () => (filterPM === 'All' ? projects : projects.filter((project) => project.project_manager === filterPM)),
-        [projects, filterPM]
-    );
-
-    const branchScopedProjects = useMemo(
-        () => (filterBranch === 'All' ? projects : projects.filter((project) => project.branch === filterBranch)),
-        [projects, filterBranch]
-    );
-
-    const stageCardCount = useMemo(
-        () => new Set(stageScopedProjects.map((project) => normalizeBoardStage(project.board_stage)).filter(Boolean)).size,
-        [stageScopedProjects]
-    );
-
-    const managerCardCount = useMemo(
-        () => new Set(managerScopedProjects.map((project) => project.project_manager).filter(Boolean)).size,
-        [managerScopedProjects]
-    );
-
-    const branchCardCount = useMemo(
-        () => new Set(branchScopedProjects.map((project) => project.branch).filter(Boolean)).size,
-        [branchScopedProjects]
-    );
+    const stageCardCount = filterStatus === 'All' ? stageScopedProjects.length : filteredProjects.length;
+    const managerCardCount = filterPM === 'All' ? managerScopedProjects.length : filteredProjects.length;
+    const branchCardCount = filterBranch === 'All' ? branchScopedProjects.length : filteredProjects.length;
 
     const summary = useMemo(() => ({
         totalProjects: projects.length,
@@ -282,7 +325,8 @@ export default function ProjectsDashboardPremium() {
                         open={openDropdown === 'stage'}
                         onToggle={(isOpen) => setOpenDropdown(isOpen ? 'stage' : null)}
                         onSelect={setFilterStatus}
-                        totalDetail="Unique stages"
+                        totalDetail={`${stageScopedProjects.length} projects in view`}
+                        selectedDetail={`${filteredProjects.length} projects in ${filterStatus}`}
                     />
                     <DropdownKpiCard
                         icon={UserCircle2}
@@ -295,7 +339,8 @@ export default function ProjectsDashboardPremium() {
                         open={openDropdown === 'manager'}
                         onToggle={(isOpen) => setOpenDropdown(isOpen ? 'manager' : null)}
                         onSelect={setFilterPM}
-                        totalDetail="Active managers"
+                        totalDetail={`${managerScopedProjects.length} projects in view`}
+                        selectedDetail={`${filteredProjects.length} projects handled by ${filterPM}`}
                     />
                     <DropdownKpiCard
                         icon={MapPin}
@@ -308,7 +353,8 @@ export default function ProjectsDashboardPremium() {
                         open={openDropdown === 'branch'}
                         onToggle={(isOpen) => setOpenDropdown(isOpen ? 'branch' : null)}
                         onSelect={setFilterBranch}
-                        totalDetail="Active branches"
+                        totalDetail={`${branchScopedProjects.length} projects in view`}
+                        selectedDetail={`${filteredProjects.length} projects in ${filterBranch}`}
                     />
                 </div>
 

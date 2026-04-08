@@ -21,6 +21,7 @@ export default function AppShell({
     actions = null,
     toolbar = null,
     showGlobalDate = true,
+    showLogout = false,
     pageClassName = '',
     children,
 }) {
@@ -114,9 +115,11 @@ export default function AppShell({
                         <div className="premium-header__actions">
                             {showGlobalDate ? <GlobalDateRangePicker compact /> : null}
                             {actions}
-                            <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
-                                <LogOut size={16} />
-                            </button>
+                            {showLogout ? (
+                                <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
+                                    <LogOut size={16} />
+                                </button>
+                            ) : null}
                         </div>
                     </header>
 

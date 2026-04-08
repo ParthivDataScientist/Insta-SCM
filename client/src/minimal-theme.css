@@ -365,7 +365,8 @@ body {
     padding-top: 24px;
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    overflow: auto;
+    padding-right: 4px;
 }
 
 .premium-page--design {
@@ -375,6 +376,12 @@ body {
 
 .premium-page--projects {
     gap: 10px;
+    padding-top: 10px;
+}
+
+.premium-page--board,
+.premium-page--timeline {
+    gap: 14px;
     padding-top: 10px;
 }
 
@@ -1472,6 +1479,7 @@ body {
     align-items: stretch;
     overflow: visible;
     min-height: 0;
+    height: 100%;
 }
 
 .premium-board-scroll {
@@ -1480,10 +1488,12 @@ body {
     padding-bottom: 8px;
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    scrollbar-width: thin;
 }
 
 .premium-column {
-    width: 300px;
+    width: 320px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -1706,12 +1716,14 @@ body {
 
 .premium-timeline-shell {
     overflow: hidden;
+    flex: 1;
+    min-height: 0;
 }
 
 .premium-timeline-shell__body {
     display: flex;
-    min-height: 720px;
-    max-height: 72vh;
+    flex: 1;
+    min-height: 0;
 }
 
 .premium-timeline-window {
@@ -1719,6 +1731,8 @@ body {
     overflow: auto;
     position: relative;
     background: #ffffff;
+    min-width: 0;
+    min-height: 0;
 }
 
 .premium-segmented {
@@ -1792,7 +1806,7 @@ body {
 }
 
 .premium-unassigned-tray {
-    width: 300px;
+    width: 272px;
     flex-shrink: 0;
     border-left: 1px solid var(--bd);
     display: flex;
@@ -1891,6 +1905,23 @@ body {
 
 .premium-manager-header__next strong {
     color: var(--tx);
+}
+
+.premium-page--timeline .premium-grid {
+    gap: 12px;
+}
+
+.premium-page--timeline .premium-kpi {
+    height: 116px;
+    padding: 14px;
+}
+
+.premium-page--timeline .premium-kpi__value {
+    font-size: clamp(24px, 2.2vw, 32px);
+}
+
+.premium-page--timeline .premium-kpi__detail {
+    font-size: 12px;
 }
 
 .mobile-only {

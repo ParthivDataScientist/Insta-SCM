@@ -16,6 +16,7 @@ export default function ProjectBoardPremium() {
     const [activeDragProjectId, setActiveDragProjectId] = useState(null);
     const location = useLocation();
     const hasLinked = useRef(false);
+    const boardScrollRef = useRef(null);
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
     const {
@@ -80,6 +81,23 @@ export default function ProjectBoardPremium() {
         updateBoardStage(projectId, nextStage);
     };
 
+    const handleBoardWheel = (event) => {
+        const boardScroll = boardScrollRef.current;
+        if (!boardScroll || boardScroll.scrollWidth <= boardScroll.clientWidth) {
+            return;
+        }
+
+        const dominantDelta = Math.abs(event.deltaX) > 0 ? event.deltaX : event.deltaY;
+        if (dominantDelta === 0) {
+            return;
+        }
+
+        if (event.shiftKey || Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+            event.preventDefault();
+            boardScroll.scrollLeft += dominantDelta;
+        }
+    };
+
     const actions = (
         <button type="button" className="premium-action-button premium-action-button--primary" onClick={loadData} disabled={loading}>
             <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
@@ -117,6 +135,7 @@ export default function ProjectBoardPremium() {
                 subtitle="Execution pipeline and live stage handoffs."
                 headerCenter={headerCenter}
                 actions={actions}
+                pageClassName="premium-page--board"
             >
                 {error ? (
                     <div className="premium-banner">
@@ -139,7 +158,7 @@ export default function ProjectBoardPremium() {
                             </div>
                         </div>
 
-                        <div className="premium-board-scroll">
+                        <div ref={boardScrollRef} className="premium-board-scroll" onWheel={handleBoardWheel}>
                             <div className="premium-board-columns">
                                 {loading && projects.length === 0 ? (
                                     <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
