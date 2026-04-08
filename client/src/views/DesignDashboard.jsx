@@ -159,7 +159,7 @@ export default function DesignDashboard() {
                 />
             </div>
 
-            <div className="premium-panel" style={{ minHeight: '420px', overflow: 'auto' }}>
+            <div className="premium-panel premium-panel--scroll" style={{ minHeight: 0 }}>
                 {loading && tableProjects.length === 0 ? (
                     <div className="loading-row">Loading design briefs...</div>
                 ) : (

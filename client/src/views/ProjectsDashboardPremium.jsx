@@ -9,66 +9,6 @@ import { EXECUTION_BOARD_STAGES, normalizeBoardStage } from '../utils/projectSta
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 
-function filterProjects(projects, filters, options = {}) {
-    const {
-        searchQuery = '',
-        filterBranch = 'All',
-        filterPM = 'All',
-        filterStatus = 'All',
-        dateRange = {},
-    } = filters;
-    const {
-        ignoreBranch = false,
-        ignorePM = false,
-        ignoreStatus = false,
-    } = options;
-
-    return projects.filter((project) => {
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            const matchesSearch =
-                (project.project_name || '').toLowerCase().includes(query) ||
-                (project.event_name || '').toLowerCase().includes(query) ||
-                (project.crm_project_id || '').toLowerCase().includes(query) ||
-                (project.venue || '').toLowerCase().includes(query) ||
-                (project.branch || '').toLowerCase().includes(query) ||
-                (project.city || '').toLowerCase().includes(query) ||
-                normalizeBoardStage(project.board_stage).toLowerCase().includes(query) ||
-                (project.project_manager || '').toLowerCase().includes(query);
-
-            if (!matchesSearch) {
-                return false;
-            }
-        }
-
-        if (!ignoreBranch && filterBranch !== 'All' && project.branch !== filterBranch) {
-            return false;
-        }
-
-        if (!ignorePM && filterPM !== 'All' && project.project_manager !== filterPM) {
-            return false;
-        }
-
-        if (!ignoreStatus && filterStatus !== 'All' && normalizeBoardStage(project.board_stage) !== filterStatus) {
-            return false;
-        }
-
-        if ((dateRange.start || dateRange.end) && !project.event_start_date) {
-            return false;
-        }
-
-        if (dateRange.start && project.event_start_date && new Date(project.event_start_date) < new Date(dateRange.start)) {
-            return false;
-        }
-
-        if (dateRange.end && project.event_start_date && new Date(project.event_start_date) > new Date(dateRange.end)) {
-            return false;
-        }
-
-        return true;
-    });
-}
-
 function buildCountMap(items, values, readValue) {
     return values.map((value) => ({
         value,
@@ -77,11 +17,11 @@ function buildCountMap(items, values, readValue) {
     }));
 }
 
-function DropdownKpiCard({ icon: Icon, label, selectedValue, options, totalCount, active, open, onToggle, onSelect }) {
+function DropdownKpiCard({ icon: Icon, label, selectedValue, options, totalCount, active, open, onToggle, onSelect, totalDetail = null, selectedDetail = null }) {
     const rootRef = useRef(null);
     const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
-    const displayCount = selectedValue === 'All' ? totalCount : (selectedOption?.count ?? 0);
-    const detail = selectedValue === 'All' ? `Total ${label.toLowerCase()}` : selectedOption?.label;
+    const displayCount = totalCount;
+    const detail = selectedValue === 'All' ? (totalDetail || `Total ${label.toLowerCase()}`) : (selectedDetail || selectedOption?.label);
 
     useEffect(() => {
         if (!open) {
@@ -192,39 +132,58 @@ export default function ProjectsDashboardPremium() {
         [projects]
     );
 
-    const projectsMatchingBranchContext = useMemo(
-        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignoreBranch: true }),
-        [projects, searchQuery, filterBranch, filterPM, filterStatus, dateRange]
-    );
-
-    const projectsMatchingManagerContext = useMemo(
-        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignorePM: true }),
-        [projects, searchQuery, filterBranch, filterPM, filterStatus, dateRange]
-    );
-
-    const projectsMatchingStageContext = useMemo(
-        () => filterProjects(projects, { searchQuery, filterBranch, filterPM, filterStatus, dateRange }, { ignoreStatus: true }),
-        [projects, searchQuery, filterBranch, filterPM, filterStatus, dateRange]
-    );
-
     const branchOptions = useMemo(() => ([
-        { value: 'All', label: 'All branches', count: projectsMatchingBranchContext.length },
-        ...buildCountMap(projectsMatchingBranchContext, allBranches, (project) => project.branch),
-    ]), [allBranches, projectsMatchingBranchContext]);
+        { value: 'All', label: 'All branches', count: allBranches.length },
+        ...buildCountMap(projects, allBranches, (project) => project.branch),
+    ]), [allBranches, projects]);
 
     const managerOptions = useMemo(() => ([
-        { value: 'All', label: 'All managers', count: projectsMatchingManagerContext.length },
-        ...buildCountMap(projectsMatchingManagerContext, allManagers, (project) => project.project_manager),
-    ]), [allManagers, projectsMatchingManagerContext]);
+        { value: 'All', label: 'All managers', count: allManagers.length },
+        ...buildCountMap(projects, allManagers, (project) => project.project_manager),
+    ]), [allManagers, projects]);
 
     const stageOptions = useMemo(() => ([
-        { value: 'All', label: 'All stages', count: projectsMatchingStageContext.length },
-        ...buildCountMap(projectsMatchingStageContext, EXECUTION_BOARD_STAGES, (project) => normalizeBoardStage(project.board_stage)),
-    ]), [projectsMatchingStageContext]);
+        {
+            value: 'All',
+            label: 'All stages',
+            count: new Set(projects.map((project) => normalizeBoardStage(project.board_stage)).filter(Boolean)).size,
+        },
+        ...buildCountMap(projects, EXECUTION_BOARD_STAGES, (project) => normalizeBoardStage(project.board_stage)),
+    ]), [projects]);
+
+    const stageScopedProjects = useMemo(
+        () => (filterStatus === 'All' ? projects : projects.filter((project) => normalizeBoardStage(project.board_stage) === filterStatus)),
+        [projects, filterStatus]
+    );
+
+    const managerScopedProjects = useMemo(
+        () => (filterPM === 'All' ? projects : projects.filter((project) => project.project_manager === filterPM)),
+        [projects, filterPM]
+    );
+
+    const branchScopedProjects = useMemo(
+        () => (filterBranch === 'All' ? projects : projects.filter((project) => project.branch === filterBranch)),
+        [projects, filterBranch]
+    );
+
+    const stageCardCount = useMemo(
+        () => new Set(stageScopedProjects.map((project) => normalizeBoardStage(project.board_stage)).filter(Boolean)).size,
+        [stageScopedProjects]
+    );
+
+    const managerCardCount = useMemo(
+        () => new Set(managerScopedProjects.map((project) => project.project_manager).filter(Boolean)).size,
+        [managerScopedProjects]
+    );
+
+    const branchCardCount = useMemo(
+        () => new Set(branchScopedProjects.map((project) => project.branch).filter(Boolean)).size,
+        [branchScopedProjects]
+    );
 
     const summary = useMemo(() => ({
-        totalProjects: filteredProjects.length,
-    }), [filteredProjects.length]);
+        totalProjects: projects.length,
+    }), [projects.length]);
 
     const latestActiveProject = projects.find((project) => project.id === activeProjectCard?.id) || activeProjectCard;
     const hasActiveViewState =
@@ -294,7 +253,7 @@ export default function ProjectsDashboardPremium() {
                         icon={Briefcase}
                         label="Total Projects"
                         value={summary.totalProjects}
-                        detail="Visible after current filters"
+                        detail="Global total in database"
                         tone="blue"
                         onClick={resetFilters}
                     />
@@ -303,33 +262,36 @@ export default function ProjectsDashboardPremium() {
                         label="Stage"
                         selectedValue={filterStatus}
                         options={stageOptions}
-                        totalCount={projectsMatchingStageContext.length}
+                        totalCount={stageCardCount}
                         active={filterStatus !== 'All'}
                         open={openDropdown === 'stage'}
                         onToggle={(isOpen) => setOpenDropdown(isOpen ? 'stage' : null)}
                         onSelect={setFilterStatus}
+                        totalDetail="Unique stages"
                     />
                     <DropdownKpiCard
                         icon={UserCircle2}
                         label="Manager"
                         selectedValue={filterPM}
                         options={managerOptions}
-                        totalCount={projectsMatchingManagerContext.length}
+                        totalCount={managerCardCount}
                         active={filterPM !== 'All'}
                         open={openDropdown === 'manager'}
                         onToggle={(isOpen) => setOpenDropdown(isOpen ? 'manager' : null)}
                         onSelect={setFilterPM}
+                        totalDetail="Active managers"
                     />
                     <DropdownKpiCard
                         icon={MapPin}
                         label="Branch"
                         selectedValue={filterBranch}
                         options={branchOptions}
-                        totalCount={projectsMatchingBranchContext.length}
+                        totalCount={branchCardCount}
                         active={filterBranch !== 'All'}
                         open={openDropdown === 'branch'}
                         onToggle={(isOpen) => setOpenDropdown(isOpen ? 'branch' : null)}
                         onSelect={setFilterBranch}
+                        totalDetail="Active branches"
                     />
                 </div>
 
