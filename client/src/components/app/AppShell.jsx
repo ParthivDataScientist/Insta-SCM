@@ -21,6 +21,7 @@ export default function AppShell({
     actions = null,
     toolbar = null,
     showGlobalDate = true,
+    pageClassName = '',
     children,
 }) {
     const { logout } = useAuth();
@@ -121,7 +122,7 @@ export default function AppShell({
 
                     {toolbar ? <div className="premium-toolbar">{toolbar}</div> : null}
 
-                    <section className="premium-page">
+                    <section className={`premium-page${pageClassName ? ` ${pageClassName}` : ''}`}>
                         {children}
                     </section>
                 </main>

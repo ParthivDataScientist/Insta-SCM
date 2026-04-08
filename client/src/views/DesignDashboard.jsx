@@ -84,6 +84,7 @@ export default function DesignDashboard() {
             title="Design"
             headerCenter={headerSearch}
             actions={shellActions}
+            pageClassName="premium-page--design"
         >
             {error ? <div className="premium-banner">{error}</div> : null}
 

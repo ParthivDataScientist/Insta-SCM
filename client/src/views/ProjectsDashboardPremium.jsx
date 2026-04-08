@@ -17,7 +17,20 @@ function buildCountMap(items, values, readValue) {
     }));
 }
 
-function DropdownKpiCard({ icon: Icon, label, selectedValue, options, totalCount, active, open, onToggle, onSelect, totalDetail = null, selectedDetail = null }) {
+function DropdownKpiCard({
+    icon: Icon,
+    label,
+    selectedValue,
+    options,
+    totalCount,
+    active,
+    open,
+    onToggle,
+    onSelect,
+    totalDetail = null,
+    selectedDetail = null,
+    tone = 'neutral',
+}) {
     const rootRef = useRef(null);
     const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
     const displayCount = totalCount;
@@ -42,7 +55,7 @@ function DropdownKpiCard({ icon: Icon, label, selectedValue, options, totalCount
         <div ref={rootRef} className="premium-kpi-dropdown-card">
             <button
                 type="button"
-                className={`premium-kpi premium-kpi--neutral premium-kpi--dropdown${active ? ' is-active' : ''}${open ? ' is-open' : ''}`}
+                className={`premium-kpi premium-kpi--${tone} premium-kpi--dropdown${active ? ' is-active' : ''}${open ? ' is-open' : ''}`}
                 onClick={() => onToggle(!open)}
                 aria-expanded={open}
             >
@@ -247,6 +260,7 @@ export default function ProjectsDashboardPremium() {
                 subtitle="Execution pipeline, ownership, and delivery dates in one view."
                 headerCenter={headerCenter}
                 actions={actions}
+                pageClassName="premium-page--projects"
             >
                 <div className="premium-grid premium-grid--projects-kpis">
                     <KpiCard
@@ -260,6 +274,7 @@ export default function ProjectsDashboardPremium() {
                     <DropdownKpiCard
                         icon={Layout}
                         label="Stage"
+                        tone="orange"
                         selectedValue={filterStatus}
                         options={stageOptions}
                         totalCount={stageCardCount}
@@ -272,6 +287,7 @@ export default function ProjectsDashboardPremium() {
                     <DropdownKpiCard
                         icon={UserCircle2}
                         label="Manager"
+                        tone="green"
                         selectedValue={filterPM}
                         options={managerOptions}
                         totalCount={managerCardCount}
@@ -284,6 +300,7 @@ export default function ProjectsDashboardPremium() {
                     <DropdownKpiCard
                         icon={MapPin}
                         label="Branch"
+                        tone="red"
                         selectedValue={filterBranch}
                         options={branchOptions}
                         totalCount={branchCardCount}
@@ -302,8 +319,8 @@ export default function ProjectsDashboardPremium() {
                 ) : null}
 
                 <div className="premium-panel project-dashboard-panel">
-                    <div className="project-dashboard-actionbar" aria-live="polite">
-                        {hasActiveViewState ? (
+                    {hasActiveViewState ? (
+                        <div className="project-dashboard-actionbar" aria-live="polite">
                             <div className="project-dashboard-actionbar__content">
                                 <div className="project-dashboard-actionbar__summary">
                                     {selectedProject ? '1 project selected' : `Showing ${filteredProjects.length} of ${projects.length} projects`}
@@ -313,8 +330,8 @@ export default function ProjectsDashboardPremium() {
                                     Reset view
                                 </button>
                             </div>
-                        ) : null}
-                    </div>
+                        </div>
+                    ) : null}
 
                     <div className="premium-table-scroll premium-table-scroll--projects">
                         {loading && projects.length === 0 ? (

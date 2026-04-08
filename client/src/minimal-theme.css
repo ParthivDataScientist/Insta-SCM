@@ -278,7 +278,7 @@ body {
     gap: 16px;
     height: 64px;
     min-height: 64px;
-    padding: 0;
+    padding: 0 14px;
     background: var(--bg-hdr);
     border-bottom: 1px solid var(--bd);
 }
@@ -368,6 +368,16 @@ body {
     overflow: hidden;
 }
 
+.premium-page--design {
+    gap: 2px;
+    padding-top: 10px;
+}
+
+.premium-page--projects {
+    gap: 10px;
+    padding-top: 10px;
+}
+
 .premium-panel {
     background: var(--bg-card);
     border: 1px solid var(--bd);
@@ -424,6 +434,9 @@ body {
 }
 
 .premium-kpi {
+    --kpi-accent: #94a3b8;
+    position: relative;
+    overflow: hidden;
     width: 100%;
     height: 152px;
     padding: 16px;
@@ -435,6 +448,17 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 14px;
     transition: border-color 0.16s var(--ease), background 0.16s var(--ease), box-shadow 0.16s var(--ease), transform 0.16s var(--ease);
+}
+
+.premium-kpi::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 4px;
+    background: var(--kpi-accent);
+    border-radius: 16px 16px 10px 10px;
 }
 
 .premium-kpi:hover,
@@ -496,6 +520,12 @@ body {
     background: transparent;
 }
 
+.premium-kpi--blue { --kpi-accent: #3b82f6; }
+.premium-kpi--green { --kpi-accent: #22c55e; }
+.premium-kpi--orange { --kpi-accent: #f59e0b; }
+.premium-kpi--red { --kpi-accent: #ef4444; }
+.premium-kpi--neutral { --kpi-accent: #94a3b8; }
+
 .premium-kpi--compact {
     min-width: 180px;
     height: 152px;
@@ -518,6 +548,10 @@ body {
     padding-bottom: 8px;
     scrollbar-width: none;
     flex-shrink: 0;
+}
+
+.premium-page--design .premium-kpi-strip {
+    padding-bottom: 2px;
 }
 
 .premium-kpi-strip > .premium-kpi {
@@ -1038,6 +1072,19 @@ body {
 .premium-grid--projects-kpis {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: stretch;
+}
+
+.premium-page--projects .premium-kpi {
+    height: 132px;
+    padding: 14px;
+}
+
+.premium-page--projects .premium-kpi__value {
+    font-size: clamp(26px, 2.6vw, 34px);
+}
+
+.premium-page--projects .premium-kpi__detail {
+    font-size: 12px;
 }
 
 .premium-kpi-dropdown-card {
