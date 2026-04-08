@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Briefcase, ChevronDown, Layout, MapPin, RefreshCw, Search, UserCircle2, X } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import ProjectTable from '../components/ProjectTable';
