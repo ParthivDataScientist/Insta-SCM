@@ -1490,6 +1490,7 @@ body {
     min-height: 0;
     min-width: 0;
     scrollbar-width: thin;
+    overscroll-behavior-x: contain;
 }
 
 .premium-column {
@@ -1590,6 +1591,7 @@ body {
     overflow-y: auto;
     padding: 12px;
     min-height: 0;
+    overscroll-behavior: contain;
 }
 
 .premium-column__empty {
@@ -1733,6 +1735,7 @@ body {
     background: #ffffff;
     min-width: 0;
     min-height: 0;
+    overscroll-behavior: contain;
 }
 
 .premium-segmented {
@@ -1838,6 +1841,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: 14px;
+    overscroll-behavior: contain;
 }
 
 .premium-unassigned-card {

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useRef, useState } from 'react';
 import { Briefcase, ChevronDown, Layout, MapPin, RefreshCw, Search, UserCircle2, X } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import ProjectTable from '../components/ProjectTable';
@@ -113,7 +113,6 @@ function ProjectsEmptyState() {
 }
 
 export default function ProjectsDashboardPremium() {
-    const [selectedProject, setSelectedProject] = useState(null);
     const [activeProjectCard, setActiveProjectCard] = useState(null);
     const [openDropdown, setOpenDropdown] = useState(null);
 
@@ -248,21 +247,13 @@ export default function ProjectsDashboardPremium() {
         filterPM !== 'All' ||
         searchQuery !== '' ||
         Boolean(dateRange.start) ||
-        Boolean(dateRange.end) ||
-        Boolean(selectedProject);
-
-    useEffect(() => {
-        if (selectedProject && !filteredProjects.some((project) => project.id === selectedProject.id)) {
-            setSelectedProject(null);
-        }
-    }, [filteredProjects, selectedProject]);
+        Boolean(dateRange.end);
 
     const resetFilters = () => {
         setFilterStatus('All');
         setFilterBranch('All');
         setFilterPM('All');
         setSearchQuery('');
-        setSelectedProject(null);
         setOpenDropdown(null);
     };
 
@@ -279,10 +270,16 @@ export default function ProjectsDashboardPremium() {
     );
 
     const actions = (
-        <button type="button" className="premium-action-button premium-action-button--primary" onClick={loadData} disabled={loading}>
-            <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            {loading ? 'Syncing' : 'Refresh'}
-        </button>
+        <>
+            <button type="button" className="premium-action-button" onClick={resetFilters} disabled={!hasActiveViewState}>
+                <X size={14} />
+                Reset Filters
+            </button>
+            <button type="button" className="premium-action-button premium-action-button--primary" onClick={loadData} disabled={loading}>
+                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                {loading ? 'Syncing' : 'Refresh'}
+            </button>
+        </>
     );
 
     return (
@@ -369,12 +366,8 @@ export default function ProjectsDashboardPremium() {
                         <div className="project-dashboard-actionbar" aria-live="polite">
                             <div className="project-dashboard-actionbar__content">
                                 <div className="project-dashboard-actionbar__summary">
-                                    {selectedProject ? '1 project selected' : `Showing ${filteredProjects.length} of ${projects.length} projects`}
+                                    {`Showing ${filteredProjects.length} of ${projects.length} projects`}
                                 </div>
-                                <button type="button" className="premium-action-button" onClick={resetFilters}>
-                                    <X size={14} />
-                                    Reset view
-                                </button>
                             </div>
                         </div>
                     ) : null}
@@ -392,8 +385,6 @@ export default function ProjectsDashboardPremium() {
                             <ProjectTable
                                 projects={filteredProjects}
                                 loading={loading}
-                                selectedProject={selectedProject}
-                                onSelectProject={setSelectedProject}
                                 updateProjectFull={updateProjectFull}
                                 onDoubleClickProject={setActiveProjectCard}
                             />

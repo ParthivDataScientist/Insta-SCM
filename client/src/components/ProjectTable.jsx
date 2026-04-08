@@ -95,7 +95,6 @@ const DateCell = ({ project, field, editingCell, setEditingCell, updateProjectFu
 
 export default function ProjectTable({
     projects,
-    loading,
     selectedProject,
     onSelectProject,
     onDoubleClickProject,
@@ -132,7 +131,7 @@ export default function ProjectTable({
                         <tr
                             key={project.id}
                             className={`table-row ${selectedProject?.id === project.id ? 'selected-row' : ''}`}
-                            onClick={() => onSelectProject && onSelectProject(selectedProject?.id === project.id ? null : project)}
+                            onClick={onSelectProject ? () => onSelectProject(selectedProject?.id === project.id ? null : project) : undefined}
                             onDoubleClick={() => onDoubleClickProject && onDoubleClickProject(project)}
                             style={{ cursor: 'pointer', userSelect: 'none' }}
                         >
