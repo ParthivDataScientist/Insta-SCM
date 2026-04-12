@@ -4,13 +4,14 @@ from collections import defaultdict
 from datetime import date as py_date
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select, text
 
 from app.db.session import get_session
-from app.models.dashboard_project import Client, DashboardProject, ProjectAuditLog, ProjectLink
+from app.models.dashboard_project import Client, DashboardProject, ProjectAuditLog, ProjectLink, ProjectResource
 from app.models.shipment import Shipment
 from app.models.user import User
 from app.schemas.dashboard_project import (
@@ -20,6 +21,9 @@ from app.schemas.dashboard_project import (
     ProjectLinkCreate,
     ProjectLinkRead,
     ProjectLinkUpdate,
+    ProjectResourceEntryRead,
+    ProjectResourceVersionCreate,
+    ProjectResourceVersionRead,
 )
 from app.services.availability import is_manager_available
 
@@ -30,6 +34,15 @@ WIN_STAGE_ALIASES = {"win", "won", "confirmed"}
 DROP_STAGE_ALIASES = {"drop", "dropped", "lost"}
 DESIGN_ITERATION_ALIASES = {"design change", "design-change", "design_change"}
 IN_PROCESS_ALIASES = {"open", "in-process", "in process", "in_progress", "in-progress"}
+PRIORITY_ALIASES = {
+    "high": "high",
+    "urgent": "high",
+    "critical": "high",
+    "medium": "medium",
+    "med": "medium",
+    "normal": "medium",
+    "low": "low",
+}
 
 CANONICAL_STATUS_ALIASES = {
     "pending": "pending",
@@ -50,6 +63,7 @@ CANONICAL_STATUS_ALIASES = {
     "dropped": "lost",
 }
 LEGACY_PENDING_ALIASES = {"brief", "design", "negotiation", "open"}
+RESOURCE_TYPES = {"design", "autocad", "graphic_file"}
 
 CRM_DESIGN_FEED = [
     {
@@ -167,6 +181,21 @@ def _normalize_stage(stage: Optional[str]) -> str:
     return raw_stage or "Open"
 
 
+def _normalize_manager_name(value: Optional[str]) -> str:
+    return " ".join((value or "").strip().split())
+
+
+def _build_manager_email(name: str) -> str:
+    return f"{name.lower().replace(' ', '.')}@insta-scm.com"
+
+
+def _normalize_resource_type(resource_type: str) -> str:
+    normalized = (resource_type or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if normalized not in RESOURCE_TYPES:
+        raise HTTPException(status_code=404, detail="Unknown project resource type")
+    return normalized
+
+
 def _stage_from_status(status: str) -> str:
     return {
         "pending": "Open",
@@ -188,6 +217,30 @@ def _normalize_current_version(value: Optional[str]) -> Optional[str]:
         return None
     raw = str(value).strip()
     return raw or None
+
+
+def _normalize_priority(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return PRIORITY_ALIASES.get(str(value).strip().lower())
+
+
+def _infer_priority(project: DashboardProject) -> str:
+    anchor_date = (
+        project.dispatch_date
+        or project.installation_start_date
+        or project.event_start_date
+        or project.booking_date
+    )
+    if not anchor_date:
+        return "medium"
+
+    days_until = (anchor_date - datetime.now(timezone.utc).date()).days
+    if days_until <= 10:
+        return "high"
+    if days_until <= 30:
+        return "medium"
+    return "low"
 
 
 def _derive_status(status: Optional[str], stage: Optional[str], revision_count: int, current_version: Optional[str]) -> str:
@@ -218,11 +271,41 @@ def _default_revision_note(status: str, current_version: Optional[str]) -> str:
     return "Design state updated"
 
 
+def _resolve_project_filter_date(project: DashboardProject, date_context: str = "execution") -> Optional[py_date]:
+    normalized_context = (date_context or "execution").strip().lower()
+    if normalized_context == "booking":
+        return project.booking_date
+    if normalized_context == "allocation":
+        return project.allocation_start_date or project.dispatch_date or project.event_start_date
+    return project.event_start_date or project.dispatch_date or project.allocation_start_date
+
+
+def _project_matches_date_range(
+    project: DashboardProject,
+    *,
+    start_date: Optional[py_date] = None,
+    end_date: Optional[py_date] = None,
+    date_context: str = "execution",
+) -> bool:
+    if not start_date and not end_date:
+        return True
+
+    date_value = _resolve_project_filter_date(project, date_context)
+    if not date_value:
+        return False
+    if start_date and date_value < start_date:
+        return False
+    if end_date and date_value > end_date:
+        return False
+    return True
+
+
 def _apply_design_state(project: DashboardProject, payload: dict[str, Any]) -> None:
     previous_history = _coerce_revision_history(getattr(project, "revision_history", []))
     explicit_history = payload.get("revision_history")
     revision_history = _coerce_revision_history(explicit_history) if explicit_history is not None else previous_history
     revision_note = payload.pop("revision_note", None)
+    previous_version = previous_history[-1].get("version") if previous_history else None
 
     for key, value in payload.items():
         if key in {"revision_history", "revision_note"}:
@@ -236,6 +319,7 @@ def _apply_design_state(project: DashboardProject, payload: dict[str, Any]) -> N
     status = _derive_status(status_source, normalized_stage, revision_count, current_version)
 
     project.status = status
+    project.priority = _normalize_priority(getattr(project, "priority", None)) or _infer_priority(project)
     if payload.get("status") is not None or payload.get("stage") is not None:
         project.stage = _stage_from_status(status)
     else:
@@ -248,6 +332,20 @@ def _apply_design_state(project: DashboardProject, payload: dict[str, Any]) -> N
         project.board_stage = "TBC"
     if payload.get("booking_date") == "":
         project.booking_date = None
+
+    if explicit_history is None and current_version and current_version != previous_version:
+        revision_history = [
+            *revision_history,
+            {
+                "version": current_version,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "notes": revision_note or _default_revision_note(status, current_version),
+            },
+        ]
+
+    inferred_revision_count = max(0, len(revision_history) - 1)
+    if payload.get("revision_count") is None:
+        project.revision_count = max(revision_count, inferred_revision_count)
 
     project.revision_history = revision_history
 
@@ -291,6 +389,7 @@ def _serialize_project(project: DashboardProject, awb_map: Optional[dict[int, li
         stage=_normalize_stage(project.stage),
         board_stage=project.board_stage or "TBC",
         status=_derive_status(project.status, project.stage, project.revision_count, project.current_version),
+        priority=_normalize_priority(project.priority) or _infer_priority(project),
         revision_count=max(0, int(project.revision_count or 0)),
         current_version=_normalize_current_version(project.current_version),
         is_active=bool(project.is_active),
@@ -327,6 +426,92 @@ def _serialize_project_link(link: ProjectLink) -> ProjectLinkRead:
     )
 
 
+def _serialize_project_resource_version(resource: ProjectResource) -> ProjectResourceVersionRead:
+    return ProjectResourceVersionRead(
+        id=resource.id,
+        project_id=resource.project_id,
+        resource_type=resource.resource_type,
+        entry_key=resource.entry_key,
+        label=resource.label,
+        version_number=resource.version_number,
+        version_label=f"v{resource.version_number}",
+        source_type=resource.source_type,
+        url=resource.url,
+        file_name=resource.file_name,
+        file_content=resource.file_content,
+        mime_type=resource.mime_type,
+        created_by=resource.created_by,
+        created_at=resource.created_at,
+        updated_at=resource.updated_at,
+    )
+
+
+def _serialize_project_resource_entry(resource_type: str, versions: list[ProjectResource]) -> ProjectResourceEntryRead:
+    ordered_versions = sorted(versions, key=lambda version: (version.version_number, version.created_at))
+    latest = ordered_versions[-1]
+    return ProjectResourceEntryRead(
+        entry_key=latest.entry_key,
+        project_id=latest.project_id,
+        resource_type=resource_type,
+        label=latest.label,
+        latest_version=f"v{latest.version_number}",
+        version_count=len(ordered_versions),
+        versions=[_serialize_project_resource_version(version) for version in ordered_versions],
+    )
+
+
+def _get_project_resource_entries(
+    session: Session,
+    project_id: int,
+    resource_type: str,
+) -> list[ProjectResourceEntryRead]:
+    rows = session.exec(
+        select(ProjectResource)
+        .where(
+            ProjectResource.project_id == project_id,
+            ProjectResource.resource_type == resource_type,
+        )
+        .order_by(ProjectResource.label.asc(), ProjectResource.version_number.asc(), ProjectResource.created_at.asc())
+    ).all()
+
+    grouped: dict[str, list[ProjectResource]] = defaultdict(list)
+    for row in rows:
+        grouped[row.entry_key].append(row)
+
+    entries = [_serialize_project_resource_entry(resource_type, versions) for versions in grouped.values()]
+    return sorted(
+        entries,
+        key=lambda entry: (
+            -(entry.versions[-1].created_at.timestamp() if entry.versions else 0),
+            entry.label.lower(),
+        ),
+    )
+
+
+def _sync_project_design_version(session: Session, project: DashboardProject) -> None:
+    design_versions = session.exec(
+        select(ProjectResource.version_number)
+        .where(
+            ProjectResource.project_id == project.id,
+            ProjectResource.resource_type == "design",
+        )
+    ).all()
+
+    highest_version = max([int(value or 0) for value in design_versions], default=0)
+    next_current_version = f"V{highest_version}" if highest_version > 0 else None
+
+    if _normalize_current_version(project.current_version) == next_current_version:
+        return
+
+    _apply_design_state(
+        project,
+        {
+            "current_version": next_current_version,
+            "revision_note": f"Design version {next_current_version} updated" if next_current_version else "Design version cleared",
+        },
+    )
+
+
 def _project_matches_search(project: DashboardProject, query: str, awbs: Iterable[str]) -> bool:
     q = query.strip().lower()
     if not q:
@@ -340,6 +525,7 @@ def _project_matches_search(project: DashboardProject, query: str, awbs: Iterabl
         project.city or "",
         project.branch or "",
         project.current_version or "",
+        project.priority or "",
         project.client_relationship.name if project.client_relationship else "",
     ]
     searchable.extend(awbs)
@@ -392,8 +578,23 @@ def _filter_design_projects(
 
 
 @router.get("/stats")
-def get_project_stats(session: Session = Depends(get_session)):
+def get_project_stats(
+    session: Session = Depends(get_session),
+    start_date: Optional[py_date] = None,
+    end_date: Optional[py_date] = None,
+    date_context: str = Query(default="execution"),
+):
     projects = session.exec(select(DashboardProject)).all()
+    projects = [
+        project
+        for project in projects
+        if _project_matches_date_range(
+            project,
+            start_date=start_date,
+            end_date=end_date,
+            date_context=date_context,
+        )
+    ]
     execution_projects = [project for project in projects if _is_won_project(project.stage)]
     branches = {project.branch for project in execution_projects if project.branch}
     pm_count = session.exec(select(func.count(User.id)).where(User.role == "PROJECT_MANAGER")).one()
@@ -529,6 +730,9 @@ def get_projects(
     session: Session = Depends(get_session),
     stage: Optional[str] = None,
     scope: str = Query(default="execution"),
+    start_date: Optional[py_date] = None,
+    end_date: Optional[py_date] = None,
+    date_context: str = Query(default="execution"),
 ):
     projects = session.exec(select(DashboardProject)).all()
     awb_map = _build_awb_map(session)
@@ -543,6 +747,17 @@ def get_projects(
     if stage:
         normalized_stage = _normalize_stage(stage)
         projects = [project for project in projects if _normalize_stage(project.stage) == normalized_stage]
+
+    projects = [
+        project
+        for project in projects
+        if _project_matches_date_range(
+            project,
+            start_date=start_date,
+            end_date=end_date,
+            date_context=date_context,
+        )
+    ]
 
     return [_serialize_project(project, awb_map) for project in projects]
 
@@ -577,6 +792,7 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
     audit_fields = [
         "stage",
         "status",
+        "priority",
         "board_stage",
         "dispatch_date",
         "dismantling_date",
@@ -730,6 +946,113 @@ def delete_project_link(project_id: int, link_id: int, session: Session = Depend
     return {"message": "Project link deleted successfully"}
 
 
+@router.get("/{project_id}/resources/{resource_type}", response_model=List[ProjectResourceEntryRead])
+def get_project_resources(project_id: int, resource_type: str, session: Session = Depends(get_session)):
+    project = session.get(DashboardProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    normalized_resource_type = _normalize_resource_type(resource_type)
+    return _get_project_resource_entries(session, project_id, normalized_resource_type)
+
+
+@router.post("/{project_id}/resources/{resource_type}", response_model=ProjectResourceEntryRead)
+def create_project_resource_version(
+    project_id: int,
+    resource_type: str,
+    payload: ProjectResourceVersionCreate,
+    session: Session = Depends(get_session),
+):
+    project = session.get(DashboardProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    normalized_resource_type = _normalize_resource_type(resource_type)
+    entry_key = payload.entry_key or uuid4().hex
+    normalized_payload = payload.model_dump()
+
+    last_error: Optional[Exception] = None
+    for _ in range(3):
+        existing_versions = session.exec(
+            select(ProjectResource)
+            .where(
+                ProjectResource.project_id == project_id,
+                ProjectResource.resource_type == normalized_resource_type,
+                ProjectResource.entry_key == entry_key,
+            )
+            .order_by(ProjectResource.version_number.desc())
+        ).all()
+        next_version = (existing_versions[0].version_number if existing_versions else 0) + 1
+
+        resource = ProjectResource(
+            project_id=project_id,
+            resource_type=normalized_resource_type,
+            entry_key=entry_key,
+            label=normalized_payload["label"],
+            version_number=next_version,
+            source_type=normalized_payload["source_type"],
+            url=normalized_payload.get("url"),
+            file_name=normalized_payload.get("file_name"),
+            file_content=normalized_payload.get("file_content"),
+            mime_type=normalized_payload.get("mime_type"),
+        )
+        session.add(resource)
+
+        if normalized_resource_type == "design":
+            existing_design_versions = session.exec(
+                select(ProjectResource.version_number)
+                .where(
+                    ProjectResource.project_id == project_id,
+                    ProjectResource.resource_type == normalized_resource_type,
+                )
+            ).all()
+            highest_version = max([*[int(value or 0) for value in existing_design_versions], next_version], default=next_version)
+            _apply_design_state(
+                project,
+                {
+                    "current_version": f"V{highest_version}",
+                    "revision_note": f"Design version V{highest_version} uploaded",
+                },
+            )
+
+        try:
+            session.commit()
+            session.refresh(resource)
+            grouped_entries = _get_project_resource_entries(session, project_id, normalized_resource_type)
+            return next(entry for entry in grouped_entries if entry.entry_key == entry_key)
+        except IntegrityError as exc:
+            session.rollback()
+            last_error = exc
+            logger.warning(
+                "Project resource version conflict for project=%s type=%s entry=%s: %s",
+                project_id,
+                normalized_resource_type,
+                entry_key,
+                exc,
+            )
+
+    raise HTTPException(
+        status_code=409,
+        detail="Unable to create the next resource version. Please retry the upload.",
+    ) from last_error
+
+
+@router.delete("/{project_id}/resources/{resource_id}")
+def delete_project_resource_version(project_id: int, resource_id: int, session: Session = Depends(get_session)):
+    resource = session.get(ProjectResource, resource_id)
+    if not resource or resource.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Project resource not found")
+
+    normalized_resource_type = resource.resource_type
+    project = session.get(DashboardProject, project_id)
+    session.delete(resource)
+    if project and normalized_resource_type == "design":
+        session.flush()
+        _sync_project_design_version(session, project)
+    session.commit()
+    return {"message": "Project resource version deleted successfully"}
+
+
 @router.get("/manager/{manager_id}", response_model=List[DashboardProjectRead])
 def get_manager_projects(manager_id: int, session: Session = Depends(get_session)):
     query = select(DashboardProject).where(DashboardProject.manager_id == manager_id)
@@ -788,7 +1111,6 @@ def get_timeline_data(session: Session = Depends(get_session)):
             if (
                 project is not None
                 and _is_won_project(project.stage)
-                and (project.dispatch_date is not None or project.event_start_date is not None)
             ):
                 manager_groups[manager.id]["allocations"].append(
                     {
@@ -806,6 +1128,7 @@ def get_timeline_data(session: Session = Depends(get_session)):
                             "stage": _normalize_stage(project.stage),
                             "board_stage": project.board_stage,
                             "status": _derive_status(project.status, project.stage, project.revision_count, project.current_version),
+                            "priority": _normalize_priority(project.priority) or _infer_priority(project),
                             "current_version": _normalize_current_version(project.current_version),
                             "revision_count": max(0, int(project.revision_count or 0)),
                             "event_name": project.event_name,
@@ -826,7 +1149,6 @@ def get_timeline_data(session: Session = Depends(get_session)):
         unassigned_stmt = (
             select(DashboardProject)
             .where(DashboardProject.manager_id == None)
-            .where((DashboardProject.dispatch_date.is_not(None)) | (DashboardProject.event_start_date.is_not(None)))
         )
         unassigned_projects = [project for project in session.exec(unassigned_stmt).all() if _is_won_project(project.stage)]
         if unassigned_projects:
@@ -848,6 +1170,7 @@ def get_timeline_data(session: Session = Depends(get_session)):
                             "stage": _normalize_stage(project.stage),
                             "board_stage": project.board_stage,
                             "status": _derive_status(project.status, project.stage, project.revision_count, project.current_version),
+                            "priority": _normalize_priority(project.priority) or _infer_priority(project),
                             "current_version": _normalize_current_version(project.current_version),
                             "revision_count": max(0, int(project.revision_count or 0)),
                             "event_name": project.event_name,
@@ -882,14 +1205,25 @@ def get_timeline_data(session: Session = Depends(get_session)):
 
 @router.post("/managers")
 def create_manager(manager_data: dict, session: Session = Depends(get_session)):
-    name = manager_data.get("name")
+    name = _normalize_manager_name(manager_data.get("name"))
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
 
-    email = f"{name.lower().replace(' ', '.')}@insta-scm.com"
-    existing = session.exec(select(User).where(User.email == email)).first()
+    existing = session.exec(
+        select(User).where(
+            func.lower(User.full_name) == name.lower(),
+            User.role == "PROJECT_MANAGER",
+        )
+    ).first()
     if existing:
         return {"id": existing.id, "full_name": existing.full_name}
+
+    email = _build_manager_email(name)
+    existing_email = session.exec(select(User).where(func.lower(User.email) == email.lower())).first()
+    if existing_email and existing_email.role == "PROJECT_MANAGER":
+        return {"id": existing_email.id, "full_name": existing_email.full_name}
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Another user already uses this manager email")
 
     new_user = User(
         full_name=name,
@@ -922,7 +1256,7 @@ def delete_manager(manager_id: int, session: Session = Depends(get_session)):
 
 @router.get("/pm-list")
 def get_pm_list(session: Session = Depends(get_session)):
-    users = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
+    users = session.exec(select(User).where(User.role == "PROJECT_MANAGER").order_by(User.full_name.asc())).all()
     return [{"id": user.id, "full_name": user.full_name} for user in users]
 
 

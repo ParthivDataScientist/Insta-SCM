@@ -1,36 +1,43 @@
 import React from 'react';
 import { CheckCircle2, ChevronDown, Clock3, PencilRuler, RefreshCw, XCircle } from 'lucide-react';
-import { getProjectCode } from '../utils/projectStatus';
+import { formatDateDisplay } from '../utils/dateUtils';
 
 const STATUS_META = {
     pending: {
         label: 'Pending',
         icon: Clock3,
-        style: { background: 'var(--bg-in)', color: 'var(--tx2)', border: '1px solid var(--bd)' },
+        style: { background: 'var(--status-pending-bg)', color: 'var(--warning)', border: '1px solid color-mix(in srgb, var(--warning) 24%, transparent)' },
     },
     in_progress: {
         label: 'In Progress',
         icon: PencilRuler,
-        style: { background: 'var(--b-bg)', color: 'var(--blu)', border: '1px solid var(--b-bd)' },
+        style: { background: 'var(--status-progress-bg)', color: 'var(--status-progress-text)', border: '1px solid color-mix(in srgb, var(--status-progress-text) 24%, transparent)' },
     },
     changes: {
         label: 'Changes',
         icon: RefreshCw,
-        style: { background: 'var(--o-bg)', color: 'var(--org)', border: '1px solid var(--o-bd)' },
+        style: { background: 'var(--status-changes-bg)', color: 'var(--status-changes-text)', border: '1px solid color-mix(in srgb, var(--status-changes-text) 24%, transparent)' },
     },
     won: {
         label: 'Won',
         icon: CheckCircle2,
-        style: { background: 'var(--green-ghost)', color: 'var(--green)', border: '1px solid var(--green-glow)' },
+        style: { background: 'var(--status-won-bg)', color: 'var(--status-won-text)', border: '1px solid color-mix(in srgb, var(--status-won-text) 24%, transparent)' },
     },
     lost: {
         label: 'Lost',
         icon: XCircle,
-        style: { background: 'var(--red-ghost)', color: 'var(--red)', border: '1px solid var(--red-glow)' },
+        style: { background: 'var(--status-lost-bg)', color: 'var(--status-lost-text)', border: '1px solid color-mix(in srgb, var(--status-lost-text) 24%, transparent)' },
     },
 };
 
 const STATUS_OPTIONS = ['pending', 'in_progress', 'changes', 'won', 'lost'];
+
+function getDesignBriefId(project) {
+    if (project?.crm_project_id) {
+        return project.crm_project_id;
+    }
+    return `Proj - ${project?.id ?? '-'}`;
+}
 
 function VersionCell({ project, onUpdateField }) {
     const [value, setValue] = React.useState(project.current_version || '');
@@ -52,6 +59,7 @@ function VersionCell({ project, onUpdateField }) {
     return (
         <input
             type="text"
+            className="design-table__version-input"
             value={value}
             onChange={(event) => setValue(event.target.value)}
             onBlur={commitValue}
@@ -60,25 +68,14 @@ function VersionCell({ project, onUpdateField }) {
                     event.currentTarget.blur();
                 }
             }}
-            placeholder="v1 / Final / Custom"
-            style={{
-                width: '100%',
-                minWidth: '140px',
-                border: '1px solid var(--bd)',
-                background: 'var(--bg-card)',
-                color: 'var(--tx)',
-                borderRadius: '10px',
-                padding: '8px 10px',
-                fontSize: '12px',
-                fontWeight: 600,
-            }}
+            placeholder="Version"
         />
     );
 }
 
-export default function DesignTable({ projects, onUpdateStatus, onUpdateField = onUpdateStatus }) {
+export default function DesignTable({ projects, onUpdateStatus, onUpdateField = onUpdateStatus, onOpenProject = null }) {
     return (
-        <table className="tracking-table tracking-table--projects">
+        <table className="design-table">
             <thead>
                 <tr>
                     <th>Brief ID</th>
@@ -97,60 +94,54 @@ export default function DesignTable({ projects, onUpdateStatus, onUpdateField = 
                     const Icon = meta.icon;
 
                     return (
-                        <tr key={project.id} className="table-row" style={{ cursor: 'default' }}>
-                            <td className="fw-600">{getProjectCode(project)}</td>
+                        <tr
+                            key={project.id}
+                            className={`design-table__row${onOpenProject ? ' design-table__row--clickable' : ''}`}
+                            onDoubleClick={() => onOpenProject?.(project)}
+                        >
+                            <td className="design-table__brief-id">{getDesignBriefId(project)}</td>
                             <td>
-                                <div
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 10px',
-                                        borderRadius: '999px',
-                                        ...meta.style,
-                                    }}
-                                >
+                                <div className="design-table__status-pill" style={meta.style}>
                                     <Icon size={12} />
                                     <select
                                         value={project.status}
                                         onChange={(event) => onUpdateStatus(project.id, { status: event.target.value })}
-                                        style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            color: 'inherit',
-                                            font: 'inherit',
-                                            fontSize: '11px',
-                                            fontWeight: 800,
-                                            textTransform: 'uppercase',
-                                            outline: 'none',
-                                            cursor: 'pointer',
-                                            appearance: 'none',
-                                            WebkitAppearance: 'none',
-                                            paddingRight: '16px',
-                                        }}
+                                        className="design-table__status-select"
                                     >
                                         {STATUS_OPTIONS.map((option) => (
                                             <option key={option} value={option}>{STATUS_META[option].label}</option>
                                         ))}
                                     </select>
-                                    <ChevronDown size={12} style={{ pointerEvents: 'none', marginLeft: '-14px' }} />
+                                    <ChevronDown size={12} className="design-table__status-chevron" />
                                 </div>
                             </td>
-                            <td>{project.project_name || '-'}</td>
-                            <td>{project.client || '-'}</td>
-                            <td>{project.city || '-'}</td>
+                            <td className="design-table__project-name">
+                                {onOpenProject ? (
+                                    <button
+                                        type="button"
+                                        className="design-table__project-link"
+                                        onClick={() => onOpenProject(project)}
+                                    >
+                                        {project.project_name || '-'}
+                                    </button>
+                                ) : (
+                                    project.project_name || '-'
+                                )}
+                            </td>
+                            <td>{project.client || 'Client pending'}</td>
+                            <td>{project.city || 'City pending'}</td>
                             <td>
                                 <VersionCell project={project} onUpdateField={onUpdateField} />
                             </td>
-                            <td>{project.booking_date || '—'}</td>
-                            <td>{project.event_start_date || '—'}</td>
+                            <td>{formatDateDisplay(project.booking_date) || '-'}</td>
+                            <td>{formatDateDisplay(project.event_start_date) || '-'}</td>
                         </tr>
                     );
                 })}
 
                 {projects.length === 0 && (
                     <tr>
-                        <td colSpan="8" style={{ padding: '32px', textAlign: 'center', color: 'var(--tx3)', fontWeight: 600 }}>
+                        <td colSpan="8" className="design-table__empty">
                             No design briefs match the current filters.
                         </td>
                     </tr>

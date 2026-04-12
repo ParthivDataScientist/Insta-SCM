@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Clock, MessageSquare, Maximize2, Minimize2, Plus, CheckCircle, Circle, Trash2, Camera, ExternalLink, Copy, AlertTriangle, Link as LinkIcon, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { sanitize, stripTags } from '../utils/sanitizer';
 import CalendarPicker from './CalendarPicker';
 import { formatDateDisplay, formatDateTimeDisplay } from '../utils/dateUtils';
 import ManagerAssignmentPlanner from './ManagerAssignmentPlanner';
 import ProjectBrandAsset from './ProjectBrandAsset';
-import { EXECUTION_BOARD_STAGES, getProjectCode, normalizeBoardStage } from '../utils/projectStatus';
+import ProjectFileResourcePanel from './ProjectFileResourcePanel';
+import ProjectPriorityBadge from './ProjectPriorityBadge';
+import { EXECUTION_BOARD_STAGES, PROJECT_PRIORITY_OPTIONS, PROJECT_STATUS_OPTIONS, formatProjectPriorityLabel, formatProjectStatusLabel, getProjectCode, normalizeBoardStage, normalizeProjectPriority } from '../utils/projectStatus';
 import projectsService from '../api/projects';
 
 const LINK_TYPE_META = {
@@ -16,9 +19,11 @@ const LINK_TYPE_META = {
     other: { label: 'Other', color: 'var(--tx2)', bg: 'var(--bg-in)' },
 };
 
-export default function ProjectBoardModal({ project, onClose, updateProjectFull }) {
+export default function ProjectBoardModal({ project, onClose, updateProjectFull, onProjectRefresh = null }) {
     const { user } = useAuth();
+    const { theme } = useTheme();
     const projectId = project?.id;
+    const isExecutionProject = ['won', 'win', 'confirmed'].includes(String(project?.status || project?.stage || '').trim().toLowerCase());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(true);
     const [activeTab, setActiveTab] = useState('Details');
@@ -42,6 +47,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
 
     // Fallbacks to empty arrays if null/undefined
     const comments = project?.comments || [];
+    const revisionHistory = project?.revision_history || [];
 
     useEffect(() => {
         scrollToBottom();
@@ -53,44 +59,6 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
     // Local states for inputs
     const [newMaterial, setNewMaterial] = useState({ name: '', quantity: '', status: 'Pending', supplier: '', expected: '' });
     const [newQcStep, setNewQcStep] = useState("");
-
-    useEffect(() => {
-        if (!projectId) return;
-        setProjectLinks([]);
-        setLinksError('');
-        setShowLinkForm(false);
-        setEditingLinkId(null);
-        setLinkForm({ label: '', link_type: 'drive', url: '' });
-    }, [projectId]);
-
-    useEffect(() => {
-        if (activeTab !== 'Design' || !projectId) return;
-        let ignore = false;
-
-        const loadLinks = async () => {
-            setLinksLoading(true);
-            setLinksError('');
-            try {
-                const data = await projectsService.fetchProjectLinks(projectId);
-                if (!ignore) {
-                    setProjectLinks(data);
-                }
-            } catch (err) {
-                if (!ignore) {
-                    setLinksError(err.response?.data?.detail || err.message || 'Unable to load project links');
-                }
-            } finally {
-                if (!ignore) {
-                    setLinksLoading(false);
-                }
-            }
-        };
-
-        loadLinks();
-        return () => {
-            ignore = true;
-        };
-    }, [activeTab, projectId]);
 
     // ----- Handlers for Chat -----
     const handleSendComment = async () => {
@@ -256,12 +224,12 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                                 setRect(r);
                                 setIsEditing(true);
                             }}
-                            style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)', cursor: 'pointer', position: 'relative' }}
+                            style={{ padding: '16px', border: '1px solid var(--border-subtle)', borderRadius: '18px', background: 'var(--surface-card-strong)', cursor: 'pointer', position: 'relative' }}
                         >
-                            <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {Icon && <Icon size={14} color="var(--tx3)" />}
-                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--tx)' }}>
+                                {Icon && <Icon size={14} color="var(--text-muted)" />}
+                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
                                     {formatDateDisplay(value) || 'Set Date...'}
                                 </div>
                             </div>
@@ -281,10 +249,10 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                 };
 
                 const TextField = ({ label, field, icon: Icon }) => (
-                    <div style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                    <div className="saas-field">
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {Icon && <Icon size={14} color="var(--tx3)" />}
+                            {Icon && <Icon size={14} color="var(--text-muted)" />}
                             <input 
                                 type="text"
                                 defaultValue={project[field] || ''}
@@ -293,40 +261,50 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                                     flex: 1,
                                     background: 'transparent',
                                     border: 'none',
-                                    borderBottom: '1px solid transparent',
                                     fontSize: '14px',
                                     fontWeight: 600,
-                                    color: 'var(--tx)',
+                                    color: 'var(--text-primary)',
                                     outline: 'none',
-                                    paddingBottom: '2px'
+                                    paddingBottom: '0'
                                 }}
-                                onFocus={(e) => e.target.style.borderBottom = '1px solid var(--org)'}
                             />
                         </div>
                     </div>
                 );
 
                 const SelectField = ({ label, field, options, icon: Icon }) => (
-                    <div style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                    <div className="saas-field">
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {Icon && <Icon size={14} color="var(--tx3)" />}
+                            {Icon && <Icon size={14} color="var(--text-muted)" />}
                             <select
-                                value={field === 'board_stage' ? normalizeBoardStage(project[field]) : (project[field] || '')}
-                                onChange={(event) => updateProjectFull(project.id, { [field]: event.target.value })}
+                                value={
+                                    field === 'board_stage'
+                                        ? normalizeBoardStage(project[field])
+                                        : field === 'priority'
+                                            ? normalizeProjectPriority(project[field])
+                                        : (project[field] || options[0] || '')
+                                }
+                                onChange={(event) => updateProjectFull(project.id, {
+                                    [field]: field === 'priority' ? event.target.value.toLowerCase() : event.target.value,
+                                })}
                                 style={{
                                     flex: 1,
-                                    background: 'transparent',
+                                    background: 'var(--surface-card-strong)',
                                     border: 'none',
                                     fontSize: '14px',
                                     fontWeight: 600,
-                                    color: 'var(--tx)',
+                                    color: 'var(--text-primary)',
                                     outline: 'none',
                                     cursor: 'pointer',
+                                    borderRadius: '10px',
+                                    colorScheme: theme === 'dark' ? 'dark' : 'light',
                                 }}
                             >
                                 {options.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
+                                    <option key={option} value={field === 'priority' ? option.toLowerCase() : option}>
+                                        {field === 'status' ? formatProjectStatusLabel(option) : option}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -341,15 +319,34 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                             style={{ width: '100%', height: '220px', marginBottom: '20px' }}
                         />
 
-                        <div style={{ marginBottom: '20px' }}>
-                            <ManagerAssignmentPlanner project={project} updateProjectFull={updateProjectFull} />
+                        <div className="saas-detail-grid" style={{ marginBottom: '20px' }}>
+                            <SelectField label="Project Status" field="status" options={PROJECT_STATUS_OPTIONS} />
+                            <SelectField label="Priority" field="priority" options={PROJECT_PRIORITY_OPTIONS.map(formatProjectPriorityLabel)} />
+                            {isExecutionProject ? (
+                                <SelectField label="Execution Stage" field="board_stage" options={EXECUTION_BOARD_STAGES} />
+                            ) : (
+                                <div className="saas-field">
+                                    <div className="saas-field__label">Execution Stage</div>
+                                    <div className="saas-field__value">Available after project is won</div>
+                                </div>
+                            )}
+                            <div className="saas-field">
+                                <div className="saas-field__label">Current Version</div>
+                                <div className="saas-field__value">{project.current_version || 'Not set'}</div>
+                            </div>
                         </div>
 
-                        <div style={{ padding: '24px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)' }}>
-                            <h3 style={{ fontSize: '15px', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <Clock size={18} color="var(--org)" /> Event & Installation Timeline
+                        {isExecutionProject ? (
+                            <div className="project-card-section-shell" style={{ marginBottom: '20px' }}>
+                                <ManagerAssignmentPlanner project={project} updateProjectFull={updateProjectFull} />
+                            </div>
+                        ) : null}
+
+                        <div className="saas-surface project-card-section-shell" style={{ padding: '24px' }}>
+                            <h3 style={{ fontSize: '15px', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)' }}>
+                                <Clock size={18} color="var(--warning)" /> Event & Installation Timeline
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div className="saas-detail-grid" style={{ gap: '20px' }}>
                                 <TextField label="Show Name" field="event_name" />
                                 <TextField label="Venue" field="venue" />
                                 <DateDetailField label="Event Start" field="event_start_date" />
@@ -361,6 +358,39 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                                 <TextField label="Branch" field="branch" />
                             </div>
                         </div>
+
+                        <div className="saas-surface" style={{ padding: '24px', marginTop: '20px' }}>
+                            <div className="saas-section-heading" style={{ padding: 0, marginBottom: '16px' }}>
+                                <div>
+                                    <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Version History</h3>
+                                    <p style={{ color: 'var(--text-muted)' }}>Track the revision chain and understand what changed without scanning freeform comments.</p>
+                                </div>
+                            </div>
+                            {revisionHistory.length ? (
+                                <div className="saas-version-timeline">
+                                    {revisionHistory.map((entry, index) => (
+                                        <div key={`${entry.version || 'version'}-${index}`} className="saas-version-item">
+                                            <div className="saas-inline-meta">
+                                                <span className="saas-badge saas-badge--status-in_progress saas-badge--sm">
+                                                    {entry.version || `V${index + 1}`}
+                                                </span>
+                                                <span className="saas-page-note">
+                                                    {entry.timestamp ? formatDateTimeDisplay(entry.timestamp) : 'Timestamp unavailable'}
+                                                </span>
+                                            </div>
+                                            <strong style={{ color: 'var(--text-primary)' }}>
+                                                {entry.notes || 'Revision recorded without notes'}
+                                            </strong>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="saas-empty-state is-compact">
+                                    <strong>No version history yet</strong>
+                                    <span>Once versions are updated, the revision chain will appear here.</span>
+                                </div>
+                            )}
+                        </div>
                     </>
                 );
 
@@ -368,13 +398,13 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                 return (
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0, fontSize: '16px' }}>Materials Logistics</h3>
+                            <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Materials Logistics</h3>
                         </div>
                         {/* Add material inputs */}
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto', gap: '8px', marginBottom: '16px' }}>
                             <input value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} placeholder="Material Name" style={{ padding: '8px', border: '1px solid var(--bd)', borderRadius: '4px' }} />
                             <input value={newMaterial.quantity} onChange={e => setNewMaterial({...newMaterial, quantity: e.target.value})} placeholder="Qty" style={{ padding: '8px', border: '1px solid var(--bd)', borderRadius: '4px' }} />
-                            <select value={newMaterial.status} onChange={e => setNewMaterial({...newMaterial, status: e.target.value})} style={{ padding: '8px', border: '1px solid var(--bd)', borderRadius: '4px' }}>
+                            <select value={newMaterial.status} onChange={e => setNewMaterial({...newMaterial, status: e.target.value})} style={{ padding: '8px', border: '1px solid var(--bd)', borderRadius: '4px', background: 'var(--surface-card-strong)', color: 'var(--text-primary)', colorScheme: theme === 'dark' ? 'dark' : 'light' }}>
                                 <option>Pending</option><option>Ordered</option><option>In Stock</option><option>Missing</option>
                             </select>
                             <input value={newMaterial.supplier} onChange={e => setNewMaterial({...newMaterial, supplier: e.target.value})} placeholder="Supplier" style={{ padding: '8px', border: '1px solid var(--bd)', borderRadius: '4px' }} />
@@ -427,143 +457,25 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
 
             case 'Design':
                 return (
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '16px' }}>Design Resources</h3>
-                                <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--tx3)' }}>
-                                    Structured links for Drive folders, AutoCAD layouts, renders, and reference files.
-                                </p>
-                            </div>
-                            {canManageTabData && (
-                                <button
-                                    onClick={() => {
-                                        if (showLinkForm && !editingLinkId) {
-                                            resetLinkForm();
-                                        } else {
-                                            setShowLinkForm(true);
-                                        }
-                                    }}
-                                    style={{ padding: '10px 16px', background: 'var(--tx)', color: 'var(--bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                                >
-                                    <Plus size={16} /> Add Link
-                                </button>
-                            )}
-                        </div>
-
-                        {showLinkForm && (
-                            <div style={{ padding: '18px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-ralt)', marginBottom: '18px' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1.6fr auto', gap: '12px', alignItems: 'end' }}>
-                                    <div>
-                                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>Label</div>
-                                        <input
-                                            value={linkForm.label}
-                                            onChange={(event) => setLinkForm((prev) => ({ ...prev, label: event.target.value }))}
-                                            placeholder="AutoCAD Layout V2"
-                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--bd)', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--tx)' }}
-                                        />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>Type</div>
-                                        <select
-                                            value={linkForm.link_type}
-                                            onChange={(event) => setLinkForm((prev) => ({ ...prev, link_type: event.target.value }))}
-                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--bd)', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--tx)' }}
-                                        >
-                                            <option value="drive">Drive</option>
-                                            <option value="autocad">AutoCAD</option>
-                                            <option value="render">Render</option>
-                                            <option value="other">Other</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '11px', color: 'var(--tx3)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>URL</div>
-                                        <input
-                                            value={linkForm.url}
-                                            onChange={(event) => setLinkForm((prev) => ({ ...prev, url: event.target.value }))}
-                                            placeholder="https://..."
-                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--bd)', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--tx)' }}
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button onClick={handleSaveLink} style={{ padding: '10px 14px', background: 'var(--tx)', color: 'var(--bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
-                                            <Save size={15} /> Save
-                                        </button>
-                                        <button onClick={resetLinkForm} style={{ padding: '10px 14px', background: 'transparent', color: 'var(--tx2)', border: '1px solid var(--bd)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {linksError && (
-                            <div style={{ padding: '12px 14px', borderRadius: '8px', background: 'var(--red-ghost)', color: 'var(--red)', marginBottom: '16px', fontSize: '13px', fontWeight: 600 }}>
-                                {linksError}
-                            </div>
-                        )}
-
-                        {linksLoading ? (
-                            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--tx3)' }}>Loading project links...</div>
-                        ) : projectLinks.length === 0 ? (
-                            <div style={{ padding: '40px', border: '1px dashed var(--bd)', borderRadius: 'var(--r-md)', textAlign: 'center', color: 'var(--tx3)' }}>
-                                No design links yet. {canManageTabData ? 'Add the first Drive, AutoCAD, or render resource.' : ''}
-                            </div>
-                        ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-                                {projectLinks.map((link) => {
-                                    const meta = LINK_TYPE_META[link.link_type] || LINK_TYPE_META.other;
-                                    const isSafeLink = isSafeHttpUrl(link.url);
-
-                                    return (
-                                        <div key={link.id} style={{ padding: '16px', border: '1px solid var(--bd)', borderRadius: 'var(--r-md)', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                                                <div style={{ minWidth: 0 }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--tx)', marginBottom: '6px' }}>{link.label}</div>
-                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '999px', background: meta.bg, color: meta.color, fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
-                                                        <LinkIcon size={12} /> {meta.label}
-                                                    </div>
-                                                </div>
-                                                {!isSafeLink && <AlertTriangle size={16} color="var(--red)" />}
-                                            </div>
-
-                                            <div style={{ fontSize: '12px', color: 'var(--tx3)', wordBreak: 'break-all' }}>{link.url}</div>
-
-                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                <button onClick={() => handleCopyLink(link.url)} style={{ padding: '8px 12px', border: '1px solid var(--bd)', background: 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                                                    <Copy size={14} /> Copy
-                                                </button>
-                                                <button
-                                                    onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
-                                                    disabled={!isSafeLink}
-                                                    style={{ padding: '8px 12px', border: 'none', background: 'var(--accent)', color: 'white', borderRadius: '8px', cursor: isSafeLink ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, opacity: isSafeLink ? 1 : 0.5 }}
-                                                >
-                                                    <ExternalLink size={14} /> Open
-                                                </button>
-                                                {canManageTabData && (
-                                                    <>
-                                                        <button onClick={() => handleEditLink(link)} style={{ padding: '8px 12px', border: '1px solid var(--bd)', background: 'transparent', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                                                            Edit
-                                                        </button>
-                                                        <button onClick={() => handleDeleteLink(link.id)} style={{ padding: '8px 12px', border: '1px solid var(--exc-bd)', background: 'var(--red-ghost)', color: 'var(--red)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
-                                                            Delete
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <ProjectFileResourcePanel
+                        projectId={project.id}
+                        resourceType="design"
+                        canManage={canManageTabData}
+                        onResourceSaved={onProjectRefresh}
+                    />
                 );
+
+            case 'AutoCAD':
+                return <ProjectFileResourcePanel projectId={project.id} resourceType="autocad" canManage={canManageTabData} />;
+
+            case 'Graphic File':
+                return <ProjectFileResourcePanel projectId={project.id} resourceType="graphic_file" canManage={canManageTabData} />;
 
             case 'Photos':
                 return (
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0, fontSize: '16px' }}>Project Photos & Execution</h3>
+                            <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Project Photos & Execution</h3>
                             <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--tx)', color: 'var(--bg)', padding: '8px 16px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
                                 <Camera size={16} /> Add Photo
                                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
@@ -608,11 +520,11 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                     </div>
                 );
 
-            case 'QC':
+            case 'Checklist':
                 return (
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0, fontSize: '16px' }}>QC & Execution Checklist</h3>
+                            <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>Execution Checklist</h3>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                             <input 
@@ -638,7 +550,7 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                                     </button>
                                 </div>
                             ))}
-                            {qcSteps.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: 'var(--tx3)' }}>No QC steps defined.</div>}
+                            {qcSteps.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: 'var(--tx3)' }}>No checklist steps defined.</div>}
                         </div>
                     </div>
                 );
@@ -648,118 +560,90 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
         }
     };
 
+    const tabContent = React.useMemo(
+        () => renderTabContent(),
+        [activeTab, canManageTabData, hoveredPhoto, isExecutionProject, newMaterial, newQcStep, onProjectRefresh, project, updateProjectFull]
+    );
+
     if (!project) return null;
 
     return (
-        <div 
-            className="modal-backdrop-animate"
-            style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
-                zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '20px'
-            }}
-        >
-            <div 
-                className="modal-content-animate"
-                style={{
-                    background: 'var(--bg-card)', 
-                    width: isFullscreen ? '100vw' : '900px', 
-                    maxWidth: isFullscreen ? '100vw' : '95vw',
-                    height: isFullscreen ? '100vh' : '80vh', 
-                    borderRadius: isFullscreen ? '0' : 'var(--r-md)', 
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-                    display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-            >
-                {/* Header */}
-                <div style={{
-                    padding: '24px', borderBottom: '1px solid var(--bd)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
-                }}>
+        <div className={`saas-modal ${theme}`}>
+            <div className={`saas-modal__dialog${isFullscreen ? ' is-fullscreen' : ''}`}>
+                <div className="saas-modal__header">
                     <div>
-                        <div style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                        <div className="saas-eyebrow">
                             {getProjectCode(project)}
                         </div>
-                        <h2 style={{ margin: '8px 0 0', fontSize: '22px', color: 'var(--tx)', lineHeight: 1.25 }}>
+                        <h2 style={{ margin: '8px 0 0', fontSize: '24px', color: 'var(--text-primary)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>
                             {project.project_name || 'Untitled project'}
                         </h2>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
                             {project.event_name ? (
-                                <span style={{ fontSize: '13px', color: 'var(--tx2)', fontWeight: 500 }}>
+                                <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
                                     {project.event_name}
                                 </span>
                             ) : null}
                             {project.area ? (
-                                <span style={{ fontSize: '13px', color: 'var(--tx3)' }}>
+                                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                                     {project.area}
                                 </span>
                             ) : null}
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
-                            <span style={{ padding: '6px 10px', background: 'rgba(16, 185, 129, 0.1)', color: '#047857', fontSize: '11px', borderRadius: '999px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.16)' }}>
-                                {project.stage || 'Status TBD'}
+                        <div className="saas-inline-meta" style={{ marginTop: '14px' }}>
+                            <span className={`saas-badge saas-badge--status-${project.status || 'pending'}`}>
+                                {formatProjectStatusLabel(project.status)}
                             </span>
-                            <span style={{ padding: '6px 10px', background: 'rgba(15, 23, 42, 0.05)', color: 'var(--tx2)', fontSize: '11px', borderRadius: '999px', fontWeight: 700, border: '1px solid rgba(148, 163, 184, 0.16)' }}>
-                                {normalizeBoardStage(project.board_stage)}
-                            </span>
+                            <ProjectPriorityBadge priority={project.priority} />
+                            {isExecutionProject ? (
+                                <span style={{ padding: '6px 10px', background: 'rgba(15, 23, 42, 0.05)', color: 'var(--text-secondary)', fontSize: '11px', borderRadius: '999px', fontWeight: 700, border: '1px solid rgba(148, 163, 184, 0.16)' }}>
+                                    {normalizeBoardStage(project.board_stage)}
+                                </span>
+                            ) : null}
                         </div>
                     </div>
-                    
-                    {/* Header Controls */}
+
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <button 
-                            className="btn-animate" 
-                            onClick={() => setIsChatOpen(!isChatOpen)} 
-                            title={isChatOpen ? "Hide Chat" : "Show Chat"} 
-                            style={{ background: isChatOpen ? 'var(--org-light)' : 'none', border: 'none', cursor: 'pointer', color: isChatOpen ? 'var(--org)' : 'var(--tx2)', padding: '6px', borderRadius: '4px' }}
+                        <button
+                            className="premium-icon-button"
+                            onClick={() => setIsChatOpen(!isChatOpen)}
+                            title={isChatOpen ? "Hide Chat" : "Show Chat"}
+                            style={{ background: isChatOpen ? 'var(--warning-soft)' : undefined, color: isChatOpen ? 'var(--warning)' : 'var(--text-secondary)' }}
                         >
                             <MessageSquare size={20} />
                         </button>
-                        <button className="btn-animate" onClick={() => setIsFullscreen(!isFullscreen)} title="Toggle Fullscreen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tx2)', padding: '4px' }}>
+                        <button className="premium-icon-button" onClick={() => setIsFullscreen(!isFullscreen)} title="Toggle Fullscreen" style={{ color: 'var(--text-secondary)' }}>
                             {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
                         </button>
-                        <button className="btn-animate" onClick={onClose} title="Close Panel" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-v)', padding: '4px' }}>
+                        <button className="premium-icon-button premium-icon-button--danger" onClick={onClose} title="Close Panel">
                             <X size={24} />
                         </button>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-                    
-                    {/* Main Content Area */}
-                    <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }} className="no-scrollbar">
-                        <div style={{ display: 'flex', borderBottom: '1px solid var(--bd)', marginBottom: '20px' }}>
-                            {['Details', 'Design', 'Materials', 'Photos', 'QC'].map((tab) => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className="btn-animate" style={{
-                                    padding: '10px 20px', borderBottom: activeTab === tab ? '2px solid var(--tx)' : '2px solid transparent',
-                                    fontWeight: activeTab === tab ? 600 : 500, color: activeTab === tab ? 'var(--tx)' : 'var(--tx3)',
-                                    fontSize: '13px', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
-                                }}>
+                <div className="saas-modal__body">
+                    <div className="saas-modal__main no-scrollbar">
+                        <div className="saas-tabs" style={{ marginBottom: '20px' }}>
+                            {['Details', 'Design', 'AutoCAD', 'Graphic File', 'Materials', 'Photos', 'Checklist'].map((tab) => (
+                                <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'is-active' : ''}>
                                     {tab}
                                 </button>
                             ))}
                         </div>
 
-                        {renderTabContent()}
+                        {tabContent}
 
                     </div>
 
-                    {/* Sidebar Comments */}
                     {isChatOpen && (
-                        <div 
-                            className="message-animate"
-                            style={{ width: '320px', borderLeft: '1px solid var(--bd)', background: 'var(--bg-in)', display: 'flex', flexDirection: 'column', transition: 'width 0.3s ease' }}
-                        >
+                        <div className="saas-modal__sidebar message-animate">
                             <div style={{ padding: '16px', borderBottom: '1px solid var(--bd)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
-                                    <MessageSquare size={16} color="var(--org)" /> Comments and activity
+                                    <MessageSquare size={16} color="var(--warning)" /> Comments and activity
                                 </div>
                             </div>
-                            
-                            <div style={{ padding: '16px', borderBottom: '1px solid var(--bd)' }}>
+
+                            <div className="saas-comment-composer">
                             <div style={{ position: 'relative' }}>
                                 <input 
                                     value={newComment}
@@ -777,11 +661,10 @@ export default function ProjectBoardModal({ project, onClose, updateProjectFull 
                             </div>
                         </div>
 
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }} className="no-scrollbar">
-                            {/* Render Dynamic Comments */}
+                        <div className="saas-comment-thread no-scrollbar">
                             {comments.map((c, idx) => (
                                 <div key={idx} className="message-animate" style={{ display: 'flex', gap: '12px' }}>
-                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: c.color || '#E0E7FF', color: c.textCol || '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0, transition: '0.3s transform ease' }}>
+                                    <div className="saas-comment__avatar" style={{ background: c.color || '#E0E7FF', color: c.textCol || '#4F46E5' }}>
                                         {c.initials}
                                     </div>
                                     <div>

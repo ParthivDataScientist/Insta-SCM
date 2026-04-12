@@ -1,6 +1,6 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarRange, CheckCircle2, Loader2, Users } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, CalendarRange, CheckCircle2, Loader2, Plus, Users } from 'lucide-react';
 import projectsService from '../api/projects';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
 import {
@@ -20,6 +20,7 @@ const sectionTitleStyle = {
 };
 
 export default function ManagerAssignmentPlanner({ project, updateProjectFull }) {
+    const queryClient = useQueryClient();
     const initialWindow = React.useMemo(() => resolveProjectSchedule(project), [project]);
     const [draft, setDraft] = React.useState({
         managerId: project?.manager_id ? String(project.manager_id) : '',
@@ -29,6 +30,8 @@ export default function ManagerAssignmentPlanner({ project, updateProjectFull })
     const [showAvailabilityModal, setShowAvailabilityModal] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
     const [isEditing, setIsEditing] = React.useState(!project?.manager_id);
+    const [showCreateManager, setShowCreateManager] = React.useState(false);
+    const [newManagerName, setNewManagerName] = React.useState('');
 
     React.useEffect(() => {
         const nextWindow = resolveProjectSchedule(project);
@@ -52,6 +55,23 @@ export default function ManagerAssignmentPlanner({ project, updateProjectFull })
         queryKey: ['managers_list'],
         queryFn: projectsService.fetchManagers,
         staleTime: 30000,
+    });
+
+    const createManagerMutation = useMutation({
+        mutationFn: (data) => projectsService.createManager(data),
+        onSuccess: async (createdManager) => {
+            setDraft((current) => ({ ...current, managerId: String(createdManager.id) }));
+            setNewManagerName('');
+            setShowCreateManager(false);
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['managers_list'] }),
+                queryClient.invalidateQueries({ queryKey: ['manager_timeline'] }),
+                queryClient.invalidateQueries({ queryKey: ['projects'] }),
+            ]);
+        },
+        onError: (error) => {
+            window.alert(error.response?.data?.detail || error.message || 'Failed to create manager');
+        },
     });
 
     const normalizedEndDate =
@@ -246,7 +266,7 @@ export default function ManagerAssignmentPlanner({ project, updateProjectFull })
                     padding: '24px',
                     border: '1px solid var(--bd)',
                     borderRadius: '24px',
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96))',
+                    background: 'var(--bg-card)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '18px',
@@ -258,41 +278,108 @@ export default function ManagerAssignmentPlanner({ project, updateProjectFull })
                             Manager Assignment
                         </div>
                         <div style={{ marginTop: '8px', fontSize: '19px', fontWeight: 800, color: 'var(--tx)' }}>
-                            Assign by availability, not guesswork
-                        </div>
-                        <div style={{ marginTop: '6px', fontSize: '13px', color: 'var(--tx3)', maxWidth: '560px', lineHeight: 1.5 }}>
-                            Set the working window first. The system will separate managers into available and busy lists for that exact period.
+                            {selectedManager?.full_name || 'Unassigned'}
                         </div>
                     </div>
 
-                    <div
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            borderRadius: '999px',
-                            background: selectionTone.background,
-                            color: selectionTone.color,
-                            border: `1px solid ${selectionTone.border}`,
-                            fontSize: '12px',
-                            fontWeight: 700,
-                        }}
-                    >
-                        {availabilityQuery.isLoading ? (
-                            <Loader2 size={14} className="animate-spin" />
-                        ) : selectedAvailability?.available === false ? (
-                            <AlertTriangle size={14} />
-                        ) : (
-                            <CheckCircle2 size={14} />
-                        )}
-                        {!draft.managerId
-                            ? 'No manager selected'
-                            : selectedAvailability?.available === false
-                                ? 'Selected manager has conflicts'
-                                : 'Selected manager is available'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+                        <button
+                            type="button"
+                            className="premium-action-button"
+                            onClick={() => setShowCreateManager((open) => !open)}
+                        >
+                            <Plus size={14} />
+                            {showCreateManager ? 'Hide manager form' : 'Add manager'}
+                        </button>
+                        <div
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                borderRadius: '999px',
+                                background: selectionTone.background,
+                                color: selectionTone.color,
+                                border: `1px solid ${selectionTone.border}`,
+                                fontSize: '12px',
+                                fontWeight: 700,
+                            }}
+                        >
+                            {availabilityQuery.isLoading ? (
+                                <Loader2 size={14} className="animate-spin" />
+                            ) : selectedAvailability?.available === false ? (
+                                <AlertTriangle size={14} />
+                            ) : (
+                                <CheckCircle2 size={14} />
+                            )}
+                            {!draft.managerId
+                                ? 'No manager selected'
+                                : selectedAvailability?.available === false
+                                    ? 'Selected manager has conflicts'
+                                    : 'Selected manager is available'}
+                        </div>
                     </div>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+                    <label className="premium-filter" style={{ minWidth: 0 }}>
+                        <Users size={14} color="var(--tx3)" />
+                        <select
+                            value={draft.managerId}
+                            onChange={(event) => setDraft((current) => ({ ...current, managerId: event.target.value }))}
+                        >
+                            <option value="">Unassigned</option>
+                            {managers.map((manager) => (
+                                <option key={manager.id} value={String(manager.id)}>
+                                    {manager.full_name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
+                        <button
+                            type="button"
+                            className="premium-action-button"
+                            style={{ flex: 1, justifyContent: 'space-between', marginLeft: 'auto' }}
+                            disabled={!selectedManager}
+                            onClick={() => setShowAvailabilityModal(true)}
+                        >
+                            <Users size={14} />
+                            Overview
+                        </button>
+                    </div>
+                </div>
+
+                {showCreateManager ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '12px', alignItems: 'center', padding: '14px 16px', borderRadius: '18px', border: '1px solid var(--bd)', background: 'var(--bg-ralt)' }}>
+                        <label className="premium-filter" style={{ minWidth: 0 }}>
+                            <Plus size={14} color="var(--tx3)" />
+                            <input
+                                type="text"
+                                placeholder="Create a new manager"
+                                value={newManagerName}
+                                onChange={(event) => setNewManagerName(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        createManagerMutation.mutate({ name: newManagerName });
+                                    }
+                                }}
+                            />
+                        </label>
+
+                        <button
+                            type="button"
+                            className="premium-action-button premium-action-button--primary"
+                            disabled={createManagerMutation.isPending}
+                            onClick={() => createManagerMutation.mutate({ name: newManagerName })}
+                        >
+                            {createManagerMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                            Save manager
+                        </button>
+                    </div>
+                ) : null}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                     <label className="premium-filter" style={{ minWidth: 0 }}>
@@ -314,45 +401,25 @@ export default function ManagerAssignmentPlanner({ project, updateProjectFull })
                     </label>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                     <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'var(--bg-ralt)', border: '1px solid var(--bd)' }}>
                         <div style={sectionTitleStyle}>Selected manager</div>
                         <div style={{ marginTop: '8px', fontSize: '16px', fontWeight: 700, color: 'var(--tx)' }}>
                             {selectedManager?.full_name || 'Unassigned'}
                         </div>
                     </div>
-
-                    <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'var(--bg-ralt)', border: '1px solid var(--bd)' }}>
-                        <div style={sectionTitleStyle}>Requested window</div>
-                        <div style={{ marginTop: '8px', fontSize: '15px', fontWeight: 700, color: 'var(--tx)' }}>
-                            {draft.startDate ? formatDateRangeDisplay(draft.startDate, normalizedEndDate) : 'Set dates'}
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
-                        <button
-                            type="button"
-                            className="premium-action-button"
-                            style={{ flex: 1, justifyContent: 'space-between' }}
-                            disabled={!selectedManager}
-                            onClick={() => setShowAvailabilityModal(true)}
-                        >
-                            <Users size={14} />
-                            Overview
-                        </button>
-                        <button
-                            type="button"
-                            className="premium-action-button"
-                            onClick={() => setDraft((current) => ({ ...current, managerId: '' }))}
-                        >
-                            Clear
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        className="premium-action-button"
+                        onClick={() => setDraft((current) => ({ ...current, managerId: '' }))}
+                    >
+                        Clear
+                    </button>
                 </div>
 
                 {draft.startDate ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
-                        <div style={{ padding: '16px', borderRadius: '20px', border: '1px solid var(--bd)', background: 'rgba(240, 253, 244, 0.58)', display: 'grid', gap: '12px' }}>
+                        <div className="project-card-section-shell" style={{ padding: '16px', borderRadius: '20px', borderColor: 'color-mix(in srgb, var(--green) 20%, var(--bd))', background: 'color-mix(in srgb, var(--green-ghost) 44%, var(--surface-card-strong))', display: 'grid', gap: '12px' }}>
                             <div>
                                 <div style={{ ...sectionTitleStyle, color: 'var(--green)' }}>Available managers</div>
                                 <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--tx3)' }}>
@@ -375,7 +442,7 @@ export default function ManagerAssignmentPlanner({ project, updateProjectFull })
                             </div>
                         </div>
 
-                        <div style={{ padding: '16px', borderRadius: '20px', border: '1px solid var(--bd)', background: 'rgba(254, 242, 242, 0.74)', display: 'grid', gap: '12px' }}>
+                        <div className="project-card-section-shell" style={{ padding: '16px', borderRadius: '20px', borderColor: 'color-mix(in srgb, var(--red) 18%, var(--bd))', background: 'color-mix(in srgb, var(--red-ghost) 52%, var(--surface-card-strong))', display: 'grid', gap: '12px' }}>
                             <div>
                                 <div style={{ ...sectionTitleStyle, color: 'var(--red)' }}>Busy managers</div>
                                 <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--tx3)' }}>

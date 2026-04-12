@@ -96,16 +96,33 @@ export function useDesignProjects() {
         if (activeKpi === 'open') {
             return designProjects.filter((project) => !['won', 'lost'].includes(project.status));
         }
+        if (activeKpi === 'overdue') {
+            return designProjects.filter((project) => {
+                const anchor = project.event_start_date || project.booking_date;
+                return anchor && !['won', 'lost'].includes(project.status) && new Date(anchor) < new Date(new Date().toISOString().split('T')[0]);
+            });
+        }
         if (STATUS_FILTERS.includes(activeKpi) && activeKpi !== 'all') {
             return designProjects.filter((project) => project.status === activeKpi);
         }
         return designProjects;
     }, [activeKpi, designProjects]);
 
+    const overdueCount = useMemo(
+        () => designProjects.filter((project) => {
+            const anchor = project.event_start_date || project.booking_date;
+            return anchor && !['won', 'lost'].includes(project.status) && new Date(anchor) < new Date(new Date().toISOString().split('T')[0]);
+        }).length,
+        [designProjects]
+    );
+
     return {
         designProjects,
         tableProjects,
-        designStats: designStatsQuery.data || {},
+        designStats: {
+            ...(designStatsQuery.data || {}),
+            overdue_count: overdueCount,
+        },
         clients: clientsQuery.data || [],
         cityOptions,
         loading: designQuery.isLoading || designStatsQuery.isLoading,

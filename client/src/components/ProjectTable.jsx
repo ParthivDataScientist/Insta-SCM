@@ -1,88 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import { Edit3, User } from 'lucide-react';
-import CalendarPicker from './CalendarPicker';
-import { formatDateDisplay, parseDateInput } from '../utils/dateUtils';
+import React, { useState } from 'react';
+import { User } from 'lucide-react';
 import ManagerAvailabilityModal from './ManagerAvailabilityModal';
 import { getProjectCode, normalizeBoardStage } from '../utils/projectStatus';
+import EmptyState from './EmptyState';
+import { formatDateDisplay } from '../utils/dateUtils';
 
 const DATE_PLACEHOLDER = '-';
 
-const DateCell = ({ project, field, editingCell, setEditingCell, updateProjectFull }) => {
-    const isEditing = editingCell?.id === project.id && editingCell?.field === field;
-    const value = project[field] || '';
-    const displayValue = formatDateDisplay(value) || DATE_PLACEHOLDER;
-    const [rect, setRect] = useState(null);
-    const [inputValue, setInputValue] = useState('');
+function StagePill({ stage }) {
+    const s = normalizeBoardStage(stage);
+    const sLower = s.toLowerCase();
+    let bg = 'var(--bg-card)';
+    let color = 'var(--text-primary)';
+    let border = 'var(--border)';
 
-    useEffect(() => {
-        if (isEditing) {
-            setInputValue(formatDateDisplay(value));
-        }
-    }, [isEditing, value]);
-
-    const handleDateChange = async (projectId, targetField, isoValue) => {
-        if (updateProjectFull && isoValue) {
-            await updateProjectFull(projectId, { [targetField]: isoValue });
-        }
-        setEditingCell(null);
-    };
-
-    const handleManualSubmit = (event) => {
-        if (event.key === 'Enter') {
-            const iso = parseDateInput(inputValue);
-            if (iso) {
-                handleDateChange(project.id, field, iso);
-            } else {
-                alert('Invalid format. Please use DD-MM-YYYY');
-            }
-        }
-    };
+    if (sLower.includes('design') || sLower.includes('bom')) {
+        color = '#D97706'; // orange-600
+        bg = 'color-mix(in srgb, #D97706 15%, transparent)';
+        border = 'color-mix(in srgb, #D97706 30%, transparent)';
+    } else if (sLower.includes('production')) {
+        color = '#2563EB'; // blue-600
+        bg = 'color-mix(in srgb, #2563EB 15%, transparent)';
+        border = 'color-mix(in srgb, #2563EB 30%, transparent)';
+    } else if (sLower.includes('qc') || sLower.includes('dispatch')) {
+        color = '#9333EA'; // purple-600
+        bg = 'color-mix(in srgb, #9333EA 15%, transparent)';
+        border = 'color-mix(in srgb, #9333EA 30%, transparent)';
+    } else if (sLower.includes('install')) {
+        color = '#059669'; // green-600
+        bg = 'color-mix(in srgb, #059669 15%, transparent)';
+        border = 'color-mix(in srgb, #059669 30%, transparent)';
+    }
 
     return (
-        <td
-            onClick={(event) => {
-                event.stopPropagation();
-                if (isEditing) return;
-                const cellRect = event.currentTarget.getBoundingClientRect();
-                setRect(cellRect);
-                setEditingCell({ id: project.id, field });
-            }}
-            className="hover-edit project-date-cell"
-            style={{ cursor: 'pointer', position: 'relative' }}
-        >
-            <div className="project-date-cell__content">
-                {isEditing ? (
-                    <input
-                        autoFocus
-                        className="inline-date-input"
-                        value={inputValue}
-                        onChange={(event) => setInputValue(event.target.value)}
-                        onKeyDown={handleManualSubmit}
-                        onBlur={(event) => {
-                            const iso = parseDateInput(event.target.value);
-                            if (iso && iso !== value) handleDateChange(project.id, field, iso);
-                        }}
-                        placeholder="DD-MM-YYYY"
-                    />
-                ) : (
-                    <>
-                        <span title={displayValue}>{displayValue}</span>
-                        <Edit3 size={10} className="edit-icon-hover" style={{ opacity: 0, color: 'var(--org)' }} />
-                    </>
-                )}
-            </div>
-
-            {isEditing && rect && (
-                <CalendarPicker
-                    initialDate={value}
-                    anchorRect={rect}
-                    onSelect={(date) => handleDateChange(project.id, field, date)}
-                    onClose={() => setEditingCell(null)}
-                />
-            )}
-        </td>
+        <div style={{
+            background: bg,
+            color: color,
+            border: `1px solid ${border}`,
+            padding: '4px 12px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: '600',
+            display: 'inline-block',
+            whiteSpace: 'nowrap',
+            textAlign: 'center'
+        }}>
+            {s}
+        </div>
     );
-};
+}
 
 export default function ProjectTable({
     projects,
@@ -90,85 +56,85 @@ export default function ProjectTable({
     selectedProject,
     onSelectProject,
     onDoubleClickProject,
-    updateProjectFull
 }) {
-    const [editingCell, setEditingCell] = useState(null);
     const [viewingManager, setViewingManager] = useState(null);
 
     return (
         <>
-            <table className="tracking-table tracking-table--projects">
-                <thead>
-                    <tr>
-                        <th>Project ID</th>
-                        <th>Project Name</th>
-                        <th>Stage</th>
-                        <th>Event Name</th>
-                        <th>Venue</th>
-                        <th>Area</th>
-                        <th>Manager</th>
-                        <th className="project-date-heading">Event Start</th>
-                        <th className="project-date-heading">Dispatch</th>
-                        <th className="project-date-heading">Install Start</th>
-                        <th className="project-date-heading">Install End</th>
-                        <th className="project-date-heading">Event End</th>
-                        <th className="project-date-heading">Dismantle</th>
-                        <th>Branch</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {projects.map((project) => {
-                        const boardStage = normalizeBoardStage(project.board_stage);
-                        return (
-                        <tr
-                            key={project.id}
-                            className={`table-row ${selectedProject?.id === project.id ? 'selected-row' : ''}`}
-                            onClick={() => onSelectProject && onSelectProject(selectedProject?.id === project.id ? null : project)}
-                            onDoubleClick={() => onDoubleClickProject && onDoubleClickProject(project)}
-                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                        >
-                            <td className="fw-600">{getProjectCode(project)}</td>
-                            <td className="fw-600">{project.project_name || DATE_PLACEHOLDER}</td>
-                            <td>
-                                <span className={`status-badge ${boardStage === 'Design/ BOM' ? 'in-transit' : 'delivered'}`}>
-                                    {boardStage}
-                                </span>
-                            </td>
-                            <td>{project.event_name || DATE_PLACEHOLDER}</td>
-                            <td>{project.venue || DATE_PLACEHOLDER}</td>
-                            <td>{project.area || DATE_PLACEHOLDER}</td>
-                            <td
-                                onClick={(event) => {
-                                    if (project.manager_id && project.project_manager) {
-                                        event.stopPropagation();
-                                        setViewingManager({ id: project.manager_id, name: project.project_manager });
-                                    }
-                                }}
-                                className="pm-clickable"
-                                style={{
-                                    cursor: project.project_manager ? 'pointer' : 'default',
-                                    fontWeight: 500,
-                                    color: project.project_manager ? 'var(--red)' : 'var(--tx2)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
-                                }}
-                            >
-                                <User size={12} />
-                                {project.project_manager || DATE_PLACEHOLDER}
-                            </td>
-                            <DateCell project={project} field="event_start_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
-                            <DateCell project={project} field="dispatch_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
-                            <DateCell project={project} field="installation_start_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
-                            <DateCell project={project} field="installation_end_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
-                            <DateCell project={project} field="event_end_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
-                            <DateCell project={project} field="dismantling_date" editingCell={editingCell} setEditingCell={setEditingCell} updateProjectFull={updateProjectFull} />
-                            <td>{project.branch || DATE_PLACEHOLDER}</td>
+            {projects.length === 0 && !loading ? (
+                <div className="saas-panel-content">
+                    <EmptyState
+                        title="No projects available"
+                        description="Try clearing filters or widen the date range to bring more execution work into view."
+                    />
+                </div>
+            ) : (
+                <div style={{ paddingBottom: '16px' }}>
+                <table className="design-table" style={{ width: '100%', fontSize: '13px' }}>
+                    <thead>
+                        <tr>
+                            <th style={{ whiteSpace: 'nowrap' }}>PROJECT ID</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>PROJECT NAME</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>STAGE</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>EVENT NAME</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>VENUE</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>AREA</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>MANAGER</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>EVENT START</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>DISPATCH</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>INSTALL START</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>INSTALL END</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>EVENT END</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>DISMANTLE</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>BRANCH</th>
                         </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {projects.map((project) => {
+                            return (
+                                <tr
+                                    key={project.id}
+                                    className={`design-table__row${selectedProject?.id === project.id ? ' design-table__row--clickable' : ''}`}
+                                    onClick={() => onSelectProject && onSelectProject(selectedProject?.id === project.id ? null : project)}
+                                    onDoubleClick={() => onDoubleClickProject && onDoubleClickProject(project)}
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                >
+                                    <td style={{ fontWeight: '600', fontSize: '13px' }}>{getProjectCode(project)}</td>
+                                    <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{project.project_name || DATE_PLACEHOLDER}</td>
+                                    <td>
+                                        <StagePill stage={project.board_stage} />
+                                    </td>
+                                    <td style={{ color: 'var(--text-primary)' }}>{project.event_name || project.client || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)' }}>{project.venue || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)' }}>{project.area || DATE_PLACEHOLDER}</td>
+                                    <td
+                                        onClick={(event) => {
+                                            if (project.manager_id && project.project_manager) {
+                                                event.stopPropagation();
+                                                setViewingManager({ id: project.manager_id, name: project.project_manager });
+                                            }
+                                        }}
+                                        style={{ whiteSpace: 'nowrap' }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
+                                            <User size={13} />
+                                            <span>{project.project_manager || 'Unassigned'}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatDateDisplay(project.event_start_date) || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatDateDisplay(project.dispatch_date) || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatDateDisplay(project.installation_start_date) || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatDateDisplay(project.installation_end_date) || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatDateDisplay(project.event_end_date) || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{formatDateDisplay(project.dismantle_date) || DATE_PLACEHOLDER}</td>
+                                    <td style={{ color: 'var(--text-primary)' }}>{project.branch || DATE_PLACEHOLDER}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                </div>
+            )}
 
             {viewingManager && (
                 <ManagerAvailabilityModal

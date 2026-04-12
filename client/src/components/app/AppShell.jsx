@@ -8,8 +8,8 @@ import GlobalDateRangePicker from '../GlobalDateRangePicker';
 const NAV_ITEMS = [
     { to: '/design', label: 'Design', icon: PenTool, key: 'design' },
     { to: '/projects', label: 'Projects', icon: Briefcase, key: 'projects' },
-    { to: '/board', label: 'Board', icon: Layout, key: 'board' },
-    { to: '/timeline', label: 'Timeline', icon: RefreshCw, key: 'timeline' },
+    { to: '/stages', label: 'Stages', icon: Layout, key: 'stages' },
+    { to: '/project-officer', label: 'Project Officer', icon: RefreshCw, key: 'projectOfficer' },
     { to: '/dashboard', label: 'Shipments', icon: Truck, key: 'dashboard' },
     { to: '/storage', label: 'Storage', icon: Archive, key: 'storage' },
 ];
@@ -19,7 +19,9 @@ export default function AppShell({
     title,
     subtitle,
     headerCenter = null,
+    headerFilters = null,
     actions = null,
+    header = null,
     toolbar = null,
     showGlobalDate = true,
     children,
@@ -29,6 +31,16 @@ export default function AppShell({
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const nav = useMemo(() => NAV_ITEMS, []);
+    const headerOverrideProps = useMemo(
+        () => ({
+            theme,
+            isDark,
+            toggleTheme,
+            logout,
+            toggleSidebar: () => setSidebarOpen((open) => !open),
+        }),
+        [isDark, logout, theme, toggleTheme]
+    );
 
     return (
         <div className={`${theme} premium-app`}>
@@ -53,36 +65,41 @@ export default function AppShell({
                 </aside>
 
                 <main className="premium-main">
-                    <header className="premium-header">
-                        <div className="premium-header__title">
-                            <button type="button" className="premium-icon-button mobile-only" onClick={() => setSidebarOpen((open) => !open)}>
-                                <Menu size={18} />
-                            </button>
-                            <div>
-                                <h1>{title}</h1>
-                                {subtitle ? <p>{subtitle}</p> : null}
+                    {header ? (
+                        typeof header === 'function' ? header(headerOverrideProps) : header
+                    ) : (
+                        <header className="premium-header">
+                            <div className="premium-header__title">
+                                <button type="button" className="premium-icon-button mobile-only" onClick={() => setSidebarOpen((open) => !open)}>
+                                    <Menu size={18} />
+                                </button>
+                                <div>
+                                    <h1>{title}</h1>
+                                    {subtitle ? <p>{subtitle}</p> : null}
+                                </div>
                             </div>
-                        </div>
 
-                        {headerCenter ? (
-                            <div className="premium-header__center">
-                                {headerCenter}
+                            {headerCenter ? (
+                                <div className="premium-header__center">
+                                    {headerCenter}
+                                </div>
+                            ) : (
+                                <div className="premium-header__center premium-header__center--empty" />
+                            )}
+
+                            <div className="premium-header__actions">
+                                {headerFilters ? <div className="premium-header__filters">{headerFilters}</div> : null}
+                                {showGlobalDate ? <GlobalDateRangePicker compact /> : null}
+                                {actions}
+                                <button type="button" className="premium-icon-button" onClick={toggleTheme} title="Toggle theme">
+                                    {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                                </button>
+                                <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
+                                    <LogOut size={16} />
+                                </button>
                             </div>
-                        ) : (
-                            <div className="premium-header__center premium-header__center--empty" />
-                        )}
-
-                        <div className="premium-header__actions">
-                            {showGlobalDate ? <GlobalDateRangePicker compact /> : null}
-                            {actions}
-                            <button type="button" className="premium-icon-button" onClick={toggleTheme} title="Toggle theme">
-                                {isDark ? <Sun size={16} /> : <Moon size={16} />}
-                            </button>
-                            <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
-                                <LogOut size={16} />
-                            </button>
-                        </div>
-                    </header>
+                        </header>
+                    )}
 
                     {toolbar ? <div className="premium-toolbar">{toolbar}</div> : null}
 

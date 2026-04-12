@@ -234,6 +234,64 @@ class TestDesignToExecutionFlow:
         assert delete_link.status_code == 200
         assert client.get(f"/api/v1/projects/{project['id']}/links").json() == []
 
+    def test_project_resources_keep_version_history_per_tab(self, client):
+        project = create_design_project(
+            client,
+            {
+                "crm_project_id": "CRM-RES-1",
+                "project_name": "Versioned Resource Project",
+            },
+        )
+
+        first_version = client.post(
+            f"/api/v1/projects/{project['id']}/resources/design",
+            json={
+                "label": "Main Design Pack",
+                "source_type": "link",
+                "url": "https://example.com/design-v1",
+            },
+        )
+        assert first_version.status_code == 200, first_version.text
+        created_entry = first_version.json()
+        assert created_entry["latest_version"] == "v1"
+        assert created_entry["version_count"] == 1
+
+        second_version = client.post(
+            f"/api/v1/projects/{project['id']}/resources/design",
+            json={
+                "entry_key": created_entry["entry_key"],
+                "label": "Main Design Pack",
+                "source_type": "link",
+                "url": "https://example.com/design-v2",
+            },
+        )
+        assert second_version.status_code == 200, second_version.text
+        updated_entry = second_version.json()
+        assert updated_entry["latest_version"] == "v2"
+        assert [version["version_label"] for version in updated_entry["versions"]] == ["v1", "v2"]
+        assert updated_entry["versions"][0]["url"] == "https://example.com/design-v1"
+        assert updated_entry["versions"][1]["url"] == "https://example.com/design-v2"
+
+        all_entries = client.get(f"/api/v1/projects/{project['id']}/resources/design")
+        assert all_entries.status_code == 200
+        assert len(all_entries.json()) == 1
+
+    def test_manager_creation_is_deduplicated_and_sorted(self, client):
+        first = client.post("/api/v1/projects/managers", json={"name": "  Alex   Carter  "})
+        assert first.status_code == 200, first.text
+
+        duplicate = client.post("/api/v1/projects/managers", json={"name": "alex carter"})
+        assert duplicate.status_code == 200, duplicate.text
+        assert duplicate.json()["id"] == first.json()["id"]
+
+        second = client.post("/api/v1/projects/managers", json={"name": "Brian Smith"})
+        assert second.status_code == 200, second.text
+
+        manager_list = client.get("/api/v1/projects/pm-list")
+        assert manager_list.status_code == 200
+        rows = manager_list.json()
+        assert [row["full_name"] for row in rows] == ["Alex Carter", "Brian Smith"]
+
     def test_shipments_require_project_and_project_shipments_endpoint(self, client):
         project = create_execution_project(
             client,

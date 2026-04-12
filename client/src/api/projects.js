@@ -7,16 +7,16 @@ const projectsService = {
     /**
      * Fetches all projects.
      */
-    fetchProjects: async () => {
-        const response = await apiClient.get('/api/v1/projects/');
+    fetchProjects: async (params = {}) => {
+        const response = await apiClient.get('/api/v1/projects/', { params });
         return response.data;
     },
 
     /**
      * Fetches project statistics for dashboard KPIs.
      */
-    fetchProjectStats: async () => {
-        const response = await apiClient.get('/api/v1/projects/stats');
+    fetchProjectStats: async (params = {}) => {
+        const response = await apiClient.get('/api/v1/projects/stats', { params });
         return response.data;
     },
 
@@ -85,6 +85,21 @@ const projectsService = {
 
     deleteProjectLink: async (projectId, linkId) => {
         const response = await apiClient.delete(`/api/v1/projects/${projectId}/links/${linkId}`);
+        return response.data;
+    },
+
+    fetchProjectResources: async (projectId, resourceType) => {
+        const response = await apiClient.get(`/api/v1/projects/${projectId}/resources/${resourceType}`);
+        return response.data;
+    },
+
+    createProjectResource: async (projectId, resourceType, data) => {
+        const response = await apiClient.post(`/api/v1/projects/${projectId}/resources/${resourceType}`, data);
+        return response.data;
+    },
+
+    deleteProjectResource: async (projectId, resourceId) => {
+        const response = await apiClient.delete(`/api/v1/projects/${projectId}/resources/${resourceId}`);
         return response.data;
     },
 

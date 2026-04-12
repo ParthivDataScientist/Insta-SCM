@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import date as py_date, datetime, timezone
 from sqlmodel import Field, Relationship, Column, SQLModel
-from sqlalchemy import DateTime, JSON, String, func
+from sqlalchemy import DateTime, JSON, String, UniqueConstraint, func
 from .base import AuditMixin
 
 class Client(AuditMixin, table=True):
@@ -54,6 +54,7 @@ class DashboardProject(AuditMixin, table=True):
     stage: str = Field(default="Open", description="Sales stage (e.g., Open, Confirmed, Lost).")
     board_stage: str = Field(default="TBC", description="Kanban stage for confirmed projects.")
     status: str = Field(default="pending", index=True, description="Canonical design lifecycle status.")
+    priority: str = Field(default="medium", index=True, description="Operational priority level: high, medium, or low.")
     revision_count: int = Field(default=0, description="Number of client revision cycles completed after V1.")
     current_version: Optional[str] = Field(default=None, description="Current design version, e.g. V1, V2.")
     is_active: bool = Field(default=True, description="Whether the project is active in the design funnel.")
@@ -93,6 +94,7 @@ class DashboardProject(AuditMixin, table=True):
     client_relationship: Optional[Client] = Relationship(back_populates="projects")
     audit_logs: List[ProjectAuditLog] = Relationship()
     project_links: List["ProjectLink"] = Relationship(back_populates="project")
+    project_resources: List["ProjectResource"] = Relationship(back_populates="project")
 
 
 class ProjectLink(AuditMixin, table=True):
@@ -105,3 +107,36 @@ class ProjectLink(AuditMixin, table=True):
     created_by: Optional[int] = Field(default=None, foreign_key="user.id")
 
     project: Optional[DashboardProject] = Relationship(back_populates="project_links")
+
+
+class ProjectResource(AuditMixin, table=True):
+    """Versioned project resources for design, AutoCAD, and graphic file tabs."""
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "resource_type",
+            "entry_key",
+            "version_number",
+            name="uq_project_resource_version",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="dashboardproject.id", index=True)
+    resource_type: str = Field(index=True, description="design, autocad, or graphic_file")
+    entry_key: str = Field(index=True, description="Stable identifier that groups versions of the same entry.")
+    label: str = Field(description="Human-readable resource label.")
+    version_number: int = Field(default=1, description="Monotonic version number within the entry.")
+    source_type: str = Field(default="link", description="link or file")
+    url: Optional[str] = Field(default=None, description="External link for link-based resources.")
+    file_name: Optional[str] = Field(default=None, description="Display filename for uploaded resources.")
+    file_content: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String),
+        description="Serialized file payload (data URL) for lightweight file storage.",
+    )
+    mime_type: Optional[str] = Field(default=None, description="Uploaded file MIME type.")
+    created_by: Optional[int] = Field(default=None, foreign_key="user.id")
+
+    project: Optional[DashboardProject] = Relationship(back_populates="project_resources")

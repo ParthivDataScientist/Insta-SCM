@@ -1,11 +1,14 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Layout, MapPin, RefreshCw, Search, Users } from 'lucide-react';
+import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
+import { AlertTriangle, Layout, MapPin, RefreshCw, Search, Users, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import AppShell from '../components/app/AppShell';
+import AlertBanner from '../components/AlertBanner';
+import KpiCard from '../components/app/KpiCard';
 import KanbanColumn from '../components/KanbanColumn';
 import { BoardSkeleton } from '../components/SkeletonLoader';
-import { EXECUTION_BOARD_STAGES, isWonProject, normalizeBoardStage } from '../utils/projectStatus';
+import { EXECUTION_BOARD_STAGES, isWonProject, normalizeBoardStage, normalizeProjectPriority } from '../utils/projectStatus';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 
@@ -28,9 +31,16 @@ export default function ProjectBoardPremium() {
         setFilterPM,
         filterStatus,
         setFilterStatus,
+        filterPriority,
+        setFilterPriority,
         searchQuery,
         setSearchQuery,
     } = useProjects();
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 6 },
+        })
+    );
 
     const confirmedProjects = useMemo(
         () => filteredProjects.filter((project) => isWonProject(project.stage)),
@@ -44,6 +54,12 @@ export default function ProjectBoardPremium() {
         () => ['All', ...new Set(projects.map((project) => project.project_manager).filter(Boolean))].sort(),
         [projects]
     );
+    const summary = useMemo(() => ({
+        total: confirmedProjects.length,
+        urgent: confirmedProjects.filter((project) => normalizeProjectPriority(project.priority) === 'high').length,
+        inventory: confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === 'Inventory').length,
+        active: confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) !== 'Inventory').length,
+    }), [confirmedProjects]);
 
     useEffect(() => {
         if (hasLinked.current || confirmedProjects.length === 0) return;
@@ -66,22 +82,36 @@ export default function ProjectBoardPremium() {
         return () => window.clearTimeout(timer);
     }, [confirmedProjects, location.search]);
 
-    const handleDragOver = (event) => {
-        event.preventDefault();
+    const handleDragEnd = ({ active, over }) => {
+        if (!over) return;
+        const projectId = active?.data?.current?.id;
+        const nextStage = over?.id;
+        if (!projectId || !nextStage || active?.data?.current?.stage === nextStage) return;
+        updateBoardStage(projectId, nextStage);
     };
 
-    const handleDrop = (event, stage) => {
-        event.preventDefault();
-        const projectId = Number(event.dataTransfer.getData('text/plain'));
-        if (!projectId) return;
-        updateBoardStage(projectId, stage);
+    const hasActiveFilters = filterStatus !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || filterPriority !== 'All' || searchQuery !== '';
+    const resetFilters = () => {
+        setFilterStatus('All');
+        setFilterBranch('All');
+        setFilterPM('All');
+        setFilterPriority('All');
+        setSearchQuery('');
     };
 
     const actions = (
-        <button type="button" className="premium-action-button premium-action-button--primary" onClick={loadData} disabled={loading}>
-            <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            {loading ? 'Refreshing' : 'Refresh'}
-        </button>
+        <>
+            {hasActiveFilters ? (
+                <button type="button" className="premium-action-button" onClick={resetFilters}>
+                    <X size={14} />
+                    Clear filters
+                </button>
+            ) : null}
+            <button type="button" className="premium-action-button premium-action-button--primary" onClick={loadData} disabled={loading}>
+                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                {loading ? 'Refreshing' : 'Refresh'}
+            </button>
+        </>
     );
 
     const headerCenter = (
@@ -96,10 +126,9 @@ export default function ProjectBoardPremium() {
         </label>
     );
 
-    const toolbar = (
-            <div className="premium-filter-group" style={{ justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <label className="premium-filter" style={{ minWidth: '220px' }}>
+    const headerFilters = (
+        <div className="premium-filter-group">
+            <label className="premium-filter" style={{ minWidth: '220px' }}>
                     <Layout size={14} color="var(--tx3)" />
                     <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
                         <option value="All">All stages</option>
@@ -132,11 +161,16 @@ export default function ProjectBoardPremium() {
                         ))}
                     </select>
                 </label>
-            </div>
 
-            <div style={{ color: 'var(--tx3)', fontSize: '12px', fontWeight: 600 }}>
-                Clean execution view with drag-and-drop stage planning.
-            </div>
+                <label className="premium-filter" style={{ minWidth: '180px' }}>
+                    <AlertTriangle size={14} color="var(--tx3)" />
+                    <select value={filterPriority} onChange={(event) => setFilterPriority(event.target.value)}>
+                        <option value="All">All priorities</option>
+                        <option value="high">High priority</option>
+                        <option value="medium">Medium priority</option>
+                        <option value="low">Low priority</option>
+                    </select>
+                </label>
         </div>
     );
 
@@ -153,20 +187,23 @@ export default function ProjectBoardPremium() {
             </Suspense>
 
             <AppShell
-                activeNav="board"
-                title="Project Board"
-                subtitle="A cleaner execution board for planning, movement, and manager context."
+                activeNav="stages"
+                title="Stages"
+                subtitle="A cleaner execution board for planning, movement, and stage control."
                 headerCenter={headerCenter}
+                headerFilters={headerFilters}
                 actions={actions}
-                toolbar={toolbar}
             >
-                {error ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', color: 'var(--red)' }}>
-                        {error}
-                    </div>
-                ) : null}
+                <div className="saas-stat-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+                    <KpiCard label="Total" value={summary.total} />
+                    <KpiCard label="Active" value={summary.active} />
+                    <KpiCard label="Inventory" value={summary.inventory} tone="green" />
+                    <KpiCard label="High" value={summary.urgent} tone="red" className="saas-kpi--alert" />
+                </div>
 
-                <div className="premium-panel" style={{ padding: '22px', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95))' }}>
+                <AlertBanner message={error} />
+
+                <div className="premium-panel" style={{ padding: '22px', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
                         <div style={{ width: '38px', height: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '14px', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--accent)' }}>
                             <Layout size={18} />
@@ -178,20 +215,20 @@ export default function ProjectBoardPremium() {
                     </div>
 
                     <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
-                        <div style={{ display: 'flex', gap: '20px', minWidth: 'max-content', alignItems: 'stretch' }}>
+                        <div className="saas-board">
                             {loading && projects.length === 0 ? (
                                 <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
                             ) : (
-                                EXECUTION_BOARD_STAGES.map((stage) => (
-                                    <KanbanColumn
-                                        key={stage}
-                                        stage={stage}
-                                        projects={confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === stage)}
-                                        onProjectClick={setSelectedProject}
-                                        onDragOver={handleDragOver}
-                                        onDrop={handleDrop}
-                                    />
-                                ))
+                                <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                                    {EXECUTION_BOARD_STAGES.map((stage) => (
+                                        <KanbanColumn
+                                            key={stage}
+                                            stage={stage}
+                                            projects={confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === stage)}
+                                            onProjectClick={setSelectedProject}
+                                        />
+                                    ))}
+                                </DndContext>
                             )}
                         </div>
                     </div>

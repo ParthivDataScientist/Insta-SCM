@@ -5,7 +5,7 @@ import projectsService from '../api/projects';
  * Hook for managing Projects data with React Query
  * Handles caching, polling, and optimistic updates.
  */
-export function useProjectData() {
+export function useProjectData(params = {}) {
     const queryClient = useQueryClient();
 
     const invalidateProjectCaches = () => {
@@ -14,19 +14,20 @@ export function useProjectData() {
         queryClient.invalidateQueries({ queryKey: ['designProjects'] });
         queryClient.invalidateQueries({ queryKey: ['designStats'] });
         queryClient.invalidateQueries({ queryKey: ['manager_timeline'] });
+        queryClient.invalidateQueries({ queryKey: ['managers_list'] });
     };
 
     // 1. Fetching Projects
     const projectsQuery = useQuery({
-        queryKey: ['projects'],
-        queryFn: projectsService.fetchProjects,
+        queryKey: ['projects', params],
+        queryFn: () => projectsService.fetchProjects(params),
         refetchInterval: 5000, // 5s interval for real-time dashboard feel
     });
 
     // 2. Fetching Stats
     const statsQuery = useQuery({
-        queryKey: ['projectStats'],
-        queryFn: projectsService.fetchProjectStats,
+        queryKey: ['projectStats', params],
+        queryFn: () => projectsService.fetchProjectStats(params),
         refetchInterval: 10000, // Stats can be slightly slower
     });
 
@@ -39,12 +40,14 @@ export function useProjectData() {
             await queryClient.cancelQueries({ queryKey: ['projects'] });
 
             // Snapshot the previous value
-            const previousProjects = queryClient.getQueryData(['projects']);
+            const previousProjects = queryClient.getQueriesData({ queryKey: ['projects'] });
 
             // Optimistically update to the new value
-            queryClient.setQueryData(['projects'], (old) => 
-                old ? old.map(p => p.id === id ? { ...p, ...data } : p) : []
-            );
+            previousProjects.forEach(([queryKey]) => {
+                queryClient.setQueryData(queryKey, (old) =>
+                    old ? old.map((project) => (project.id === id ? { ...project, ...data } : project)) : []
+                );
+            });
 
             // Return a context object with the snapshotted value
             return { previousProjects };
@@ -52,7 +55,9 @@ export function useProjectData() {
         // If the mutation fails, use the context returned from onMutate to roll back
         onError: (err, newTodo, context) => {
             if (context?.previousProjects) {
-                queryClient.setQueryData(['projects'], context.previousProjects);
+                context.previousProjects.forEach(([queryKey, previousValue]) => {
+                    queryClient.setQueryData(queryKey, previousValue);
+                });
             }
         },
         // Always refetch after error or success:

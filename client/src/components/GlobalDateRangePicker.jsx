@@ -2,63 +2,41 @@ import React from 'react';
 import { Calendar, X } from 'lucide-react';
 import { useGlobalDateRange } from '../contexts/GlobalDateRangeContext';
 
-export default function GlobalDateRangePicker({ compact = false }) {
+export default function GlobalDateRangePicker({ compact = false, label = 'Master Date', className = '' }) {
   const { dateRange, setDateRange, clearDateRange } = useGlobalDateRange();
   const hasActiveRange = Boolean(dateRange.start || dateRange.end);
+  const rootClassName = `saas-filter-chip${compact ? ' is-compact' : ''}${className ? ` ${className}` : ''}`;
 
   return (
-    <div
-      className="animate-card"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: compact ? '6px' : '8px',
-        padding: compact ? '6px 10px' : '8px 12px',
-        background: 'var(--bg-in)',
-        border: '1px solid var(--bd)',
-        borderRadius: 'var(--r-md)',
-      }}
-    >
+    <div className={rootClassName}>
       <Calendar size={14} color="var(--tx3)" />
-      <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--tx3)' }}>
-        Master Date
-      </span>
-      <input
-        type="date"
-        value={dateRange.start}
-        onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          font: 'inherit',
-          fontSize: '11px',
-          color: 'var(--tx)',
-          outline: 'none',
-          width: '110px',
-        }}
-      />
-      <span style={{ color: 'var(--tx3)', fontSize: '11px' }}>to</span>
-      <input
-        type="date"
-        value={dateRange.end}
-        onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          font: 'inherit',
-          fontSize: '11px',
-          color: 'var(--tx)',
-          outline: 'none',
-          width: '110px',
-        }}
-      />
+      <span className="saas-eyebrow">{label}</span>
+      <label className="saas-filter-chip__date-field">
+        <span className="saas-filter-chip__date-label">From</span>
+        <input
+          type="date"
+          value={dateRange.start}
+          onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))}
+          style={{ width: compact ? '96px' : '108px', fontSize: '12px' }}
+        />
+      </label>
+      <span className="saas-filter-chip__date-separator">to</span>
+      <label className="saas-filter-chip__date-field">
+        <span className="saas-filter-chip__date-label">To</span>
+        <input
+          type="date"
+          value={dateRange.end}
+          onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))}
+          style={{ width: compact ? '96px' : '108px', fontSize: '12px' }}
+        />
+      </label>
       {hasActiveRange && (
         <button
           type="button"
-          className="icon-btn"
+          className="premium-icon-button"
           onClick={clearDateRange}
           title="Clear master date range"
-          style={{ width: '24px', height: '24px', color: 'var(--tx3)' }}
+          style={{ width: '32px', minWidth: '32px', height: '32px', color: 'var(--tx3)' }}
         >
           <X size={14} />
         </button>

@@ -44,6 +44,7 @@ def _ensure_project_schema_compatibility() -> None:
     dashboardproject_columns = {
         "crm_project_id": "ALTER TABLE dashboardproject ADD COLUMN crm_project_id VARCHAR",
         "status": "ALTER TABLE dashboardproject ADD COLUMN status VARCHAR DEFAULT 'pending'",
+        "priority": "ALTER TABLE dashboardproject ADD COLUMN priority VARCHAR DEFAULT 'medium'",
         "revision_count": "ALTER TABLE dashboardproject ADD COLUMN revision_count INTEGER DEFAULT 0",
         "current_version": "ALTER TABLE dashboardproject ADD COLUMN current_version VARCHAR",
         "is_active": "ALTER TABLE dashboardproject ADD COLUMN is_active BOOLEAN DEFAULT TRUE",
@@ -94,6 +95,7 @@ def _backfill_project_canonical_fields() -> None:
         for project in projects:
             before = (
                 project.status,
+                project.priority,
                 project.revision_count,
                 project.current_version,
                 project.is_active,
@@ -103,6 +105,7 @@ def _backfill_project_canonical_fields() -> None:
             _apply_design_state(project, {})
             after = (
                 project.status,
+                project.priority,
                 project.revision_count,
                 project.current_version,
                 project.is_active,

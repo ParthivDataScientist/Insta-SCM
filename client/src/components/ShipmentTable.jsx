@@ -135,7 +135,7 @@ const ShipmentTable = ({
     };
 
     return (
-        <div className="table-container">
+        <div className="design-dashboard__table-shell">
             <div style={{ padding: '0 16px', marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
                     <button className="btn-outline-sm" onClick={() => {
@@ -151,7 +151,7 @@ const ShipmentTable = ({
                         Loading shipments...
                     </div>
                 ) : (
-                    <table className="tracking-table advanced-table">
+                    <table className="design-table">
                         <thead>
                             <tr>
                                 <th style={{ width: 40, paddingRight: 0 }}>
@@ -330,7 +330,7 @@ const ShipmentRowGroup = ({
 
     return (
         <Fragment>
-            <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={isSelected ? 'row-selected' : ''}>
+            <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={`design-table__row ${isSelected ? 'row-selected' : ''}`}>
                 <td onClick={onSelectRow}>
                     <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                         {isSelected && <Check size={10} />}
@@ -420,7 +420,7 @@ const ShipmentRowGroup = ({
             {isExpanded && hasChildren && s.child_parcels.map((child, idx) => (
                 <tr 
                     key={`${s.id}-child-${idx}`} 
-                    className={`child-row clickable-row ${isSelected ? 'row-selected' : ''}`}
+                    className={`design-table__row child-row clickable-row ${isSelected ? 'row-selected' : ''}`}
                     onClick={() => handleTrackChild(child)}
                     style={{ cursor: 'pointer' }}
                 >

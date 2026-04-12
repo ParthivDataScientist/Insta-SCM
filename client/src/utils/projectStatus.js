@@ -2,6 +2,8 @@ const WIN_STAGE_ALIASES = new Set(['win', 'won', 'confirmed']);
 const DROP_STAGE_ALIASES = new Set(['drop', 'dropped', 'lost']);
 
 export const DESIGN_STATUSES = ['In-Process', 'Design Change', 'Drop', 'Win'];
+export const PROJECT_STATUS_OPTIONS = ['pending', 'in_progress', 'changes', 'won', 'lost'];
+export const PROJECT_PRIORITY_OPTIONS = ['high', 'medium', 'low'];
 export const EXECUTION_BOARD_STAGES = [
   'Design/ BOM',
   'Procuement (Material management)',
@@ -40,6 +42,12 @@ const BOARD_STAGE_ALIASES = new Map([
   ['return to inventory', 'Inventory'],
   ['inventory', 'Inventory'],
 ]);
+
+const PRIORITY_META = {
+  high: { label: 'High', rank: 0, accentVar: '--priority-high' },
+  medium: { label: 'Medium', rank: 1, accentVar: '--priority-medium' },
+  low: { label: 'Low', rank: 2, accentVar: '--priority-low' },
+};
 
 export function normalizeProjectStage(stage) {
   const value = (stage || 'In-Process').trim();
@@ -80,5 +88,47 @@ export function getInitialBoardStage() {
 
 export function getProjectCode(project) {
   if (!project) return '-';
-  return project.crm_project_id || `PRJ-${String(project.id || 0).padStart(5, '0')}`;
+  return project.crm_project_id || `Proj - ${project.id ?? '-'}`;
+}
+
+export function formatProjectStatusLabel(status) {
+  switch ((status || '').trim().toLowerCase()) {
+    case 'in_progress':
+    case 'in-progress':
+    case 'in progress':
+      return 'In Progress';
+    case 'changes':
+      return 'Changes';
+    case 'won':
+      return 'Won';
+    case 'lost':
+      return 'Lost';
+    case 'pending':
+    default:
+      return 'Pending';
+  }
+}
+
+export function normalizeProjectPriority(priority) {
+  const value = (priority || '').trim().toLowerCase();
+  if (value === 'high' || value === 'urgent' || value === 'critical') return 'high';
+  if (value === 'low') return 'low';
+  return 'medium';
+}
+
+export function formatProjectPriorityLabel(priority) {
+  return PRIORITY_META[normalizeProjectPriority(priority)].label;
+}
+
+export function getProjectPriorityRank(priority) {
+  return PRIORITY_META[normalizeProjectPriority(priority)].rank;
+}
+
+export function sortProjectsByPriority(left, right) {
+  const rankDiff = getProjectPriorityRank(left?.priority) - getProjectPriorityRank(right?.priority);
+  if (rankDiff !== 0) return rankDiff;
+
+  const leftDate = left?.dispatch_date || left?.installation_start_date || left?.event_start_date || left?.updated_at || '';
+  const rightDate = right?.dispatch_date || right?.installation_start_date || right?.event_start_date || right?.updated_at || '';
+  return String(leftDate).localeCompare(String(rightDate));
 }
