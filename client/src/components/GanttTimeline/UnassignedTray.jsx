@@ -39,29 +39,25 @@ export default function UnassignedTray({ projects, onProjectClick, onDropReassig
 
   return (
     <div 
-      className="unassigned-tray"
+      className="premium-unassigned-tray"
       data-unassigned-tray="true"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={{
-        width: '320px', flexShrink: 0, borderLeft: '1px solid var(--bd)',
-        background: isOver ? 'var(--red-ghost)' : 'var(--bg-card)', 
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', height: '100%', zIndex: 100,
-        transition: 'background 0.2s ease'
-      }}
+      style={{ background: isOver ? 'var(--accent-soft)' : '#ffffff' }}
     >
-      <div style={{ padding: '20px', borderBottom: '1px solid var(--bd)', background: 'var(--bg-ralt)' }}>
-        <h3 style={{ fontSize: '12px', fontWeight: 900, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          <Briefcase size={16} /> UNASSIGNED POOL ({projects?.length || 0})
-        </h3>
-        <p style={{ fontSize: '11px', color: 'var(--tx3)', marginTop: '4px', fontWeight: 600 }}>Drag here to unassign from a manager.</p>
+      <div className="premium-unassigned-tray__header">
+        <div className="premium-unassigned-tray__title">
+          <Briefcase size={16} />
+          Unassigned
+          <span style={{ color: 'var(--tx3)', fontWeight: 600 }}>({projects?.length || 0})</span>
+        </div>
+        <p className="premium-unassigned-tray__meta">Drag here to remove a manager assignment.</p>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }} className="no-scrollbar">
+      <div className="premium-unassigned-tray__body no-scrollbar">
         {!projects || projects.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--tx3)', fontSize: '12px', fontWeight: 600, border: '2px dashed var(--bd)', borderRadius: 'var(--r-md)' }}>
+          <div className="premium-column__empty">
             No unassigned projects.
           </div>
         ) : (
@@ -83,35 +79,27 @@ export default function UnassignedTray({ projects, onProjectClick, onDropReassig
                 );
               }}
               onClick={() => onProjectClick(p)}
-              style={{
-                padding: '16px', border: '1.5px solid var(--bd)', borderRadius: 'var(--r-md)',
-                background: 'var(--bg-card)', marginBottom: '16px', cursor: 'grab',
-                transition: 'all 0.2s ease', position: 'relative',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-              }}
-              className="hover-card"
+              className="premium-unassigned-card"
             >
-              <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--tx)', marginBottom: '10px', borderBottom: '1px solid var(--bd-l)', pb: '4px' }}>{p.project_name}</div>
+              <div className="premium-unassigned-card__title">{p.project_name}</div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '10px' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--red)' }} />
-                   <span style={{ color: 'var(--tx3)', textTransform: 'uppercase', fontWeight: 800 }}>Dispatch:</span>
-                   <span style={{ color: 'var(--tx)', fontWeight: 700 }}>{p.dispatch_date || p.allocation_start_date}</span>
+              <div className="premium-unassigned-card__meta">
+                 <div className="premium-unassigned-card__row">
+                   <span className="premium-unassigned-card__label">Dispatch</span>
+                   <span style={{ color: 'var(--tx)', fontWeight: 600 }}>{p.dispatch_date || p.allocation_start_date}</span>
                  </div>
                  
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--blu)' }} />
-                   <span style={{ color: 'var(--blu)', textTransform: 'uppercase', fontWeight: 800 }}>Show Dates:</span>
-                   <span style={{ color: 'var(--tx)', fontWeight: 700 }}>{p.event_start_date || 'N/A'} — {p.event_end_date || 'N/A'}</span>
+                 <div className="premium-unassigned-card__row">
+                   <span className="premium-unassigned-card__label">Event</span>
+                   <span style={{ color: 'var(--tx)', fontWeight: 600 }}>{p.event_start_date || 'N/A'} - {p.event_end_date || 'N/A'}</span>
                  </div>
 
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--tx3)', fontWeight: 600 }}>
-                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--bd)' }} />
+                 <div className="premium-unassigned-card__row" style={{ color: 'var(--tx3)', fontWeight: 500 }}>
+                   <span className="premium-unassigned-card__label">Location</span>
                    {p.venue || p.branch || 'Loc: N/A'}
                  </div>
               </div>
-              <div style={{ position: 'absolute', top: '16px', right: '16px', color: 'var(--bd)' }}><Grab size={16} /></div>
+              <div style={{ position: 'absolute', top: '14px', right: '14px', color: 'var(--tx3)' }}><Grab size={14} /></div>
             </div>
           ))
         )}

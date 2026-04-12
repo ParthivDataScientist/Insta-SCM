@@ -93,33 +93,42 @@ export default function ShipmentDashboardPremium() {
     const toolbar = (
         <div className="premium-filter-group" style={{ justifyContent: 'space-between', width: '100%' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <Truck size={14} color="var(--tx3)" />
-                    <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-                        <option value="All">All shipments</option>
-                        <option value="Active">Active</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Exception">Exception</option>
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Status</span>
+                    <span className="premium-filter">
+                        <Truck size={14} color="var(--tx3)" />
+                        <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+                            <option value="All">All</option>
+                            <option value="Active">Active</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Exception">Exception</option>
+                        </select>
+                    </span>
                 </label>
 
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <Package size={14} color="var(--tx3)" />
-                    <select defaultValue="All" onChange={(event) => setCarrierFilter(event.target.value)}>
-                        <option value="All">All carriers</option>
-                        <option value="FedEx">FedEx</option>
-                        <option value="DHL">DHL</option>
-                        <option value="UPS">UPS</option>
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Carrier</span>
+                    <span className="premium-filter">
+                        <Package size={14} color="var(--tx3)" />
+                        <select defaultValue="All" onChange={(event) => setCarrierFilter(event.target.value)}>
+                            <option value="All">All</option>
+                            <option value="FedEx">FedEx</option>
+                            <option value="DHL">DHL</option>
+                            <option value="UPS">UPS</option>
+                        </select>
+                    </span>
                 </label>
 
-                <label className="premium-filter" style={{ minWidth: '160px' }}>
-                    <RefreshCw size={14} color="var(--tx3)" />
-                    <select defaultValue="All" onChange={(event) => setDateFilter(event.target.value)}>
-                        <option value="All">All time</option>
-                        <option value="Today">Today</option>
-                        <option value="Last 7 Days">Last 7 Days</option>
-                    </select>
+                <label className="premium-inline-filter">
+                    <span className="premium-inline-filter__label">Date</span>
+                    <span className="premium-filter">
+                        <RefreshCw size={14} color="var(--tx3)" />
+                        <select defaultValue="All" onChange={(event) => setDateFilter(event.target.value)}>
+                            <option value="All">Any</option>
+                            <option value="Today">Today</option>
+                            <option value="Last 7 Days">Last 7 Days</option>
+                        </select>
+                    </span>
                 </label>
             </div>
 
@@ -157,8 +166,8 @@ export default function ShipmentDashboardPremium() {
 
             <AppShell
                 activeNav="dashboard"
-                title="Shipment Tracking"
-                subtitle="Monitor carriers, exceptions and delivery progress from one premium workspace."
+                title="Shipments"
+                subtitle="Tracking, exceptions, and delivery progress in one view."
                 headerCenter={headerCenter}
                 actions={actions}
                 toolbar={toolbar}
@@ -171,7 +180,7 @@ export default function ShipmentDashboardPremium() {
                 </div>
 
                 {error ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', color: 'var(--red)' }}>
+                    <div className="premium-banner">
                         {error}
                     </div>
                 ) : null}
@@ -202,8 +211,8 @@ export default function ShipmentDashboardPremium() {
                 </div>
 
                 {selectedIds.length > 0 ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--tx)' }}>
+                    <div className="premium-bulkbar">
+                        <div className="premium-bulkbar__count">
                             {selectedIds.length} shipment{selectedIds.length > 1 ? 's' : ''} selected
                         </div>
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
