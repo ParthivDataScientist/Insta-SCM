@@ -126,9 +126,9 @@ export default function AppShell({
                                 <button type="button" className="premium-icon-button" onClick={toggleTheme} title="Toggle theme">
                                     {isDark ? <Sun size={16} /> : <Moon size={16} />}
                                 </button>
-                                <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
+                                {/* <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
                                     <LogOut size={16} />
-                                </button>
+                                </button> */}
                             </div>
                         </header>
                     )}
