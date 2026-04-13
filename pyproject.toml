@@ -1,3 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insta-track"
+version = "0.1.0"
+description = "Insta-Track backend service"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.5",
+    "uvicorn[standard]==0.32.1",
+    "requests==2.32.3",
+    "python-dotenv==1.0.1",
+    "sqlmodel==0.0.22",
+    "pydantic-settings==2.6.1",
+    "pandas==2.2.3",
+    "openpyxl==3.1.5",
+    "python-multipart==0.0.18",
+    "bcrypt==4.1.2",
+    "PyJWT==2.8.0",
+    "slowapi==0.1.9",
+    "email-validator==2.1.1",
+    "psycopg2-binary==2.9.9",
+    "pyotp==2.9.0",
+]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 120
