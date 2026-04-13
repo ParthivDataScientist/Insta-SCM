@@ -30,9 +30,9 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }) => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-    if (!user) return <Navigate to="/login" />;
+    // const { user, loading } = useAuth();
+    // if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+    // if (!user) return <Navigate to="/login" />;
     return children;
 };
 
@@ -44,10 +44,10 @@ export default function App() {
                     <BrowserRouter>
                         <GlobalDateRangeProvider>
                             <Routes>
-                                <Route path="/login" element={<Login />} />
-                                <Route path="/register" element={<Register />} />
-                                <Route path="/forgot-password" element={<ForgotPassword />} />
-                                <Route path="/reset-password" element={<ResetPassword />} />
+                                {/* <Route path="/login" element={<Login />} /> */}
+                                {/* <Route path="/register" element={<Register />} /> */}
+                                {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
+                                {/* <Route path="/reset-password" element={<ResetPassword />} /> */}
                                 <Route path="/" element={<Navigate to="/design" replace />} />
                                 <Route path="/design" element={<ProtectedRoute><DesignDashboard /></ProtectedRoute>} />
                                 <Route path="/storage" element={<ProtectedRoute><StoragePremium /></ProtectedRoute>} />

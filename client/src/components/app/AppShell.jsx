@@ -115,11 +115,11 @@ export default function AppShell({
                         <div className="premium-header__actions">
                             {showGlobalDate ? <GlobalDateRangePicker compact /> : null}
                             {actions}
-                            {showLogout ? (
+                            {/* showLogout ? (
                                 <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
                                     <LogOut size={16} />
                                 </button>
-                            ) : null}
+                            ) : null */}
                         </div>
                     </header>
 
