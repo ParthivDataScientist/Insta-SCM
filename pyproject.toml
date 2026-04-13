@@ -1,0 +1,20 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+# Focus on correctness (F) and serious syntax/runtime issues; expand rules as legacy debt is cleared.
+select = ["E9", "F"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# SQLModel/SQLAlchemy forward refs in quotes are not resolved by Ruff.
+"app/models/*" = ["F821"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+ignore_missing_imports = true
+check_untyped_defs = true
+packages = ["app.core"]

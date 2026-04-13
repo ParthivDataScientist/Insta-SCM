@@ -68,6 +68,11 @@ const projectsService = {
         return response.data;
     },
 
+    updateProjectPatch: async (id, data) => {
+        const response = await apiClient.patch(`/api/v1/projects/${id}`, data);
+        return response.data;
+    },
+
     fetchProjectLinks: async (projectId) => {
         const response = await apiClient.get(`/api/v1/projects/${projectId}/links`);
         return response.data;

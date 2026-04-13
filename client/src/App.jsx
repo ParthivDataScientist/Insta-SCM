@@ -52,8 +52,10 @@ export default function App() {
                                 <Route path="/design" element={<ProtectedRoute><DesignDashboard /></ProtectedRoute>} />
                                 <Route path="/storage" element={<ProtectedRoute><StoragePremium /></ProtectedRoute>} />
                                 <Route path="/projects" element={<ProtectedRoute><ProjectsDashboardPremium /></ProtectedRoute>} />
-                                <Route path="/board" element={<ProtectedRoute><ProjectBoardPremium /></ProtectedRoute>} />
-                                <Route path="/timeline" element={<ProtectedRoute><ManagerTimelinePremium /></ProtectedRoute>} />
+                                <Route path="/stages" element={<ProtectedRoute><ProjectBoardPremium /></ProtectedRoute>} />
+                                <Route path="/board" element={<Navigate to="/stages" replace />} />
+                                <Route path="/project-officer" element={<ProtectedRoute><ManagerTimelinePremium /></ProtectedRoute>} />
+                                <Route path="/timeline" element={<Navigate to="/project-officer" replace />} />
                                 <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
                                 <Route path="/*" element={<Navigate to="/design" replace />} />
                             </Routes>

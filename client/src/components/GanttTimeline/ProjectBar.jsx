@@ -14,6 +14,15 @@ const TRAY_SELECTOR = '[data-unassigned-tray="true"]';
 const SCROLL_CONTAINER_SELECTOR = '[data-gantt-scroll-container="true"]';
 const AUTO_SCROLL_EDGE_PX = 96;
 const AUTO_SCROLL_STEP_PX = 22;
+const STAGE_COLORS = {
+  'Design/BOM': { text: 'var(--stage-design-text)', bg: 'var(--stage-design-bg)', border: 'var(--stage-design-border)' },
+  Procurement: { text: 'var(--stage-procurement-text)', bg: 'var(--stage-procurement-bg)', border: 'var(--stage-procurement-border)' },
+  Production: { text: 'var(--stage-production-text)', bg: 'var(--stage-production-bg)', border: 'var(--stage-production-border)' },
+  Dispatch: { text: 'var(--stage-dispatch-text)', bg: 'var(--stage-dispatch-bg)', border: 'var(--stage-dispatch-border)' },
+  'Event Installation': { text: 'var(--stage-installation-text)', bg: 'var(--stage-installation-bg)', border: 'var(--stage-installation-border)' },
+  Dismantle: { text: 'var(--stage-dismantle-text)', bg: 'var(--stage-dismantle-bg)', border: 'var(--stage-dismantle-border)' },
+  'Completed/Closed': { text: 'var(--stage-completed-text)', bg: 'var(--stage-completed-bg)', border: 'var(--stage-completed-border)' },
+};
 
 function getDropTarget(clientX, clientY) {
   const element = document.elementFromPoint(clientX, clientY);
@@ -396,25 +405,10 @@ const ProjectBar = React.memo(({
   const isResizingLeft = interactionMode === 'resize-left';
   const isResizingRight = interactionMode === 'resize-right';
   const isInteracting = Boolean(interactionMode);
-
-  const barColor =
-    allocation.allocation_end_date || allocation.dismantling_date
-      ? allocation.hasConflict
-        ? 'var(--red)'
-        : 'var(--blu)'
-      : 'var(--org)';
-  const barBackground =
-    allocation.allocation_end_date || allocation.dismantling_date
-      ? allocation.hasConflict
-        ? 'var(--red-ghost)'
-        : 'var(--b-bg)'
-      : 'var(--o-bg)';
-  const barBorder =
-    allocation.allocation_end_date || allocation.dismantling_date
-      ? allocation.hasConflict
-        ? 'var(--red-v)'
-        : 'var(--b-bd)'
-      : 'var(--o-bd)';
+  const stageColors = STAGE_COLORS[project.board_stage] || STAGE_COLORS['Design/BOM'];
+  const barColor = allocation.hasConflict ? 'var(--status-changes-text)' : stageColors.text;
+  const barBackground = allocation.hasConflict ? 'var(--status-changes-bg)' : stageColors.bg;
+  const barBorder = allocation.hasConflict ? 'var(--status-changes-text)' : stageColors.border;
 
   return (
     <div
@@ -426,10 +420,10 @@ const ProjectBar = React.memo(({
       onClick={handleCardClick}
       style={{
         position: 'absolute',
-        top: `${8 + levelIndex * 40}px`,
+        top: `${14 + levelIndex * 48}px`,
         left: `${baseLayout.left}px`,
         width: `${baseLayout.width}px`,
-        height: '32px',
+        height: '34px',
         zIndex: isInteracting || showTooltip ? 60 : 3,
         cursor: isDragging ? 'grabbing' : isInteracting ? 'col-resize' : 'grab',
         opacity: isDragging ? 0.92 : 1,
@@ -438,7 +432,7 @@ const ProjectBar = React.memo(({
         transition: isInteracting
           ? 'none'
           : 'left 0.24s cubic-bezier(.22,1,.36,1), width 0.24s cubic-bezier(.22,1,.36,1), transform 0.16s ease',
-        filter: isInteracting ? 'drop-shadow(0 10px 22px rgba(0,0,0,0.18))' : 'none',
+        filter: isInteracting ? 'drop-shadow(var(--shadow-strong))' : 'none',
         touchAction: 'none',
       }}
     >
@@ -490,7 +484,7 @@ const ProjectBar = React.memo(({
             padding: '12px',
             width: 'max-content',
             minWidth: '200px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            boxShadow: 'var(--shadow-strong)',
             zIndex: 9999,
             display: 'flex',
             flexDirection: 'column',
@@ -521,23 +515,21 @@ const ProjectBar = React.memo(({
             }}
           >
             <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>
-              Dispatch:
+              Timeline:
             </span>
-            <span style={{ fontWeight: 600, color: 'var(--org)' }}>{project.dispatch_date || 'TBD'}</span>
-
-            <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>
-              Show Dates:
-            </span>
-            <span style={{ fontWeight: 600, color: 'var(--blu)' }}>
-              {project.event_start_date || 'TBD'} - {project.event_end_date || 'TBD'}
+            <span style={{ fontWeight: 600, color: 'var(--org)' }}>
+              {formatUTCDate(startDate)} - {formatUTCDate(endDate)}
             </span>
 
             <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>
-              Location:
+              Completion:
             </span>
-            <span style={{ fontWeight: 600 }}>
-              {project.venue || '-'} ({project.branch || '-'})
+            <span style={{ fontWeight: 600, color: 'var(--blu)' }}>{project.completion_percent ?? 0}%</span>
+
+            <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>
+              Manager:
             </span>
+            <span style={{ fontWeight: 600 }}>{allocation.manager_name || 'Unassigned'}</span>
 
             <span style={{ color: 'var(--tx3)', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>
               Stage:
@@ -560,7 +552,7 @@ const ProjectBar = React.memo(({
         }
 
         .g-resize-handle:hover {
-          background: rgba(0, 0, 0, 0.08);
+          background: color-mix(in srgb, var(--text-primary) 12%, transparent);
         }
 
         .l-resizer {
@@ -572,9 +564,9 @@ const ProjectBar = React.memo(({
         }
 
         .active-handle {
-          background: var(--red) !important;
-          width: 4px !important;
-          box-shadow: 0 0 10px var(--red);
+          background: var(--danger);
+          width: 4px;
+          box-shadow: 0 0 10px color-mix(in srgb, var(--danger) 55%, transparent);
         }
       `}</style>
     </div>

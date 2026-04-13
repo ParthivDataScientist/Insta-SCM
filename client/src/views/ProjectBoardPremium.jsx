@@ -1,19 +1,45 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
-import { AlertTriangle, Layout, MapPin, RefreshCw, Search, Users, X } from 'lucide-react';
+import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
+import { Menu, Search } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import AppShell from '../components/app/AppShell';
 import AlertBanner from '../components/AlertBanner';
-import KpiCard from '../components/app/KpiCard';
 import KanbanColumn from '../components/KanbanColumn';
+import ProjectKanbanCard from '../components/ProjectKanbanCard';
+import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
 import { BoardSkeleton } from '../components/SkeletonLoader';
 import { EXECUTION_BOARD_STAGES, isWonProject, normalizeBoardStage, normalizeProjectPriority } from '../utils/projectStatus';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
+const MOBILE_BOARD_QUERY = '(max-width: 720px)';
+
+const getSortableId = (projectId) => `project-${projectId}`;
+const getProjectIdFromSortable = (sortableId) => Number(String(sortableId).replace('project-', ''));
+
+function createStageLayout(projects) {
+    const base = Object.fromEntries(EXECUTION_BOARD_STAGES.map((stage) => [stage, []]));
+    projects.forEach((project) => {
+        const stage = normalizeBoardStage(project.board_stage);
+        const targetStage = base[stage] ? stage : EXECUTION_BOARD_STAGES[0];
+        base[targetStage].push(getSortableId(project.id));
+    });
+    return base;
+}
+
+function findContainer(layout, id) {
+    if (!id) return null;
+    if (Object.prototype.hasOwnProperty.call(layout, id)) return id;
+    return Object.keys(layout).find((stage) => layout[stage].includes(id)) || null;
+}
 
 export default function ProjectBoardPremium() {
     const [selectedProject, setSelectedProject] = useState(null);
+    const [activeDragId, setActiveDragId] = useState(null);
+    const [boardLayout, setBoardLayout] = useState(() => Object.fromEntries(EXECUTION_BOARD_STAGES.map((stage) => [stage, []])));
+    const [isMobileBoard, setIsMobileBoard] = useState(() => window.matchMedia(MOBILE_BOARD_QUERY).matches);
+    const [activeMobileStage, setActiveMobileStage] = useState(EXECUTION_BOARD_STAGES[0]);
     const location = useLocation();
     const hasLinked = useRef(false);
 
@@ -22,17 +48,8 @@ export default function ProjectBoardPremium() {
         filteredProjects,
         loading,
         error,
-        loadData,
         updateBoardStage,
         updateProjectFull,
-        filterBranch,
-        setFilterBranch,
-        filterPM,
-        setFilterPM,
-        filterStatus,
-        setFilterStatus,
-        filterPriority,
-        setFilterPriority,
         searchQuery,
         setSearchQuery,
     } = useProjects();
@@ -46,20 +63,45 @@ export default function ProjectBoardPremium() {
         () => filteredProjects.filter((project) => isWonProject(project.stage)),
         [filteredProjects]
     );
-    const uniqueBranches = useMemo(
-        () => ['All', ...new Set(projects.map((project) => project.branch).filter(Boolean))].sort(),
-        [projects]
+    const projectsBySortableId = useMemo(
+        () => new Map(confirmedProjects.map((project) => [getSortableId(project.id), project])),
+        [confirmedProjects]
     );
-    const uniqueManagers = useMemo(
-        () => ['All', ...new Set(projects.map((project) => project.project_manager).filter(Boolean))].sort(),
-        [projects]
+    const activeProject = activeDragId ? projectsBySortableId.get(activeDragId) : null;
+    const visibleStages = isMobileBoard ? [activeMobileStage] : EXECUTION_BOARD_STAGES;
+    const highPriorityCount = useMemo(
+        () => confirmedProjects.filter((project) => normalizeProjectPriority(project.priority) === 'high').length,
+        [confirmedProjects]
     );
-    const summary = useMemo(() => ({
-        total: confirmedProjects.length,
-        urgent: confirmedProjects.filter((project) => normalizeProjectPriority(project.priority) === 'high').length,
-        inventory: confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === 'Inventory').length,
-        active: confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) !== 'Inventory').length,
-    }), [confirmedProjects]);
+
+    useEffect(() => {
+        const media = window.matchMedia(MOBILE_BOARD_QUERY);
+        const updateView = () => setIsMobileBoard(media.matches);
+        updateView();
+        media.addEventListener('change', updateView);
+        return () => media.removeEventListener('change', updateView);
+    }, []);
+
+    useEffect(() => {
+        setBoardLayout((previousLayout) => {
+            const nextLayout = createStageLayout(confirmedProjects);
+            const previousIds = new Set(Object.values(previousLayout).flat());
+
+            EXECUTION_BOARD_STAGES.forEach((stage) => {
+                const validPreviousIds = (previousLayout[stage] || []).filter((id) => projectsBySortableId.has(id));
+                const newIds = nextLayout[stage].filter((id) => !previousIds.has(id));
+                nextLayout[stage] = [...validPreviousIds, ...newIds];
+            });
+
+            return nextLayout;
+        });
+    }, [confirmedProjects, projectsBySortableId]);
+
+    useEffect(() => {
+        if (!EXECUTION_BOARD_STAGES.includes(activeMobileStage)) {
+            setActiveMobileStage(EXECUTION_BOARD_STAGES[0]);
+        }
+    }, [activeMobileStage]);
 
     useEffect(() => {
         if (hasLinked.current || confirmedProjects.length === 0) return;
@@ -82,96 +124,140 @@ export default function ProjectBoardPremium() {
         return () => window.clearTimeout(timer);
     }, [confirmedProjects, location.search]);
 
+    const handleDragStart = ({ active }) => {
+        setActiveDragId(active?.id || null);
+    };
+
+    const handleDragOver = ({ active, over }) => {
+        if (!active?.id || !over?.id) return;
+
+        setBoardLayout((current) => {
+            const activeContainer = findContainer(current, active.id);
+            const overContainer = findContainer(current, over.id);
+            if (!activeContainer || !overContainer) return current;
+
+            if (activeContainer === overContainer) {
+                const currentItems = current[activeContainer];
+                const oldIndex = currentItems.indexOf(active.id);
+                const newIndex = currentItems.indexOf(over.id);
+                if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return current;
+                return {
+                    ...current,
+                    [activeContainer]: arrayMove(currentItems, oldIndex, newIndex),
+                };
+            }
+
+            const sourceItems = current[activeContainer];
+            const destinationItems = current[overContainer];
+            const oldIndex = sourceItems.indexOf(active.id);
+            const overIndex = destinationItems.indexOf(over.id);
+            const insertIndex = overIndex >= 0 ? overIndex : destinationItems.length;
+            if (oldIndex === -1) return current;
+
+            const nextSource = sourceItems.filter((id) => id !== active.id);
+            const nextDestination = [...destinationItems];
+            nextDestination.splice(insertIndex, 0, active.id);
+
+            return {
+                ...current,
+                [activeContainer]: nextSource,
+                [overContainer]: nextDestination,
+            };
+        });
+    };
+
+    const handleDragCancel = () => {
+        setActiveDragId(null);
+    };
+
     const handleDragEnd = ({ active, over }) => {
-        if (!over) return;
-        const projectId = active?.data?.current?.id;
-        const nextStage = over?.id;
-        if (!projectId || !nextStage || active?.data?.current?.stage === nextStage) return;
+        if (!active?.id) {
+            setActiveDragId(null);
+            return;
+        }
+
+        const project = projectsBySortableId.get(active.id);
+        const projectId = project?.id || getProjectIdFromSortable(active.id);
+        const initialStage = normalizeBoardStage(project?.board_stage);
+        const nextStage = over?.id ? findContainer(boardLayout, over.id) : null;
+
+        setActiveDragId(null);
+        if (!nextStage || !projectId || !initialStage || initialStage === nextStage) return;
         updateBoardStage(projectId, nextStage);
     };
 
-    const hasActiveFilters = filterStatus !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || filterPriority !== 'All' || searchQuery !== '';
-    const resetFilters = () => {
-        setFilterStatus('All');
-        setFilterBranch('All');
-        setFilterPM('All');
-        setFilterPriority('All');
-        setSearchQuery('');
-    };
-
-    const actions = (
+    const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
         <>
-            {hasActiveFilters ? (
-                <button type="button" className="premium-action-button" onClick={resetFilters}>
-                    <X size={14} />
-                    Clear filters
+            {sidebarOverlay ? (
+                <button
+                    type="button"
+                    className="design-dashboard__sidebar-rail-btn"
+                    onClick={toggleSidebar}
+                    title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    aria-expanded={sidebarOpen}
+                    aria-controls="app-primary-sidebar"
+                >
+                    <Menu size={18} strokeWidth={2} aria-hidden />
                 </button>
             ) : null}
-            <button type="button" className="premium-action-button premium-action-button--primary" onClick={loadData} disabled={loading}>
-                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-                {loading ? 'Refreshing' : 'Refresh'}
-            </button>
+            <header className="design-dashboard__header stages-board__header">
+                <div className="design-dashboard__header-scroll">
+                    {!sidebarOverlay ? (
+                        <button
+                            type="button"
+                            className="design-dashboard__icon-button mobile-only"
+                            onClick={toggleSidebar}
+                            title="Open navigation"
+                        >
+                            <Menu size={16} />
+                        </button>
+                    ) : null}
+                    <div className="stages-board__identity">
+                        <div className="stages-board__title">Execution Pipeline</div>
+                        <div className="stages-board__breadcrumb">Projects / Stages</div>
+                        <div className="stages-board__micro-stats" aria-label="Board quick stats">
+                            <span>Total: {confirmedProjects.length}</span>
+                            <span className="stages-board__stat-sep">|</span>
+                            <span className="stages-board__high-priority">
+                                <i aria-hidden />
+                                High Priority: {highPriorityCount}
+                            </span>
+                            <span className="stages-board__stat-sep">|</span>
+                            <span>Last Sync: Just now</span>
+                        </div>
+                    </div>
+
+                    <div className="design-dashboard__header-filters stages-board__filters">
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
+                            <span className="design-dashboard__filter-label" id="stages-search-label">
+                                Searchbox
+                            </span>
+                            <label className="design-dashboard__search stages-board__search">
+                                <Search size={16} aria-hidden />
+                                <input
+                                    type="search"
+                                    placeholder="Search project, event, branch, or manager..."
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    aria-labelledby="stages-search-label"
+                                />
+                            </label>
+                        </div>
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
+                            <span className="design-dashboard__filter-label" id="stages-date-label">
+                                Daterange
+                            </span>
+                            <GlobalDateRangePicker
+                                compact
+                                label={false}
+                                className="design-dashboard__date-range stages-board__date-range"
+                                aria-labelledby="stages-date-label"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </header>
         </>
-    );
-
-    const headerCenter = (
-        <label className="premium-search">
-            <Search size={16} color="var(--tx3)" />
-            <input
-                type="search"
-                placeholder="Search project, event, branch, or manager..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-            />
-        </label>
-    );
-
-    const headerFilters = (
-        <div className="premium-filter-group">
-            <label className="premium-filter" style={{ minWidth: '220px' }}>
-                    <Layout size={14} color="var(--tx3)" />
-                    <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                        <option value="All">All stages</option>
-                        {EXECUTION_BOARD_STAGES.map((stage) => (
-                            <option key={stage} value={stage}>
-                                {stage}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <MapPin size={14} color="var(--tx3)" />
-                    <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
-                        {uniqueBranches.map((branch) => (
-                            <option key={branch} value={branch}>
-                                {branch === 'All' ? 'All branches' : branch}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <Users size={14} color="var(--tx3)" />
-                    <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
-                        {uniqueManagers.map((manager) => (
-                            <option key={manager} value={manager}>
-                                {manager === 'All' ? 'All managers' : manager}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
-                <label className="premium-filter" style={{ minWidth: '180px' }}>
-                    <AlertTriangle size={14} color="var(--tx3)" />
-                    <select value={filterPriority} onChange={(event) => setFilterPriority(event.target.value)}>
-                        <option value="All">All priorities</option>
-                        <option value="high">High priority</option>
-                        <option value="medium">Medium priority</option>
-                        <option value="low">Low priority</option>
-                    </select>
-                </label>
-        </div>
     );
 
     return (
@@ -190,44 +276,62 @@ export default function ProjectBoardPremium() {
                 activeNav="stages"
                 title="Stages"
                 subtitle="A cleaner execution board for planning, movement, and stage control."
-                headerCenter={headerCenter}
-                headerFilters={headerFilters}
-                actions={actions}
+                header={header}
+                showGlobalDate={false}
+                pageClassName="stages-board-page"
+                sidebarOverlay
             >
-                <div className="saas-stat-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-                    <KpiCard label="Total" value={summary.total} />
-                    <KpiCard label="Active" value={summary.active} />
-                    <KpiCard label="Inventory" value={summary.inventory} tone="green" />
-                    <KpiCard label="High" value={summary.urgent} tone="red" className="saas-kpi--alert" />
-                </div>
-
                 <AlertBanner message={error} />
 
-                <div className="premium-panel" style={{ padding: '22px', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-                        <div style={{ width: '38px', height: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '14px', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--accent)' }}>
-                            <Layout size={18} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--tx)' }}>Execution pipeline</div>
-                            <div style={{ fontSize: '12px', color: 'var(--tx3)' }}>{confirmedProjects.length} projects in active flow across the current filters.</div>
-                        </div>
-                    </div>
+                <div className="stages-board-canvas">
+                    <div className="stages-board-canvas__scroll">
+                        {isMobileBoard ? (
+                            <div className="saas-segmented saas-board-tabs">
+                                {EXECUTION_BOARD_STAGES.map((stage) => (
+                                    <button
+                                        key={stage}
+                                        type="button"
+                                        className={activeMobileStage === stage ? 'is-active' : ''}
+                                        onClick={() => setActiveMobileStage(stage)}
+                                    >
+                                        {stage}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
 
-                    <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
-                        <div className="saas-board">
+                        <div className="saas-board" style={{ paddingBottom: '8px' }}>
                             {loading && projects.length === 0 ? (
                                 <BoardSkeleton stages={EXECUTION_BOARD_STAGES} />
                             ) : (
-                                <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                                    {EXECUTION_BOARD_STAGES.map((stage) => (
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCorners}
+                                    onDragStart={handleDragStart}
+                                    onDragOver={handleDragOver}
+                                    onDragCancel={handleDragCancel}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    {visibleStages.map((stage) => (
                                         <KanbanColumn
                                             key={stage}
                                             stage={stage}
-                                            projects={confirmedProjects.filter((project) => normalizeBoardStage(project.board_stage) === stage)}
+                                            projectIds={boardLayout[stage] || []}
+                                            projectsById={projectsBySortableId}
                                             onProjectClick={setSelectedProject}
+                                            isDragging={Boolean(activeDragId)}
+                                            useVirtualization={!isMobileBoard}
                                         />
                                     ))}
+                                    <DragOverlay>
+                                        {activeProject ? (
+                                            <ProjectKanbanCard
+                                                project={activeProject}
+                                                stage={normalizeBoardStage(activeProject.board_stage)}
+                                                isOverlay
+                                            />
+                                        ) : null}
+                                    </DragOverlay>
                                 </DndContext>
                             )}
                         </div>

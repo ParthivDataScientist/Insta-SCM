@@ -1,9 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
-
 :root,
 .light {
-    --font: 'Plus Jakarta Sans', system-ui, sans-serif;
-    --font-display: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+    --font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
@@ -29,8 +27,43 @@
     --text-muted: #6f7b91;
     --border-subtle: rgba(15, 23, 42, 0.08);
     --border-strong: rgba(37, 99, 235, 0.14);
-    --shadow-soft: none;
-    --shadow-strong: none;
+    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --shadow-strong: 0 18px 34px -16px rgba(15, 23, 42, 0.2);
+    --bg-surface: var(--surface-card-strong);
+    --bg-surface-elevated: #ffffff;
+    --bg-canvas: #f8fafc;
+    --bg-overlay: rgba(15, 23, 42, 0.45);
+    --text-inverse: #0f172a;
+    --grid-line: rgba(15, 23, 42, 0.14);
+    --gantt-track-bg: color-mix(in srgb, var(--surface-muted) 48%, var(--surface-card-strong));
+    --gantt-today-line: #ef4444;
+    --gantt-today-tag-bg: #ef4444;
+    --gantt-today-tag-text: #ffffff;
+    --gantt-dependency-line: #94a3b8;
+    --kanban-column-bg: #ffffff;
+    --kanban-card-bg: #f3f6fb;
+    --kanban-card-hover-bg: #ffffff;
+    --stage-design-text: #1d4ed8;
+    --stage-design-bg: #dbeafe;
+    --stage-design-border: #93c5fd;
+    --stage-procurement-text: #0f766e;
+    --stage-procurement-bg: #ccfbf1;
+    --stage-procurement-border: #5eead4;
+    --stage-production-text: #6d28d9;
+    --stage-production-bg: #ede9fe;
+    --stage-production-border: #c4b5fd;
+    --stage-dispatch-text: #9a3412;
+    --stage-dispatch-bg: #ffedd5;
+    --stage-dispatch-border: #fdba74;
+    --stage-installation-text: #065f46;
+    --stage-installation-bg: #d1fae5;
+    --stage-installation-border: #86efac;
+    --stage-dismantle-text: #9f1239;
+    --stage-dismantle-bg: #ffe4e6;
+    --stage-dismantle-border: #fda4af;
+    --stage-completed-text: #334155;
+    --stage-completed-bg: #e2e8f0;
+    --stage-completed-border: #cbd5e1;
     --primary: #2563eb;
     --primary-strong: #1d4ed8;
     --primary-soft: rgba(37, 99, 235, 0.12);
@@ -69,10 +102,10 @@
 }
 
 .dark {
-    --surface-page: #08111f;
+    --surface-page: #0b1220;
     --surface-canvas: rgba(11, 18, 32, 0.96);
     --surface-card: rgba(15, 23, 42, 0.98);
-    --surface-card-strong: #101828;
+    --surface-card-strong: #0f172a;
     --surface-muted: #13203a;
     --surface-muted-strong: #16263f;
     --surface-sidebar: #040a15;
@@ -80,10 +113,45 @@
     --text-primary: #f8fafc;
     --text-secondary: #d2dae6;
     --text-muted: #91a0b8;
-    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(148, 163, 184, 0.2);
     --border-strong: rgba(96, 165, 250, 0.24);
-    --shadow-soft: none;
-    --shadow-strong: none;
+    --shadow-soft: 0 12px 24px -12px rgba(0, 0, 0, 0.55);
+    --shadow-strong: 0 28px 40px -20px rgba(0, 0, 0, 0.72);
+    --bg-surface: var(--surface-card-strong);
+    --bg-surface-elevated: #111c32;
+    --bg-canvas: #0b1220;
+    --bg-overlay: rgba(2, 6, 23, 0.72);
+    --text-inverse: #f8fafc;
+    --grid-line: rgba(148, 163, 184, 0.26);
+    --gantt-track-bg: color-mix(in srgb, #111c32 84%, var(--surface-card-strong));
+    --gantt-today-line: #fb7185;
+    --gantt-today-tag-bg: #be123c;
+    --gantt-today-tag-text: #ffe4e6;
+    --gantt-dependency-line: #64748b;
+    --kanban-column-bg: #111c32;
+    --kanban-card-bg: #17243a;
+    --kanban-card-hover-bg: #1e2d47;
+    --stage-design-text: #bfdbfe;
+    --stage-design-bg: rgba(37, 99, 235, 0.24);
+    --stage-design-border: rgba(147, 197, 253, 0.52);
+    --stage-procurement-text: #99f6e4;
+    --stage-procurement-bg: rgba(13, 148, 136, 0.24);
+    --stage-procurement-border: rgba(94, 234, 212, 0.52);
+    --stage-production-text: #ddd6fe;
+    --stage-production-bg: rgba(109, 40, 217, 0.24);
+    --stage-production-border: rgba(196, 181, 253, 0.52);
+    --stage-dispatch-text: #fed7aa;
+    --stage-dispatch-bg: rgba(154, 52, 18, 0.26);
+    --stage-dispatch-border: rgba(253, 186, 116, 0.52);
+    --stage-installation-text: #bbf7d0;
+    --stage-installation-bg: rgba(6, 95, 70, 0.3);
+    --stage-installation-border: rgba(134, 239, 172, 0.5);
+    --stage-dismantle-text: #fecdd3;
+    --stage-dismantle-bg: rgba(159, 18, 57, 0.28);
+    --stage-dismantle-border: rgba(253, 164, 175, 0.48);
+    --stage-completed-text: #cbd5e1;
+    --stage-completed-bg: rgba(71, 85, 105, 0.32);
+    --stage-completed-border: rgba(148, 163, 184, 0.46);
     --primary-soft: rgba(96, 165, 250, 0.18);
     --primary-border: rgba(96, 165, 250, 0.22);
     --status-pending-bg: rgba(148, 163, 184, 0.16);
@@ -135,7 +203,27 @@ body {
 }
 
 .premium-sidebar__brand {
+    position: relative;
     padding: var(--space-2);
+}
+
+.premium-sidebar__close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.premium-shell.premium-shell--sidebar-overlay .premium-sidebar__close {
+    display: inline-flex;
 }
 
 .premium-sidebar__logo {
@@ -159,29 +247,46 @@ body {
 .premium-nav-link {
     position: relative;
     gap: 12px;
-    padding: 12px 14px 12px 16px;
-    border-radius: 18px;
+    padding: 12px 14px 12px 18px;
+    border-radius: 14px;
     color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    transition:
+        background 0.15s ease-in-out,
+        color 0.15s ease-in-out,
+        box-shadow 0.15s ease-in-out;
 }
 
 .premium-nav-link::before {
     content: '';
     position: absolute;
-    inset: 8px auto 8px 0;
-    width: 4px;
+    inset: 10px auto 10px 0;
+    width: 3px;
     border-radius: 999px;
     background: transparent;
-    transition: background 0.2s var(--ease-standard);
+    transition: background 0.15s ease-in-out;
 }
 
-.premium-nav-link:hover,
+.premium-nav-link:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.92);
+}
+
 .premium-nav-link.is-active {
     transform: none;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(59, 130, 246, 0.14);
+    color: #ffffff;
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.22);
 }
 
 .premium-nav-link.is-active::before {
-    background: #ffffff;
+    background: linear-gradient(180deg, #93c5fd, #3b82f6);
 }
 
 .premium-main {
@@ -279,11 +384,44 @@ body {
 
 .premium-kpi,
 .saas-kpi {
+    position: relative;
     min-height: 92px;
     padding: 14px 16px;
     border-radius: 14px;
     background: var(--surface-card-strong);
     overflow: hidden;
+}
+
+.premium-kpi::before,
+.saas-kpi::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 4px;
+    border-radius: 14px 14px 10px 10px;
+    background: linear-gradient(90deg, rgba(100, 116, 139, 0.95) 0%, rgba(100, 116, 139, 0.55) 68%, rgba(100, 116, 139, 0.1) 100%);
+}
+
+.premium-kpi--blue::before {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.98) 0%, rgba(37, 99, 235, 0.62) 70%, rgba(37, 99, 235, 0.16) 100%);
+}
+
+.premium-kpi--orange::before {
+    background: linear-gradient(90deg, rgba(217, 119, 6, 0.98) 0%, rgba(217, 119, 6, 0.62) 70%, rgba(217, 119, 6, 0.16) 100%);
+}
+
+.premium-kpi--green::before {
+    background: linear-gradient(90deg, rgba(22, 163, 74, 0.98) 0%, rgba(22, 163, 74, 0.62) 70%, rgba(22, 163, 74, 0.16) 100%);
+}
+
+.premium-kpi--red::before {
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.98) 0%, rgba(220, 38, 38, 0.62) 70%, rgba(220, 38, 38, 0.16) 100%);
+}
+
+.premium-kpi--neutral::before {
+    background: linear-gradient(90deg, rgba(71, 85, 105, 0.96) 0%, rgba(71, 85, 105, 0.56) 70%, rgba(71, 85, 105, 0.12) 100%);
 }
 
 .premium-kpi:hover,
@@ -292,6 +430,14 @@ body {
     transform: none;
     border-color: var(--primary-border);
     box-shadow: none;
+}
+
+.premium-kpi.is-active {
+    transform: translateY(-3px) scale(1.01);
+    border-color: color-mix(in srgb, var(--primary) 30%, var(--border-subtle));
+    box-shadow:
+        0 10px 20px -10px color-mix(in srgb, var(--primary) 35%, transparent),
+        0 0 0 2px color-mix(in srgb, var(--primary) 24%, transparent);
 }
 
 .premium-kpi__label {
@@ -532,6 +678,41 @@ body {
     color: var(--primary-strong);
 }
 
+.global-date-range {
+    --global-date-range-input-width-compact: 72px;
+    --global-date-range-input-font-size: 10px;
+    --global-date-range-clear-size: 24px;
+}
+
+.global-date-range--compact {
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    height: 38px;
+    background: #ffffff;
+}
+
+.global-date-range--compact .saas-filter-chip__date-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    min-width: 0;
+    padding: 0 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #f8fafc;
+}
+
+.global-date-range--compact .saas-filter-chip__date-label,
+.global-date-range--compact .saas-filter-chip__date-separator {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
 .saas-panel-content {
     padding: var(--space-5);
 }
@@ -703,23 +884,157 @@ body {
     display: flex;
     gap: var(--space-4);
     min-width: max-content;
+    align-items: stretch;
+}
+
+.stages-board-page {
+    margin-top: var(--space-3);
+    gap: var(--space-3);
+}
+
+.stages-board__header {
+    position: sticky;
+    top: var(--space-4, 16px);
+    z-index: 40;
+    padding: 12px 14px;
+    border: 1px solid rgba(15, 23, 42, 0.04);
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: rgba(248, 250, 252, 0.5);
+    box-shadow: none;
+}
+
+.stages-board__header .design-dashboard__header-scroll {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: nowrap;
+}
+
+.stages-board__filters {
+    margin-left: 0;
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: nowrap;
+    flex: 1 1 640px;
+    min-width: 0;
+    justify-content: flex-end;
+}
+
+.stages-board__search,
+.stages-board__date-range {
+    height: 40px;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.stages-board__search {
+    min-width: 320px;
+    width: 100%;
+}
+
+.stages-board__identity {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    flex: 1 1 380px;
+}
+
+.stages-board__filters .design-dashboard__filter-field--search {
+    flex: 1 1 420px;
+    min-width: 300px;
+}
+
+.stages-board__title {
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+
+.stages-board__breadcrumb {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.stages-board__micro-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.stages-board__stat-sep {
+    opacity: 0.55;
+}
+
+.stages-board__high-priority {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stages-board__high-priority i {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #dc2626;
+}
+
+.stages-board__cta {
+    min-height: 40px;
+    border-radius: 8px;
+    padding: 0 14px;
+}
+
+.stages-board__filters .design-dashboard__filter-field--date {
+    min-width: 180px;
+}
+
+.stages-board__date-range {
+    --global-date-range-input-width-compact: 80px;
+    --global-date-range-input-font-size: 10px;
+    --global-date-range-clear-size: 24px;
+}
+
+.stages-board-canvas {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.stages-board-canvas__scroll {
+    overflow-x: auto;
+    padding-bottom: 6px;
 }
 
 .saas-board-column {
-    width: 340px;
+    width: 332px;
     display: flex;
     flex-direction: column;
     border-radius: 16px;
     border: 1px solid var(--border-subtle);
-    background: var(--surface-card);
-    box-shadow: none;
+    background: var(--kanban-column-bg);
+    box-shadow: var(--shadow-soft);
     transition: border-color 0.18s var(--ease-standard), box-shadow 0.18s var(--ease-standard), transform 0.18s var(--ease-standard);
+    max-height: min(74vh, 780px);
+    overflow: hidden;
 }
 
 .saas-board-column.is-over {
     border-color: var(--primary-border);
-    box-shadow: none;
-    transform: none;
+    box-shadow:
+        0 10px 28px -10px color-mix(in srgb, var(--primary) 28%, transparent),
+        0 0 0 2px color-mix(in srgb, var(--primary) 24%, transparent);
+    transform: translateY(-1px);
 }
 
 .saas-board-column__header {
@@ -727,14 +1042,21 @@ body {
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    padding: 18px;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--border-subtle);
+    background: color-mix(in srgb, var(--surface-card-strong) 94%, transparent);
+    backdrop-filter: blur(8px);
+    border-left: 4px solid transparent;
 }
 
 .saas-board-column__title {
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 15px;
+    font-weight: 800;
     color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .saas-board-column__meta {
@@ -744,8 +1066,8 @@ body {
 }
 
 .saas-board-column__count {
-    min-width: 42px;
-    height: 42px;
+    min-width: 38px;
+    height: 28px;
     border-radius: 14px;
     display: inline-flex;
     align-items: center;
@@ -756,33 +1078,81 @@ body {
     font-weight: 800;
 }
 
+.saas-board-column.saas-board-column--blue .saas-board-column__header {
+    border-left-color: var(--stage-design-text);
+    background: color-mix(in srgb, var(--stage-design-bg) 68%, var(--kanban-column-bg));
+}
+
+.saas-board-column.saas-board-column--amber .saas-board-column__header {
+    border-left-color: var(--stage-dispatch-text);
+    background: color-mix(in srgb, var(--stage-dispatch-bg) 58%, var(--kanban-column-bg));
+}
+
+.saas-board-column.saas-board-column--purple .saas-board-column__header {
+    border-left-color: var(--stage-production-text);
+    background: color-mix(in srgb, var(--stage-production-bg) 58%, var(--kanban-column-bg));
+}
+
+.saas-board-column.saas-board-column--green .saas-board-column__header {
+    border-left-color: var(--stage-installation-text);
+    background: color-mix(in srgb, var(--stage-installation-bg) 52%, var(--kanban-column-bg));
+}
+
+.saas-board-column.saas-board-column--teal .saas-board-column__header {
+    border-left-color: var(--stage-procurement-text);
+    background: color-mix(in srgb, var(--stage-procurement-bg) 56%, var(--kanban-column-bg));
+}
+
+.saas-board-column.saas-board-column--indigo .saas-board-column__header {
+    border-left-color: var(--stage-production-border);
+    background: color-mix(in srgb, var(--stage-production-bg) 44%, var(--kanban-column-bg));
+}
+
+.saas-board-column.saas-board-column--rose .saas-board-column__header {
+    border-left-color: var(--stage-dismantle-text);
+    background: color-mix(in srgb, var(--stage-dismantle-bg) 52%, var(--kanban-column-bg));
+}
+
 .saas-board-column__body {
     display: grid;
-    gap: 14px;
-    padding: 16px;
-    min-height: 240px;
+    gap: 12px;
+    padding: 12px 12px 14px;
+    min-height: 220px;
+    overflow-y: auto;
+    align-content: start;
 }
 
 .saas-project-card {
     width: 100%;
     text-align: left;
-    padding: 14px;
-    border-radius: 14px;
+    padding: 12px;
+    border-radius: 12px;
     border: 1px solid var(--border-subtle);
-    background: var(--surface-card-strong);
-    box-shadow: none;
+    background: var(--kanban-card-bg);
+    box-shadow: var(--shadow-soft);
     transition: transform 0.18s var(--ease-standard), box-shadow 0.18s var(--ease-standard), border-color 0.18s var(--ease-standard);
+    border-left: 4px solid transparent;
 }
 
 .saas-project-card:hover {
-    transform: none;
+    transform: scale(1.02);
     border-color: var(--primary-border);
-    box-shadow: none;
+    background: var(--kanban-card-hover-bg);
+    box-shadow: var(--shadow-strong);
 }
 
 .saas-project-card.is-dragging {
-    opacity: 0.5;
-    transform: rotate(1deg);
+    opacity: 0.35;
+    transform: rotate(1deg) scale(0.98);
+}
+
+.saas-project-card.is-overlay {
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: var(--shadow-strong);
+}
+
+.dark .saas-project-card.is-overlay {
+    box-shadow: var(--shadow-strong);
 }
 
 .saas-project-card__header,
@@ -794,10 +1164,10 @@ body {
 }
 
 .saas-project-card__title {
-    margin-top: 8px;
+    margin-top: 0;
     color: var(--text-primary);
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 800;
     line-height: 1.35;
 }
 
@@ -806,6 +1176,34 @@ body {
     color: var(--text-muted);
     font-size: 12px;
     line-height: 1.45;
+}
+
+.saas-project-card__mini-row {
+    display: grid;
+    gap: 6px;
+}
+
+.saas-project-card__code {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.saas-project-card__deadline {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.saas-project-card__deadline span {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.saas-project-card.saas-project-card--high {
+    border-left-color: var(--danger);
 }
 
 .saas-project-card__body {
@@ -821,18 +1219,32 @@ body {
     display: grid;
     gap: 8px;
     justify-items: center;
-    padding: 30px 16px;
-    border-radius: 18px;
+    padding: 22px 14px;
+    border-radius: 14px;
     border: 1px dashed var(--border-subtle);
     color: var(--text-muted);
     font-size: 12px;
     text-align: center;
+    background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
 }
 
 .saas-drop-placeholder.is-active {
     color: var(--primary-strong);
     border-color: var(--primary-border);
     background: color-mix(in srgb, var(--primary-soft) 42%, transparent);
+}
+
+.saas-drop-placeholder--inline {
+    min-height: 62px;
+    padding: 0;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--primary-soft) 50%, transparent);
+}
+
+.saas-board-tabs {
+    display: none;
 }
 
 .saas-modal {
@@ -843,7 +1255,7 @@ body {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(2, 6, 23, 0.72);
+    background: var(--bg-overlay);
     backdrop-filter: none;
 }
 
@@ -1005,14 +1417,14 @@ body {
 
 .dark .saas-modal .saas-field select,
 .dark .saas-modal select {
-    background-color: var(--surface-card-strong) !important;
-    color: var(--text-primary) !important;
+    background-color: var(--surface-card-strong);
+    color: var(--text-primary);
 }
 
 .dark .saas-modal option,
 .dark .saas-modal optgroup {
-    background-color: #101828 !important;
-    color: #f8fafc !important;
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
 }
 
 .saas-version-timeline {
@@ -1125,6 +1537,10 @@ body {
         padding: 16px;
     }
 
+    .premium-sidebar__close {
+        display: inline-flex;
+    }
+
     .premium-toolbar,
     .premium-header {
         padding: 16px;
@@ -1146,5 +1562,38 @@ body {
 
     .saas-board-column {
         width: 300px;
+    }
+
+    .stages-board__header {
+        padding: 12px;
+    }
+
+    .stages-board__filters {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        flex-wrap: wrap;
+    }
+
+    .stages-board__search {
+        min-width: 280px;
+    }
+}
+
+@media (max-width: 720px) {
+    .saas-board-tabs {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 6px;
+    }
+
+    .saas-board {
+        min-width: 0;
+    }
+
+    .saas-board-column {
+        width: min(100%, 520px);
+        max-width: 100%;
+        max-height: min(66vh, 620px);
     }
 }

@@ -1,6 +1,5 @@
 import json
 from datetime import date as py_date
-from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -591,8 +590,11 @@ def get_timeline_data(session: Session = Depends(get_session)):
 
         return sort_by_name(list(manager_groups.values()))
 
-    except Exception as e:
-        print(f"Timeline generation error: {e}")
+    except Exception:
+        logger.exception(
+            "timeline_generation_failed",
+            extra={"event": "timeline_generation_failed"},
+        )
         return []
 
 @router.post("/managers")

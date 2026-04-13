@@ -16,12 +16,12 @@ export default function TimelineHeader({ units, cellWidth, viewMode }) {
   return (
     <div className="gantt-header-sticky" style={{ 
       display: 'flex', flexDirection: 'column', 
-      position: 'sticky', top: 0, zIndex: 100, 
+      position: 'sticky', top: 0, zIndex: 30, 
       background: 'var(--bg-card)', borderBottom: '1px solid var(--bd)' 
     }}>
       {/* Month/Year Row */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--bd-l)' }}>
-        <div style={{ width: '240px', flexShrink: 0, borderRight: '1px solid var(--bd)' }} />
+        <div style={{ width: '260px', flexShrink: 0, borderRight: '1px solid var(--bd)' }} />
         {Object.entries(monthGroups).map(([name, count]) => (
           <div key={name} style={{ 
             width: count * cellWidth, flexShrink: 0, 
@@ -38,11 +38,11 @@ export default function TimelineHeader({ units, cellWidth, viewMode }) {
       {/* Unit Row (Day/Week/Month) */}
       <div style={{ display: 'flex' }}>
         <div style={{ 
-          width: '240px', flexShrink: 0, borderRight: '1px solid var(--bd)', 
+          width: '260px', flexShrink: 0, borderRight: '1px solid var(--bd)', 
           padding: '10px 16px', fontSize: '11px', fontWeight: 800, 
           color: 'var(--tx)', textTransform: 'uppercase' 
         }}>
-          Resources / Managers
+          Project Officer
         </div>
         {units.map((date, idx) => {
           const isCurrentUnit = viewMode === 'Day' ? false : 
@@ -68,8 +68,8 @@ export default function TimelineHeader({ units, cellWidth, viewMode }) {
             <div key={idx} style={{ 
               width: cellWidth, flexShrink: 0, 
               padding: '8px 0', textAlign: 'center', 
-              fontSize: '10px', color: isCurrentUnit ? 'var(--red)' : 'var(--tx2)',
-              background: isCurrentUnit ? 'var(--red-ghost)' : 'transparent',
+              fontSize: '10px', color: isCurrentUnit ? 'var(--danger)' : 'var(--tx2)',
+              background: isCurrentUnit ? 'color-mix(in srgb, var(--danger) 14%, transparent)' : 'transparent',
               borderRight: '1px solid var(--bd-l)', fontWeight: isCurrentUnit ? 800 : 500,
               display: 'flex', flexDirection: 'column', justifyContent: 'center'
             }}>

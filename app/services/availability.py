@@ -9,6 +9,12 @@ EXECUTION_STAGE_ALIASES = {"win", "won", "confirmed"}
 
 
 def _get_project_window(project: DashboardProject) -> tuple[Optional[py_date], Optional[py_date]]:
+    """Resolve the effective busy window from allocation and milestone dates.
+
+    Why:
+        Rows may only populate dispatch/dismantle or explicit allocation fields; we pick the
+        first usable bound so overlap logic stays consistent across heterogeneous records.
+    """
     start = (
         project.allocation_start_date
         or project.dispatch_date
@@ -32,6 +38,7 @@ def _ranges_overlap(
     right_start: py_date,
     right_end: Optional[py_date],
 ) -> bool:
+    """Return True when two half-open intervals intersect (``None`` end means open-ended)."""
     left_end_effective = left_end or py_date.max
     right_end_effective = right_end or py_date.max
     return left_start <= right_end_effective and right_start <= left_end_effective
@@ -41,6 +48,7 @@ def _build_available_windows(
     projects: list[DashboardProject],
     anchor_start: py_date,
 ) -> list[dict]:
+    """Merge overlapping busy intervals, then emit gaps as candidate free slots from ``anchor_start``."""
     busy_ranges: list[tuple[py_date, Optional[py_date]]] = []
     for project in projects:
         start, end = _get_project_window(project)

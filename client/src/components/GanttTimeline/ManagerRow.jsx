@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
+import { useDroppable } from '@dnd-kit/core';
 import ProjectBar from './ProjectBar';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import {
@@ -28,6 +29,9 @@ export default function ManagerRow({
   onProjectClick,
   onAllocationCommit,
   onRemoveManager,
+  hasConflict = false,
+  onExternalDrop,
+  nowDate = new Date(),
 }) {
   const rawManager = managerData.manager;
   const managerId = typeof rawManager === 'string' ? null : rawManager?.id ?? null;
@@ -38,6 +42,10 @@ export default function ManagerRow({
   const allocations = managerData.allocations || managerData.projects || [];
   const rowRef = useRef(null);
   const trackRef = useRef(null);
+  const { setNodeRef, isOver } = useDroppable({
+    id: `manager-row-${managerId ?? 'unassigned'}`,
+    disabled: managerId === null,
+  });
 
   const stackedAllocations = useMemo(() => {
     const sorted = [...allocations].sort((left, right) => {
@@ -64,11 +72,17 @@ export default function ManagerRow({
   }, [allocations]);
 
   const rowHeight = Math.max(
-    48,
-    Math.max(...stackedAllocations.map((allocation) => allocation.levelIndex + 1), 1) * 36 + 12
+    76,
+    Math.max(...stackedAllocations.map((allocation) => allocation.levelIndex + 1), 1) * 48 + 22
   );
 
-  const lastDismantle = allocations.reduce((latest, allocation) => {
+  const remainingAllocations = allocations.filter((allocation) => {
+    const endValue = getAllocationEnd(allocation);
+    if (!endValue) return false;
+    return parseUTCDate(endValue) >= parseUTCDate(nowDate);
+  });
+
+  const lastDismantle = remainingAllocations.reduce((latest, allocation) => {
     const endValue = getAllocationEnd(allocation);
     if (!endValue) return latest;
 
@@ -134,7 +148,10 @@ export default function ManagerRow({
 
   return (
     <div
-      ref={rowRef}
+      ref={(node) => {
+        rowRef.current = node;
+        setNodeRef(node);
+      }}
       className="gantt-row"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -146,15 +163,16 @@ export default function ManagerRow({
         height: `${rowHeight}px`,
         position: 'relative',
         transition: 'height 0.24s ease, box-shadow 0.2s ease, background 0.2s ease',
+        background: isOver ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : undefined,
       }}
     >
       <div
         style={{
-          width: '240px',
+          width: '260px',
           flexShrink: 0,
           padding: '12px 16px',
           borderRight: '1px solid var(--bd)',
-          background: 'var(--bg-card)',
+          background: 'var(--bg-surface-elevated)',
           position: 'sticky',
           left: 0,
           zIndex: 10,
@@ -164,15 +182,20 @@ export default function ManagerRow({
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--tx)' }}>{managerLabel}</div>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: hasConflict ? 'var(--status-changes-text)' : 'var(--tx)' }}>
+            {managerLabel}
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--tx3)', fontWeight: 700 }}>
+            {remainingAllocations.length} Projects
+          </div>
           <div style={{ fontSize: '10px', color: 'var(--tx3)', fontWeight: 600 }}>
-            Next: <span style={{ color: 'var(--green)' }}>{nextAvailableStr}</span>
+            Next: <span style={{ color: hasConflict ? 'var(--status-changes-text)' : 'var(--success)' }}>{nextAvailableStr}</span>
           </div>
         </div>
 
         <button
           className="icon-btn"
-          onClick={() => onRemoveManager(managerId || managerLabel)}
+          onClick={() => onRemoveManager?.(managerId || managerLabel)}
           style={{ color: 'var(--red)', padding: '4px' }}
         >
           <Trash2 size={12} />
@@ -190,9 +213,9 @@ export default function ManagerRow({
             key={index}
             style={{
               width: cellWidth,
-              borderRight: '1.5px solid var(--bd-l)',
+              borderRight: '1px solid var(--grid-line)',
               height: '100%',
-              opacity: 0.3,
+              opacity: 1,
               flexShrink: 0,
             }}
           />
@@ -205,6 +228,7 @@ export default function ManagerRow({
               ...allocation,
               id: allocation.project?.id || allocation.id,
               manager_id: allocation.manager_id ?? managerId,
+              manager_name: managerLabel,
               allocation_start_date: getAllocationStart(allocation),
               allocation_end_date: getAllocationEnd(allocation),
             }}

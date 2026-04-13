@@ -43,7 +43,7 @@ const FilterPopover = ({ title, isActive, onClear, children }) => {
     useOnClickOutside(ref, () => setIsOpen(false));
 
     return (
-        <th className="filter-th" ref={ref}>
+        <th className="filter-th design-table__th design-table__th--left" ref={ref}>
             <div className="th-content" onClick={() => setIsOpen(!isOpen)}>
                 {title}
                 <div className={`filter-icon-wrapper ${isActive ? 'active' : ''}`}>
@@ -76,7 +76,8 @@ const ShipmentTable = ({
     onRefreshShipment,
     onTracked,
     selectedIds = [],
-    onSelectionChange = () => {}
+    onSelectionChange = () => {},
+    onClearFilters = () => {}
 }) => {
     // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
@@ -140,6 +141,7 @@ const ShipmentTable = ({
                 {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
                     <button className="btn-outline-sm" onClick={() => {
                         setIdSearch(''); setExhibitionFilter([]); setStatusFilter([]); setCarrierFilter([]);
+                        onClearFilters();
                     }}>Clear All Filters</button>
                 ) : null}
             </div>
@@ -154,7 +156,7 @@ const ShipmentTable = ({
                     <table className="design-table">
                         <thead>
                             <tr>
-                                <th style={{ width: 40, paddingRight: 0 }}>
+                                <th className="design-table__th design-table__th--left" style={{ width: 40, paddingRight: 0 }}>
                                     <div 
                                         className={`custom-checkbox ${selectedIds.length === filteredShipments.length && filteredShipments.length > 0 ? 'checked' : ''}`}
                                         onClick={handleSelectAll}
@@ -198,7 +200,7 @@ const ShipmentTable = ({
                                     </div>
                                 </FilterPopover>
 
-                                <th>Current Status</th>
+                                <th className="design-table__th design-table__th--left">Current Status</th>
 
                                 <FilterPopover title="Carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
                                     <div className="fp-check-list">
@@ -214,9 +216,9 @@ const ShipmentTable = ({
                                     </div>
                                 </FilterPopover>
 
-                                <th>Route</th>
-                                <th>ETA</th>
-                                <th>Actions</th>
+                                <th className="design-table__th design-table__th--left">Route</th>
+                                <th className="design-table__th design-table__th--left">ETA</th>
+                                <th className="design-table__th design-table__th--left">Actions</th>
                             </tr>
                         </thead>
                         <tbody>

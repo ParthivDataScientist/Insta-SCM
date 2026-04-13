@@ -81,17 +81,17 @@ def login(
         )
         return {"requires_mfa": True, "mfa_token": mfa_token}
 
-    access_token_expires = timedelta(minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 8))
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user.id), expires_delta=access_token_expires
     )
-    
+
     response.set_cookie(
         key="access_token",
         value=f"Bearer {access_token}",
         httponly=True,
         samesite="lax",
-        secure=False, # True if using HTTPS
+        secure=False,
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -104,15 +104,16 @@ def setup_mfa(current_user: User = Depends(get_current_user), db: Session = Depe
     db.commit()
     
     totp = pyotp.TOTP(secret)
-    uri = totp.provisioning_uri(name=current_user.email, issuer_name="Insta-SCM")
+    uri = totp.provisioning_uri(name=current_user.email, issuer_name=settings.PROJECT_NAME)
     return {"secret": secret, "otpauth_url": uri}
 
 @router.post("/mfa/verify", response_model=Token)
 def verify_mfa(mfa_data: MFAVerify, response: Response, db: Session = Depends(get_session)):
     """Verify MFA token matching the code, returns the actual JWT session."""
     try:
-        secret = getattr(settings, "JWT_SECRET_KEY", "fallback_secret_for_local_dev_only")
-        payload = jwt.decode(mfa_data.mfa_token, secret, algorithms=["HS256"])
+        payload = jwt.decode(
+            mfa_data.mfa_token, settings.JWT_SECRET_KEY, algorithms=["HS256"]
+        )
         user_id = payload.get("sub")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired MFA token")
@@ -130,11 +131,11 @@ def verify_mfa(mfa_data: MFAVerify, response: Response, db: Session = Depends(ge
         db.add(user)
         db.commit()
 
-    access_token_expires = timedelta(minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 8))
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user.id), expires_delta=access_token_expires
     )
-    
+
     response.set_cookie(
         key="access_token",
         value=f"Bearer {access_token}",
@@ -161,12 +162,22 @@ def forgot_password(request_data: ForgotPasswordRequest, db: Session = Depends(g
     db.add(user)
     db.commit()
     
-    reset_link = f"http://localhost:5173/reset-password?token={token}&email={user.email}"
-    print(f"\n" + "="*50)
-    print(f"PASSWORD RESET EMAIL TO: {user.email}")
-    print(f"LINK: {reset_link}")
-    print("="*50 + "\n")
-    
+    base = settings.FRONTEND_BASE_URL.rstrip("/")
+    reset_link = f"{base}/reset-password?token={token}&email={user.email}"
+    # Never log the raw token; in development log only that the flow ran.
+    logger.info(
+        "password_reset_token_issued",
+        extra={
+            "event": "password_reset_token_issued",
+            "user_id": user.id,
+        },
+    )
+    if settings.ENVIRONMENT == "development":
+        logger.debug(
+            "password_reset_dev_link",
+            extra={"event": "password_reset_dev_link", "reset_link": reset_link},
+        )
+
     return {"message": "If that email is in our system, a reset link will be sent."}
 
 @router.post("/reset-password")

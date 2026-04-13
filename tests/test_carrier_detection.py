@@ -1,5 +1,5 @@
 """Unit tests for carrier detection logic."""
-import pytest
+
 from app.services.carrier_detection import detect_carrier
 
 

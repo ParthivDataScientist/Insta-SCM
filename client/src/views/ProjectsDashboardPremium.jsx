@@ -1,8 +1,7 @@
-import React, { Suspense, lazy, useMemo, useState, useRef, useEffect } from 'react';
-import { Briefcase, Layout, Target, MapPin, RefreshCw, Search, X, Menu } from 'lucide-react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Building2, FolderKanban, PanelLeft, Search, Users, Workflow, X } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import ProjectTable from '../components/ProjectTable';
-import { CardSkeleton } from '../components/SkeletonLoader';
 import AppShell from '../components/app/AppShell';
 import KpiCard from '../components/app/KpiCard';
 import AlertBanner from '../components/AlertBanner';
@@ -10,72 +9,6 @@ import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
 import { EXECUTION_BOARD_STAGES } from '../utils/projectStatus';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
-
-function DropdownKpi({ label, value, detail, tone, icon, active, options, selectedValue, onSelect, className = '' }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    return (
-        <div ref={containerRef} style={{ position: 'relative' }}>
-            <KpiCard
-                label={label}
-                value={value}
-                detail={detail}
-                tone={tone}
-                active={active || isOpen}
-                icon={icon}
-                className={className}
-                onClick={() => setIsOpen(!isOpen)}
-            />
-            {isOpen && (
-                <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 100,
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    marginTop: '4px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    maxHeight: '240px',
-                    overflowY: 'auto'
-                }}>
-                    {options.map((opt) => (
-                        <div
-                            key={opt}
-                            style={{
-                                padding: '10px 14px',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                borderBottom: '1px solid var(--border)',
-                                background: selectedValue === opt ? 'var(--bg-hover)' : 'transparent',
-                                fontWeight: selectedValue === opt ? '600' : '400',
-                                color: 'var(--text-primary)'
-                            }}
-                            onClick={() => { onSelect(opt); setIsOpen(false); }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                            onMouseLeave={e => e.currentTarget.style.background = selectedValue === opt ? 'var(--bg-hover)' : 'transparent'}
-                        >
-                            {opt === 'All' ? `All ${label.toLowerCase()}s` : opt}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
 
 export default function ProjectsDashboardPremium() {
     const [selectedProject, setSelectedProject] = useState(null);
@@ -86,14 +19,14 @@ export default function ProjectsDashboardPremium() {
         filteredProjects,
         loading,
         error,
-        loadData,
+        filterStage,
+        setFilterStage,
         filterBranch,
         setFilterBranch,
         filterPM,
         setFilterPM,
         filterStatus,
         setFilterStatus,
-        filterPriority,
         setFilterPriority,
         searchQuery,
         setSearchQuery,
@@ -111,14 +44,72 @@ export default function ProjectsDashboardPremium() {
     );
 
     const latestActiveProject = projects.find((project) => project.id === activeProjectCard?.id) || activeProjectCard;
+    const [isStageMenuOpen, setIsStageMenuOpen] = useState(false);
+    const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
+    const [isManagerMenuOpen, setIsManagerMenuOpen] = useState(false);
+    const stageMenuRef = useRef(null);
+    const branchMenuRef = useRef(null);
+    const managerMenuRef = useRef(null);
+    const activeProjects = useMemo(() => projects.filter((project) => project.stage?.toLowerCase() === 'win'), [projects]);
+    const totalProjects = activeProjects.length;
+    const stageCounts = useMemo(
+        () => EXECUTION_BOARD_STAGES.reduce((acc, stage) => {
+            acc[stage] = activeProjects.filter((project) => project.board_stage === stage).length;
+            return acc;
+        }, {}),
+        [activeProjects]
+    );
+    const stagesCount = EXECUTION_BOARD_STAGES.length;
+    const activeStageCount = filterStatus !== 'All' ? (stageCounts[filterStatus] ?? 0) : stagesCount;
+    const totalBranches = Math.max(0, uniqueBranches.length - 1);
+    const totalManagers = Math.max(0, uniquePMs.length - 1);
+    const branchCounts = useMemo(
+        () => uniqueBranches.reduce((acc, branch) => {
+            if (branch !== 'All') {
+                acc[branch] = activeProjects.filter((project) => project.branch === branch).length;
+            }
+            return acc;
+        }, {}),
+        [activeProjects, uniqueBranches]
+    );
+    const managerCounts = useMemo(
+        () => uniquePMs.reduce((acc, manager) => {
+            if (manager !== 'All') {
+                acc[manager] = activeProjects.filter((project) => project.project_manager === manager).length;
+            }
+            return acc;
+        }, {}),
+        [activeProjects, uniquePMs]
+    );
     const hasActiveFilters =
+        filterStage !== 'All' ||
         filterStatus !== 'All' ||
         filterBranch !== 'All' ||
         filterPM !== 'All' ||
-        filterPriority !== 'All' ||
         searchQuery !== '';
 
+    useEffect(() => {
+        setFilterPriority('All');
+    }, [setFilterPriority]);
+
+    useEffect(() => {
+        const onClickOutside = (event) => {
+            if (stageMenuRef.current && !stageMenuRef.current.contains(event.target)) {
+                setIsStageMenuOpen(false);
+            }
+            if (branchMenuRef.current && !branchMenuRef.current.contains(event.target)) {
+                setIsBranchMenuOpen(false);
+            }
+            if (managerMenuRef.current && !managerMenuRef.current.contains(event.target)) {
+                setIsManagerMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, []);
+
     const resetFilters = () => {
+        setFilterStage('All');
         setFilterStatus('All');
         setFilterBranch('All');
         setFilterPM('All');
@@ -128,60 +119,141 @@ export default function ProjectsDashboardPremium() {
         setActiveProjectCard(null);
     };
 
-    const header = ({ toggleSidebar }) => (
-        <header className="design-dashboard__header">
-            <div className="design-dashboard__header-scroll">
+    const handleStageSelect = (stage) => {
+        setFilterStatus(stage);
+        setIsStageMenuOpen(false);
+    };
+
+    const handleBranchSelect = (branch) => {
+        setFilterBranch(branch);
+        setIsBranchMenuOpen(false);
+    };
+
+    const handleManagerSelect = (manager) => {
+        setFilterPM(manager);
+        setIsManagerMenuOpen(false);
+    };
+
+    const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
+        <>
+            {sidebarOverlay ? (
                 <button
                     type="button"
-                    className="design-dashboard__icon-button mobile-only"
+                    className="design-dashboard__sidebar-rail-btn"
                     onClick={toggleSidebar}
-                    title="Open navigation"
+                    title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    aria-expanded={sidebarOpen}
+                    aria-controls="app-primary-sidebar"
                 >
-                    <Menu size={16} />
+                    <PanelLeft size={18} strokeWidth={2} aria-hidden />
                 </button>
+            ) : null}
 
-                <div className="design-dashboard__title" style={{ marginRight: '16px', display: 'flex', flexDirection: 'column' }}>
-                    <h1 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Projects</h1>
+            <header className="design-dashboard__header projects-dashboard__header">
+                <div className="design-dashboard__header-scroll projects-dashboard__header-scroll">
+                    <div className="design-dashboard__header-filters projects-dashboard__header-filters projects-dashboard__filters-subsection">
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
+                            <span className="design-dashboard__filter-label" id="projects-search-label">
+                                Search
+                            </span>
+                            <label className="design-dashboard__search">
+                                <Search size={16} aria-hidden />
+                                <input
+                                    type="search"
+                                    placeholder="Search project, event, venue, manager..."
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    aria-labelledby="projects-search-label"
+                                />
+                            </label>
+                        </div>
+
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--stage">
+                            <span className="design-dashboard__filter-label" id="projects-stage-label">
+                                Execution stage
+                            </span>
+                            <label className="design-dashboard__control design-dashboard__control--select">
+                                <select
+                                    value={filterStatus}
+                                    onChange={(event) => setFilterStatus(event.target.value)}
+                                    aria-labelledby="projects-stage-label"
+                                >
+                                    <option value="All">All stages</option>
+                                    {EXECUTION_BOARD_STAGES.map((stage) => (
+                                        <option key={stage} value={stage}>
+                                            {stage}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--branch">
+                            <span className="design-dashboard__filter-label" id="projects-branch-label">
+                                Branch
+                            </span>
+                            <label className="design-dashboard__control design-dashboard__control--select">
+                                <select
+                                    value={filterBranch}
+                                    onChange={(event) => setFilterBranch(event.target.value)}
+                                    aria-labelledby="projects-branch-label"
+                                >
+                                    {uniqueBranches.map((branch) => (
+                                        <option key={branch} value={branch}>
+                                            {branch === 'All' ? 'All branches' : branch}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--manager">
+                            <span className="design-dashboard__filter-label" id="projects-manager-label">
+                                Manager
+                            </span>
+                            <label className="design-dashboard__control design-dashboard__control--select">
+                                <select
+                                    value={filterPM}
+                                    onChange={(event) => setFilterPM(event.target.value)}
+                                    aria-labelledby="projects-manager-label"
+                                >
+                                    {uniquePMs.map((manager) => (
+                                        <option key={manager} value={manager}>
+                                            {manager === 'All' ? 'All managers' : manager}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
+                            <span className="design-dashboard__filter-label" id="projects-date-label">
+                                Date range
+                            </span>
+                            <GlobalDateRangePicker
+                                compact
+                                label={false}
+                                className="design-dashboard__date-range projects-dashboard__date-range"
+                                aria-labelledby="projects-date-label"
+                            />
+                        </div>
+
+                        {hasActiveFilters ? (
+                            <button
+                                type="button"
+                                className="design-dashboard__action-button projects-dashboard__reset-button"
+                                onClick={resetFilters}
+                                title="Clear filters"
+                            >
+                                <X size={15} />
+                                Reset
+                            </button>
+                        ) : null}
+                    </div>
                 </div>
-
-                <label className="design-dashboard__search" style={{ minWidth: '300px' }}>
-                    <Search size={16} />
-                    <input
-                        placeholder="Search project, event, venue, manager..."
-                        value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                    />
-                </label>
-
-                <GlobalDateRangePicker compact label="Date Range" className="design-dashboard__date-range" />
-
-                {hasActiveFilters && (
-                    <button
-                        type="button"
-                        className="design-dashboard__action-button"
-                        onClick={resetFilters}
-                        title="Clear filters"
-                    >
-                        <X size={15} style={{ marginRight: '4px' }} />
-                        Reset Filters
-                    </button>
-                )}
-
-                <button
-                    type="button"
-                    className="design-dashboard__action-button"
-                    onClick={loadData}
-                    disabled={loading}
-                    style={{ background: 'var(--accent)', color: 'white', border: 'none' }}
-                >
-                    <RefreshCw size={15} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-                    Refresh
-                </button>
-            </div>
-        </header>
+            </header>
+        </>
     );
-
-    const stagesOptions = ['All', ...EXECUTION_BOARD_STAGES];
 
     return (
         <>
@@ -199,55 +271,106 @@ export default function ProjectsDashboardPremium() {
                 activeNav="projects"
                 header={header}
                 showGlobalDate={false}
+                mainClassName="premium-main--design"
+                pageClassName="design-dashboard-page"
+                sidebarOverlay
             >
-                <div className="design-dashboard__kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-                    <KpiCard
-                        icon={Briefcase}
-                        label="TOTAL PROJECTS"
-                        value={projects.length}
-                        detail="Global total in database"
-                        tone="neutral"
-                        className="design-dashboard__kpi design-dashboard__kpi--all"
-                    />
-                    <DropdownKpi
-                        icon={Layout}
-                        label="STAGE"
-                        value={filterStatus === 'All' ? filteredProjects.length : filteredProjects.length}
-                        detail={`${filteredProjects.length} projects in view`}
-                        tone="orange"
-                        active={filterStatus !== 'All'}
-                        options={stagesOptions}
-                        selectedValue={filterStatus}
-                        onSelect={setFilterStatus}
-                        className="design-dashboard__kpi design-dashboard__kpi--pending"
-                    />
-                    <DropdownKpi
-                        icon={Target}
-                        label="MANAGER"
-                        value={filterPM === 'All' ? filteredProjects.length : filteredProjects.length}
-                        detail={`${filteredProjects.length} projects in view`}
-                        tone="green"
-                        active={filterPM !== 'All'}
-                        options={uniquePMs}
-                        selectedValue={filterPM}
-                        onSelect={setFilterPM}
-                        className="design-dashboard__kpi design-dashboard__kpi--won"
-                    />
-                    <DropdownKpi
-                        icon={MapPin}
-                        label="BRANCH"
-                        value={filterBranch === 'All' ? filteredProjects.length : filteredProjects.length}
-                        detail={`${filteredProjects.length} projects in view`}
-                        tone="red"
-                        active={filterBranch !== 'All'}
-                        options={uniqueBranches}
-                        selectedValue={filterBranch}
-                        onSelect={setFilterBranch}
-                        className="design-dashboard__kpi design-dashboard__kpi--lost"
-                    />
-                </div>
-
                 <AlertBanner message={error} />
+
+                <div className="design-dashboard__kpi-grid design-dashboard__kpi-grid--projects">
+                    <KpiCard
+                        icon={FolderKanban}
+                        label="Total Projects"
+                        value={totalProjects}
+                        active={filterStage === 'All' && filterStatus === 'All'}
+                        onClick={resetFilters}
+                        className="design-dashboard__kpi design-dashboard__kpi--all projects-dashboard__kpi"
+                    />
+                    <div className="projects-dashboard__kpi-dropdown" ref={stageMenuRef}>
+                        <KpiCard
+                            icon={Workflow}
+                            label="Stages"
+                            value={activeStageCount}
+                            active={filterStatus !== 'All' || isStageMenuOpen}
+                            onClick={() => {
+                                setIsStageMenuOpen((open) => !open);
+                                setIsBranchMenuOpen(false);
+                                setIsManagerMenuOpen(false);
+                            }}
+                            className="design-dashboard__kpi design-dashboard__kpi--pending projects-dashboard__kpi"
+                        />
+                        {isStageMenuOpen ? (
+                            <div className="projects-dashboard__kpi-menu">
+                                <button type="button" className="projects-dashboard__kpi-menu-item" onClick={() => handleStageSelect('All')}>
+                                    All stages
+                                    <strong>{totalProjects}</strong>
+                                </button>
+                                {EXECUTION_BOARD_STAGES.map((stage) => (
+                                    <button key={stage} type="button" className="projects-dashboard__kpi-menu-item" onClick={() => handleStageSelect(stage)}>
+                                        {stage}
+                                        <strong>{stageCounts[stage] ?? 0}</strong>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="projects-dashboard__kpi-dropdown" ref={branchMenuRef}>
+                        <KpiCard
+                            icon={Building2}
+                            label="Branch"
+                            value={filterBranch === 'All' ? totalBranches : (branchCounts[filterBranch] ?? 0)}
+                            active={filterBranch !== 'All' || isBranchMenuOpen}
+                            onClick={() => {
+                                setIsBranchMenuOpen((open) => !open);
+                                setIsManagerMenuOpen(false);
+                                setIsStageMenuOpen(false);
+                            }}
+                            className="design-dashboard__kpi design-dashboard__kpi--in-progress projects-dashboard__kpi"
+                        />
+                        {isBranchMenuOpen ? (
+                            <div className="projects-dashboard__kpi-menu">
+                                <button type="button" className="projects-dashboard__kpi-menu-item" onClick={() => handleBranchSelect('All')}>
+                                    All branches
+                                    <strong>{totalProjects}</strong>
+                                </button>
+                                {uniqueBranches.filter((branch) => branch !== 'All').map((branch) => (
+                                    <button key={branch} type="button" className="projects-dashboard__kpi-menu-item" onClick={() => handleBranchSelect(branch)}>
+                                        {branch}
+                                        <strong>{branchCounts[branch] ?? 0}</strong>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="projects-dashboard__kpi-dropdown" ref={managerMenuRef}>
+                        <KpiCard
+                            icon={Users}
+                            label="Managers"
+                            value={filterPM === 'All' ? totalManagers : (managerCounts[filterPM] ?? 0)}
+                            active={filterPM !== 'All' || isManagerMenuOpen}
+                            onClick={() => {
+                                setIsManagerMenuOpen((open) => !open);
+                                setIsBranchMenuOpen(false);
+                                setIsStageMenuOpen(false);
+                            }}
+                            className="design-dashboard__kpi design-dashboard__kpi--won projects-dashboard__kpi"
+                        />
+                        {isManagerMenuOpen ? (
+                            <div className="projects-dashboard__kpi-menu">
+                                <button type="button" className="projects-dashboard__kpi-menu-item" onClick={() => handleManagerSelect('All')}>
+                                    All managers
+                                    <strong>{totalProjects}</strong>
+                                </button>
+                                {uniquePMs.filter((manager) => manager !== 'All').map((manager) => (
+                                    <button key={manager} type="button" className="projects-dashboard__kpi-menu-item" onClick={() => handleManagerSelect(manager)}>
+                                        {manager}
+                                        <strong>{managerCounts[manager] ?? 0}</strong>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
 
                 <div className="design-dashboard__table-shell">
                     {loading && projects.length === 0 ? (
@@ -258,8 +381,8 @@ export default function ProjectsDashboardPremium() {
                             loading={loading}
                             selectedProject={selectedProject}
                             onSelectProject={setSelectedProject}
-                            updateProjectFull={updateProjectFull}
                             onDoubleClickProject={setActiveProjectCard}
+                            onUpdateStage={(projectId, nextStage) => updateProjectFull(projectId, { board_stage: nextStage })}
                         />
                     )}
                 </div>

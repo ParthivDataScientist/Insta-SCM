@@ -1,13 +1,11 @@
+import type { TimelineBarLayout, TimelineViewMode } from '../../types/domain';
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-export function parseUTCDate(dateValue) {
+export function parseUTCDate(dateValue: Date | string | number | null | undefined): Date {
   if (dateValue instanceof Date) {
     return new Date(
-      Date.UTC(
-        dateValue.getFullYear(),
-        dateValue.getMonth(),
-        dateValue.getDate()
-      )
+      Date.UTC(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate()),
     );
   }
 
@@ -27,25 +25,37 @@ export function parseUTCDate(dateValue) {
   return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
 }
 
-export function formatUTCDate(dateValue) {
+export function formatUTCDate(dateValue: Date | string | number | null | undefined): string {
   return parseUTCDate(dateValue).toISOString().split('T')[0];
 }
 
-export function addDaysUTC(dateValue, days) {
+export function addDaysUTC(
+  dateValue: Date | string | number | null | undefined,
+  days: number,
+): Date {
   const next = parseUTCDate(dateValue);
   next.setUTCDate(next.getUTCDate() + days);
   return next;
 }
 
-export function diffDaysUTC(fromDate, toDate) {
-  return Math.round((parseUTCDate(toDate).getTime() - parseUTCDate(fromDate).getTime()) / MS_PER_DAY);
+export function diffDaysUTC(
+  fromDate: Date | string | number | null | undefined,
+  toDate: Date | string | number | null | undefined,
+): number {
+  return Math.round(
+    (parseUTCDate(toDate).getTime() - parseUTCDate(fromDate).getTime()) / MS_PER_DAY,
+  );
 }
 
-export function getDaysInMonthUTC(year, monthIndex) {
+export function getDaysInMonthUTC(year: number, monthIndex: number): number {
   return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 }
 
-export function getPxPerDay(dateValue, cellWidth, viewMode) {
+export function getPxPerDay(
+  dateValue: Date | string | number | null | undefined,
+  cellWidth: number,
+  viewMode: TimelineViewMode,
+): number {
   if (viewMode === 'Day') return cellWidth;
   if (viewMode === 'Week') return cellWidth / 7;
 
@@ -53,7 +63,12 @@ export function getPxPerDay(dateValue, cellWidth, viewMode) {
   return cellWidth / getDaysInMonthUTC(date.getUTCFullYear(), date.getUTCMonth());
 }
 
-export function dateToTimelinePx(dateValue, timelineStart, cellWidth, viewMode) {
+export function dateToTimelinePx(
+  dateValue: Date | string | number | null | undefined,
+  timelineStart: Date | string | number | null | undefined,
+  cellWidth: number,
+  viewMode: TimelineViewMode,
+): number {
   const start = parseUTCDate(timelineStart);
   const date = parseUTCDate(dateValue);
 
@@ -66,7 +81,8 @@ export function dateToTimelinePx(dateValue, timelineStart, cellWidth, viewMode) 
 
   while (
     cursor.getUTCFullYear() < date.getUTCFullYear() ||
-    (cursor.getUTCFullYear() === date.getUTCFullYear() && cursor.getUTCMonth() < date.getUTCMonth())
+    (cursor.getUTCFullYear() === date.getUTCFullYear() &&
+      cursor.getUTCMonth() < date.getUTCMonth())
   ) {
     px += cellWidth;
     cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
@@ -75,7 +91,12 @@ export function dateToTimelinePx(dateValue, timelineStart, cellWidth, viewMode) 
   return px + (date.getUTCDate() - 1) * getPxPerDay(date, cellWidth, viewMode);
 }
 
-export function pxToTimelineDate(px, timelineStart, cellWidth, viewMode) {
+export function pxToTimelineDate(
+  px: number,
+  timelineStart: Date | string | number | null | undefined,
+  cellWidth: number,
+  viewMode: TimelineViewMode,
+): Date {
   const start = parseUTCDate(timelineStart);
   const safePx = Math.max(0, px);
 
@@ -108,7 +129,19 @@ export function pxToTimelineDate(px, timelineStart, cellWidth, viewMode) {
   return current;
 }
 
-export function getBarLayout(startDate, endDate, timelineStart, cellWidth, viewMode) {
+/**
+ * Maps a date range to horizontal bar geometry on the timeline.
+ *
+ * Why normalize end: inverted ranges would render negative widths; clamping keeps
+ * layout stable when upstream data is partially filled.
+ */
+export function getBarLayout(
+  startDate: Date | string | number | null | undefined,
+  endDate: Date | string | number | null | undefined,
+  timelineStart: Date | string | number | null | undefined,
+  cellWidth: number,
+  viewMode: TimelineViewMode,
+): TimelineBarLayout {
   const normalizedStart = parseUTCDate(startDate);
   const normalizedEnd = parseUTCDate(endDate || startDate);
   const safeEnd = normalizedEnd < normalizedStart ? normalizedStart : normalizedEnd;

@@ -832,6 +832,11 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
     return _serialize_project(project, awb_map)
 
 
+@router.patch("/{project_id}", response_model=DashboardProjectRead)
+def patch_project(project_id: int, project_in: DashboardProjectUpdate, session: Session = Depends(get_session)):
+    return update_project(project_id, project_in, session)
+
+
 @router.delete("/{project_id}")
 def delete_project(project_id: int, session: Session = Depends(get_session)):
     project = session.get(DashboardProject, project_id)

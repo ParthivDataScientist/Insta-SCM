@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Archive, Briefcase, Layout, LogOut, Menu, Moon, PenTool, RefreshCw, Sun, Truck } from 'lucide-react';
+import { Archive, Briefcase, Layout, LogOut, Menu, Moon, PenTool, RefreshCw, Sun, Truck, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -24,6 +24,9 @@ export default function AppShell({
     header = null,
     toolbar = null,
     showGlobalDate = true,
+    pageClassName = '',
+    mainClassName = '',
+    sidebarOverlay = false,
     children,
 }) {
     const { logout } = useAuth();
@@ -37,16 +40,45 @@ export default function AppShell({
             isDark,
             toggleTheme,
             logout,
+            sidebarOverlay,
+            sidebarOpen,
             toggleSidebar: () => setSidebarOpen((open) => !open),
         }),
-        [isDark, logout, theme, toggleTheme]
+        [isDark, logout, sidebarOpen, sidebarOverlay, theme, toggleTheme]
     );
 
+    const shellClass = [
+        'premium-shell',
+        sidebarOverlay ? 'premium-shell--sidebar-overlay' : '',
+        sidebarOpen ? 'sidebar-open' : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
+
     return (
-        <div className={`${theme} premium-app`}>
-            <div className={`premium-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
-                <aside className="premium-sidebar">
+        <div
+            className={`${theme} premium-app`}
+            data-sidebar-state={sidebarOverlay ? (sidebarOpen ? 'open' : 'closed') : undefined}
+        >
+            {sidebarOverlay && sidebarOpen ? (
+                <button
+                    type="button"
+                    className="premium-sidebar-backdrop"
+                    aria-label="Close navigation"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            ) : null}
+            <div className={shellClass}>
+                <aside className="premium-sidebar" id="app-primary-sidebar">
                     <div className="premium-sidebar__brand">
+                        <button
+                            type="button"
+                            className="premium-sidebar__close"
+                            aria-label="Close sidebar"
+                            onClick={() => setSidebarOpen(false)}
+                        >
+                            <X size={16} />
+                        </button>
                         <img src="/logo.jpg" alt="Insta SCM" className="premium-sidebar__logo" />
                         <div>
                             <div className="premium-sidebar__title">Insta SCM</div>
@@ -64,7 +96,7 @@ export default function AppShell({
                     </nav>
                 </aside>
 
-                <main className="premium-main">
+                <main className={`premium-main${mainClassName ? ` ${mainClassName}` : ''}`}>
                     {header ? (
                         typeof header === 'function' ? header(headerOverrideProps) : header
                     ) : (
@@ -103,7 +135,7 @@ export default function AppShell({
 
                     {toolbar ? <div className="premium-toolbar">{toolbar}</div> : null}
 
-                    <section className="premium-page">
+                    <section className={`premium-page${pageClassName ? ` ${pageClassName}` : ''}`}>
                         {children}
                     </section>
                 </main>

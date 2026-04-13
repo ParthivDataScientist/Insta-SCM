@@ -8,6 +8,8 @@ export function ThemeProvider({ children }) {
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, theme);
+        document.documentElement.classList.remove('light', 'dark');
+        document.documentElement.classList.add(theme);
         document.documentElement.dataset.theme = theme;
     }, [theme]);
 

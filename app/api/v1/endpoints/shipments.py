@@ -7,7 +7,7 @@ import logging
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Path, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Path, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
@@ -108,6 +108,8 @@ def track_shipment(
     _key: str = Depends(verify_api_key),
 ):
     """Track a shipment via carrier API and save/update in DB."""
+    if body.project_id is None:
+        raise HTTPException(status_code=400, detail="project_id is required")
     _validate_project_reference(db, body.project_id)
     result = track_and_save(
         tracking_number=tracking_number.upper(),

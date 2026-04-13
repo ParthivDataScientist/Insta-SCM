@@ -1,5 +1,4 @@
 """Integration tests for shipment API endpoints."""
-import pytest
 
 
 def create_project(client, name="Shipment Project"):

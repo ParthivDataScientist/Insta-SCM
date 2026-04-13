@@ -135,6 +135,17 @@ class TestFedExMPSParser:
         assert set(result["child_tracking_numbers"]) == expected
 
     def test_track_extracts_children_from_nested_associated_response(self, fedex_service, fedex_response, monkeypatch):
+        import app.services.fedex as fedex_mod
+
+        monkeypatch.setattr(fedex_mod, "_fedex_token", "")
+        monkeypatch.setattr(fedex_mod, "_fedex_token_expiry", 0.0)
+
+        # Non-empty credentials force OAuth + track POSTs to hit ``requests.post`` (mocked below).
+        # Empty credentials make ``_get_token`` return ``mock_token``, and then ``_request_track``
+        # short-circuits without calling ``requests.post``.
+        fedex_service.client_id = "test_client_id"
+        fedex_service.client_secret = "test_client_secret"
+
         main_response = json.loads(json.dumps(fedex_response))
         track_result = main_response["output"]["completeTrackResults"][0]["trackResults"][0]
         track_result["associatedShipments"] = []
@@ -202,6 +213,14 @@ class TestFedExMPSParser:
         }
 
     def test_track_extracts_children_from_complete_track_results_shape(self, fedex_service, fedex_response, monkeypatch):
+        import app.services.fedex as fedex_mod
+
+        monkeypatch.setattr(fedex_mod, "_fedex_token", "")
+        monkeypatch.setattr(fedex_mod, "_fedex_token_expiry", 0.0)
+
+        fedex_service.client_id = "test_client_id"
+        fedex_service.client_secret = "test_client_secret"
+
         main_response = json.loads(json.dumps(fedex_response))
         track_result = main_response["output"]["completeTrackResults"][0]["trackResults"][0]
         track_result["associatedShipments"] = []

@@ -1,32 +1,50 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel, Session, text, select, func
 from sqlalchemy import inspect
-
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from sqlmodel import SQLModel, Session, select, text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.error_handlers import (
+    app_error_handler,
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
+from app.api.middleware.request_id import RequestIdMiddleware
 from app.core.config import settings
+from app.core.errors import AppError
+from app.core.logging_config import configure_logging
 from app.db.session import engine, get_session
 from app.api.v1.api import api_router
 
+configure_logging()
+logger = logging.getLogger(__name__)
+
 # Import models so SQLModel can discover them for schema creation
 from app.models.dashboard_project import DashboardProject
+from app.models.shipment import Shipment  # noqa: F401 — register table metadata
 from app.models.user import User
-from app.models.shipment import Shipment
 from app.api.v1.endpoints.dashboard_projects_v2 import _apply_design_state
 
 limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: create DB tables on startup."""
+    """Application lifespan: create DB tables on startup and run lightweight schema sync."""
     SQLModel.metadata.create_all(engine)
     _ensure_project_schema_compatibility()
     _backfill_project_canonical_fields()
+    logger.info(
+        "application_startup_complete",
+        extra={"event": "application_startup_complete"},
+    )
     yield
 
 
@@ -126,23 +144,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_exception_handler(AppError, app_error_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
-# CORS — tightly scoped; configure ALLOWED_ORIGIN in .env for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.ALLOWED_ORIGIN,
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://192.168.29.50:5173",
-        "https://insta-exhibition-scm.vercel.app"  # Added Vercel production origin
-    ],
+    allow_origins=settings.cors_origin_list(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestIdMiddleware)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -158,7 +174,10 @@ def admin_reseed(session: Session = Depends(get_session)):
         from datetime import timedelta
 
         # 1. Wipe current projects
-        print("[admin-reseed] Wiping dashboardproject table...")
+        logger.warning(
+            "admin_reseed_wipe_started",
+            extra={"event": "admin_reseed_wipe_started"},
+        )
         session.execute(text("DELETE FROM dashboardproject;"))
         # DO NOT wipe users as it may contain auth accounts. Let's только create/lookup managers.
         session.commit()

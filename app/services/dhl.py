@@ -1,10 +1,10 @@
-import requests
 import logging
-from typing import Dict, Any
-from .carrier_base import CarrierService, HISTORY_STATUS_MAP
-from typing import List, Any
-from typing import List, Any
+from typing import Any, Dict
+
+import requests
+
 from app.core.config import settings
+from .carrier_base import CarrierService, HISTORY_STATUS_MAP
 
 logger = logging.getLogger(__name__)
 

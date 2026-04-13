@@ -35,10 +35,18 @@ const StatusBadge = ({ status }) => {
         'unknown': <Clock size={13} />,
     };
 
+    const pillTone = {
+        delivered: 'design-table__status-pill--won',
+        transit: 'design-table__status-pill--changes',
+        ofd: 'design-table__status-pill--changes',
+        exception: 'design-table__status-pill--lost',
+        unknown: 'design-table__status-pill--pending',
+    };
+
     return (
-        <span className={`status-pill ${sType}`}>
+        <span className={`design-table__status-pill shipments-status-pill ${pillTone[sType] || 'design-table__status-pill--pending'}`}>
             {icons[sType] || <Clock size={13} />}
-            <span style={{ marginLeft: 6 }}>{sLabel}</span>
+            <span>{sLabel}</span>
         </span>
     );
 };
