@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
 from sqlalchemy.exc import IntegrityError
 import logging
+import secrets
 
 from app.db.session import get_session
+from app.core.auth import get_password_hash
 from app.models.dashboard_project import DashboardProject, ProjectAuditLog, Client
 from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
@@ -609,7 +611,7 @@ def create_manager(manager_data: dict, session: Session = Depends(get_session)):
     new_user = User(
         full_name=name,
         email=email,
-        hashed_password="DUMMY_PASSWORD_SCM", # Placeholder for Gantt-created managers
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)), # Placeholder for Gantt-created managers
         role="PROJECT_MANAGER",
         is_active=True
     )
