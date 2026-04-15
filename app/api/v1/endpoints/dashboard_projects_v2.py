@@ -28,7 +28,6 @@ from app.schemas.dashboard_project import (
     ProjectResourceVersionRead,
 )
 from app.services.availability import get_managers_availability, is_manager_available
-from app.services.availability import is_manager_available, get_all_managers_availability
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1100,10 +1099,6 @@ def check_availability(
         new_start=start_date,
         new_end=end_date,
         manager_ids=manager_ids,
-    return get_all_managers_availability(
-        session=session,
-        new_start=start_date,
-        new_end=end_date,
         exclude_project_id=project_id,
     )
 

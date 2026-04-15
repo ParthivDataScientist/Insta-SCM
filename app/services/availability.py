@@ -183,15 +183,6 @@ def get_managers_availability(
 ) -> dict[str, dict]:
     """
     Checks availability for multiple managers in a single database query.
-def get_all_managers_availability(
-    session: Session,
-    new_start: py_date,
-    new_end: Optional[py_date],
-    exclude_project_id: Optional[int] = None,
-) -> dict:
-    """
-    Checks manager availability for a given date range directly at the database layer
-    for all managers in one go, preventing N+1 queries.
 
     Args:
         session: Database session.
@@ -216,20 +207,6 @@ def get_all_managers_availability(
             str(m_id): {"available": True, "conflicts": [], "available_windows": []}
             for m_id in manager_ids
         }
-        exclude_project_id: Optional project ID to exclude.
-
-    Returns:
-        dict: A dictionary mapping manager ID strings to their availability dicts.
-    """
-    from app.models.user import User
-    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
-    results = {
-        str(m.id): {"available": True, "conflicts": [], "available_windows": []}
-        for m in managers
-    }
-
-    if not new_start:
-        return results
 
     stmt = select(DashboardProject).where(
         (DashboardProject.allocation_start_date.is_not(None))
@@ -245,10 +222,6 @@ def get_all_managers_availability(
 
     # Fetch all relevant projects in one query
     all_projects = [
-    if exclude_project_id:
-        stmt = stmt.where(DashboardProject.id != exclude_project_id)
-
-    projects = [
         project
         for project in session.exec(stmt).all()
         if (project.stage or "").strip().lower() in EXECUTION_STAGE_ALIASES
@@ -266,13 +239,6 @@ def get_all_managers_availability(
         conflicts = []
         manager_projects = projects_by_manager[m_id]
 
-    projects_by_manager = {str(m.id): [] for m in managers}
-    for project in projects:
-        if project.manager_id and str(project.manager_id) in projects_by_manager:
-            projects_by_manager[str(project.manager_id)].append(project)
-
-    for manager_id, manager_projects in projects_by_manager.items():
-        conflicts = []
         for project in manager_projects:
             project_start, project_end = _get_project_window(project)
             if not project_start:
@@ -293,7 +259,6 @@ def get_all_managers_availability(
                 )
 
         results[str(m_id)] = {
-        results[manager_id] = {
             "available": len(conflicts) == 0,
             "conflicts": conflicts,
             "available_windows": _build_available_windows(manager_projects, new_start),
