@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Any
 from datetime import date as py_date, datetime, timezone
 from sqlmodel import Field, Relationship, Column, SQLModel
 from sqlalchemy import DateTime, JSON, String, UniqueConstraint, func
@@ -18,8 +18,8 @@ class ProjectAuditLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="dashboardproject.id", index=True)
     change_type: str = Field(default="UPDATE") # e.g., STAGE_CHANGE, DATE_CHANGE
-    prev_state: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
-    new_state: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
+    prev_state: dict[str, Any] = Field(default={}, sa_column=Column(JSON))
+    new_state: dict[str, Any] = Field(default={}, sa_column=Column(JSON))
     changed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
