@@ -7,9 +7,11 @@ from typing import Any, Iterable, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+import secrets
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select, text
 
+from app.core.auth import get_password_hash
 from app.db.session import get_session
 from app.models.dashboard_project import Client, DashboardProject, ProjectAuditLog, ProjectLink, ProjectResource
 from app.models.shipment import Shipment
@@ -25,7 +27,7 @@ from app.schemas.dashboard_project import (
     ProjectResourceVersionCreate,
     ProjectResourceVersionRead,
 )
-from app.services.availability import is_manager_available
+from app.services.availability import is_manager_available, get_all_managers_availability
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -684,10 +686,14 @@ def get_design_projects(
 @router.post("/crm/designs/sync")
 def sync_crm_design_feed(session: Session = Depends(get_session)):
     upserted = 0
+    crm_project_ids = [record["crm_project_id"] for record in CRM_DESIGN_FEED]
+    existing_projects = session.exec(
+        select(DashboardProject).where(DashboardProject.crm_project_id.in_(crm_project_ids))
+    ).all()
+    project_map = {p.crm_project_id: p for p in existing_projects if p.crm_project_id}
+
     for crm_record in CRM_DESIGN_FEED:
-        project = session.exec(
-            select(DashboardProject).where(DashboardProject.crm_project_id == crm_record["crm_project_id"])
-        ).first()
+        project = project_map.get(crm_record["crm_project_id"])
         already_won = bool(project and _is_won_project(project.stage))
 
         if not project:
@@ -1085,17 +1091,12 @@ def check_availability(
             )
         }
 
-    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
-    results = {}
-    for manager in managers:
-        results[str(manager.id)] = is_manager_available(
-            session=session,
-            new_start=start_date,
-            new_end=end_date,
-            manager_id=manager.id,
-            exclude_project_id=project_id,
-        )
-    return results
+    return get_all_managers_availability(
+        session=session,
+        new_start=start_date,
+        new_end=end_date,
+        exclude_project_id=project_id,
+    )
 
 
 @router.get("/timeline")
@@ -1233,7 +1234,7 @@ def create_manager(manager_data: dict, session: Session = Depends(get_session)):
     new_user = User(
         full_name=name,
         email=email,
-        hashed_password="DUMMY_PASSWORD_SCM",
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
         role="PROJECT_MANAGER",
         is_active=True,
     )

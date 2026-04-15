@@ -384,7 +384,8 @@ def export_shipments(
             try:
                 dt = datetime.fromisoformat(latest["date"].replace("Z", "+00:00"))
                 h_date = dt.strftime("%d.%m.%Y")
-            except:
+            except (ValueError, TypeError):
+                logger.warning("Failed to parse master latest date: %s", latest.get("date"))
                 h_date = latest.get("date", "")[:10]
             
             loc = f" {latest.get('location', '')}" if latest.get('location') else ""
@@ -434,7 +435,8 @@ def export_shipments(
                     try:
                         dt = datetime.fromisoformat(c["last_date"].replace("Z", "+00:00"))
                         c_date = dt.strftime("%d.%m.%Y")
-                    except:
+                    except (ValueError, TypeError):
+                        logger.warning("Failed to parse child last_date: %s", c.get("last_date"))
                         c_date = c["last_date"][:10]
                 else:
                     c_date = s.created_at.strftime('%d.%m.%Y') if s.created_at else ''
@@ -492,7 +494,8 @@ def export_shipments(
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
-            except:
+            except (ValueError, TypeError):
+                logger.warning("Failed to evaluate length for cell value: %s", cell.value)
                 pass
         ws.column_dimensions[column].width = min(max_length + 2, 40)
 

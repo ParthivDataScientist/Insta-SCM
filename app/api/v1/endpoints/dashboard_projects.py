@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
 from sqlalchemy.exc import IntegrityError
 import logging
+import secrets
 
 from app.db.session import get_session
+from app.core.auth import get_password_hash
 from app.models.dashboard_project import DashboardProject, ProjectAuditLog, Client
 from app.models.user import User
 from app.schemas.dashboard_project import DashboardProjectCreate, DashboardProjectRead, DashboardProjectUpdate
-from app.services.availability import is_manager_available
+from app.services.availability import is_manager_available, get_all_managers_availability
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -454,18 +456,12 @@ def check_availability(
             )
         }
 
-    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
-    results = {}
-    for m in managers:
-        results[str(m.id)] = is_manager_available(
-            session=session,
-            new_start=start_date,
-            new_end=end_date,
-            manager_id=m.id,
-            exclude_project_id=project_id,
-        )
-
-    return results
+    return get_all_managers_availability(
+        session=session,
+        new_start=start_date,
+        new_end=end_date,
+        exclude_project_id=project_id,
+    )
 
 @router.get("/timeline")
 def get_timeline_data(session: Session = Depends(get_session)):
@@ -615,7 +611,7 @@ def create_manager(manager_data: dict, session: Session = Depends(get_session)):
     new_user = User(
         full_name=name,
         email=email,
-        hashed_password="DUMMY_PASSWORD_SCM", # Placeholder for Gantt-created managers
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)), # Placeholder for Gantt-created managers
         role="PROJECT_MANAGER",
         is_active=True
     )

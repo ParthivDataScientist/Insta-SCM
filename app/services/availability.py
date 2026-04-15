@@ -172,3 +172,81 @@ def is_manager_available(
         "conflicts": conflicts,
         "available_windows": _build_available_windows(projects, new_start),
     }
+
+def get_all_managers_availability(
+    session: Session,
+    new_start: py_date,
+    new_end: Optional[py_date],
+    exclude_project_id: Optional[int] = None,
+) -> dict:
+    """
+    Checks manager availability for a given date range directly at the database layer
+    for all managers in one go, preventing N+1 queries.
+
+    Args:
+        session: Database session.
+        new_start: Start date of the incoming assignment.
+        new_end: End date of the incoming assignment. If None, treated as open-ended.
+        exclude_project_id: Optional project ID to exclude.
+
+    Returns:
+        dict: A dictionary mapping manager ID strings to their availability dicts.
+    """
+    from app.models.user import User
+    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
+    results = {
+        str(m.id): {"available": True, "conflicts": [], "available_windows": []}
+        for m in managers
+    }
+
+    if not new_start:
+        return results
+
+    stmt = select(DashboardProject).where(
+        (DashboardProject.allocation_start_date.is_not(None))
+        | (DashboardProject.dispatch_date.is_not(None))
+        | (DashboardProject.event_start_date.is_not(None))
+    )
+
+    if exclude_project_id:
+        stmt = stmt.where(DashboardProject.id != exclude_project_id)
+
+    projects = [
+        project
+        for project in session.exec(stmt).all()
+        if (project.stage or "").strip().lower() in EXECUTION_STAGE_ALIASES
+    ]
+
+    projects_by_manager = {str(m.id): [] for m in managers}
+    for project in projects:
+        if project.manager_id and str(project.manager_id) in projects_by_manager:
+            projects_by_manager[str(project.manager_id)].append(project)
+
+    for manager_id, manager_projects in projects_by_manager.items():
+        conflicts = []
+        for project in manager_projects:
+            project_start, project_end = _get_project_window(project)
+            if not project_start:
+                continue
+
+            if _ranges_overlap(project_start, project_end, new_start, new_end):
+                conflicts.append(
+                    {
+                        "id": project.id,
+                        "crm_project_id": project.crm_project_id,
+                        "project_name": project.project_name,
+                        "manager_id": project.manager_id,
+                        "dispatch_date": project.dispatch_date,
+                        "dismantling_date": project.dismantling_date,
+                        "event_start_date": project.event_start_date,
+                        "event_end_date": project.event_end_date,
+                    }
+                )
+
+        results[manager_id] = {
+            "available": len(conflicts) == 0,
+            "conflicts": conflicts,
+            "available_windows": _build_available_windows(manager_projects, new_start),
+        }
+
+    return results
