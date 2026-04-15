@@ -7,9 +7,11 @@ from typing import Any, Iterable, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+import secrets
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select, text
 
+from app.core.auth import get_password_hash
 from app.db.session import get_session
 from app.models.dashboard_project import Client, DashboardProject, ProjectAuditLog, ProjectLink, ProjectResource
 from app.models.shipment import Shipment
@@ -1233,7 +1235,7 @@ def create_manager(manager_data: dict, session: Session = Depends(get_session)):
     new_user = User(
         full_name=name,
         email=email,
-        hashed_password="DUMMY_PASSWORD_SCM",
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
         role="PROJECT_MANAGER",
         is_active=True,
     )
