@@ -1,271 +1,235 @@
-import React, { useMemo, useState } from 'react';
-import {
-    AlertTriangle,
-    CheckCircle,
-    Download,
-    FileSpreadsheet,
-    Menu,
-    Package,
-    Plus,
-    Search,
-    Truck,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw } from 'lucide-react';
 import { useShipments } from '../hooks/useShipments';
-import AppShell from '../components/app/AppShell';
-import KpiCard from '../components/app/KpiCard';
 import ShipmentTable from '../components/ShipmentTable';
 import TrackModal from '../components/TrackModal';
 import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
+import AppShell from '../components/app/AppShell';
+import KpiCard from '../components/app/KpiCard';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import AlertBanner from '../components/AlertBanner';
 
 export default function ShipmentDashboardPremium() {
-    const [selected, setSelected] = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
-    const [showTrack, setShowTrack] = useState(false);
-    const [activeKpi, setActiveKpi] = useState('all');
-    const [carrierValue, setCarrierValue] = useState('All');
-    const [dateValue, setDateValue] = useState('All');
-
     const {
-        shipments,
-        stats,
-        loading,
-        error,
-        loadData,
-        filteredShipments,
-        filter,
-        setFilter,
-        searchQuery,
-        setSearchQuery,
-        setCarrierFilter,
-        setDateFilter,
-        deleteShipment,
-        archiveShipment,
-        batchDelete,
-        batchArchive,
-        importExcel,
-        refreshTracking,
-        exportExcel,
+        shipments, stats, loading, error, loadData, filteredShipments,
+        filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
+        deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
 
-    const alertCount = useMemo(
-        () => shipments.filter((shipment) => (shipment.status || '').toLowerCase().includes('exception')).length,
-        [shipments]
-    );
-
-    const quickFilteredShipments = useMemo(() => {
-        if (activeKpi !== 'exceptions') {
-            return filteredShipments;
-        }
-        return filteredShipments.filter((shipment) => (shipment.status || '').toLowerCase().includes('exception'));
-    }, [activeKpi, filteredShipments]);
+    const [selectedShipment, setSelectedShipment] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [showTrack, setShowTrack] = useState(false);
 
     const importExcelPrompt = () => {
-        const input = document.getElementById('excel-file-input');
-        input?.click();
+        const el = document.getElementById('excel-file-input');
+        if (el) el.click();
     };
 
-    const clearAllFilters = () => {
-        setSearchQuery('');
+    const handleDelete = (id) => {
+        if (window.confirm('Delete this shipment?')) deleteShipment(id);
+    };
+
+    const handleArchive = (id) => {
+        archiveShipment(id);
+    };
+
+    const handleBatchDelete = () => {
+        if (window.confirm(`Delete ${selectedIds.length} shipments?`)) {
+            batchDelete(selectedIds);
+            setSelectedIds([]);
+        }
+    };
+
+    const handleBatchArchive = () => {
+        batchArchive(selectedIds, true);
+        setSelectedIds([]);
+    };
+
+    const resetFilters = () => {
         setFilter('All');
-        setCarrierValue('All');
+        setSearchQuery('');
         setCarrierFilter('All');
-        setDateValue('All');
         setDateFilter('All');
-        setActiveKpi('all');
+        setSelectedShipment(null);
     };
 
-    const header = ({ toggleSidebar }) => (
-        <header className="shipments-header">
-            <div className="shipments-header__primary">
-                <div className="shipments-header__title-wrap">
-                    <button type="button" className="premium-icon-button mobile-only" onClick={toggleSidebar}>
-                        <Menu size={18} />
-                    </button>
-                    <h1 className="shipments-header__title">Shipment Tracking</h1>
-                </div>
+    const hasActiveFilters = filter !== 'All' || searchQuery !== '';
 
-                <label className="premium-search shipments-header__search">
-                    <Search size={16} color="var(--tx3)" />
-                    <input
-                        type="search"
-                        placeholder="Search exhibition, recipient, tracking number..."
-                        value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                    />
-                </label>
-
-                <GlobalDateRangePicker compact label={false} className="shipments-header__date-range" />
-
-                <button type="button" className="premium-action-button premium-action-button--primary shipments-header__add-btn" onClick={() => setShowTrack(true)}>
-                    <Plus size={14} />
-                    Add Shipment
+    const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
+        <>
+            {sidebarOverlay ? (
+                <button
+                    type="button"
+                    className="design-dashboard__sidebar-rail-btn"
+                    onClick={toggleSidebar}
+                    title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    aria-expanded={sidebarOpen}
+                    aria-controls="app-primary-sidebar"
+                >
+                    <PanelLeft size={18} strokeWidth={2} aria-hidden />
                 </button>
-            </div>
+            ) : null}
 
-            <div className="shipments-header__secondary">
-                <div className="shipments-header__filters">
-                    <label className="premium-filter">
-                    <Truck size={14} color="var(--tx3)" />
-                    <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-                        <option value="All">All shipments</option>
-                        <option value="Active">Active</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Exception">Exception</option>
-                    </select>
-                </label>
+            <header className="design-dashboard__header">
+                <div className="design-dashboard__header-scroll">
+                    {!sidebarOverlay ? (
+                        <button
+                            type="button"
+                            className="design-dashboard__icon-button mobile-only"
+                            onClick={toggleSidebar}
+                            title="Open navigation"
+                        >
+                            <Menu size={16} />
+                        </button>
+                    ) : null}
 
-                    <label className="premium-filter">
-                    <Package size={14} color="var(--tx3)" />
-                    <select
-                        value={carrierValue}
-                        onChange={(event) => {
-                            setCarrierValue(event.target.value);
-                            setCarrierFilter(event.target.value);
-                        }}
-                    >
-                        <option value="All">All carriers</option>
-                        <option value="FedEx">FedEx</option>
-                        <option value="DHL">DHL</option>
-                        <option value="UPS">UPS</option>
-                    </select>
-                </label>
+                    <div className="design-dashboard__header-filters">
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
+                            <span className="design-dashboard__filter-label">Search</span>
+                            <label className="design-dashboard__search">
+                                <Search size={16} aria-hidden />
+                                <input
+                                    type="search"
+                                    placeholder="Search ID, Exhibition..."
+                                    value={searchQuery || ''}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                />
+                            </label>
+                        </div>
+                        
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
+                            <span className="design-dashboard__filter-label">Date range</span>
+                            <GlobalDateRangePicker
+                                compact
+                                label={false}
+                                className="design-dashboard__date-range projects-dashboard__date-range"
+                            />
+                        </div>
 
-                    <label className="premium-filter">
-                    <select
-                        value={dateValue}
-                        onChange={(event) => {
-                            setDateValue(event.target.value);
-                            setDateFilter(event.target.value);
-                        }}
-                    >
-                        <option value="All">All time</option>
-                        <option value="Today">Today</option>
-                        <option value="Last 7 Days">Last 7 Days</option>
-                    </select>
-                </label>
+                        {hasActiveFilters ? (
+                            <button
+                                type="button"
+                                className="design-dashboard__action-button projects-dashboard__reset-button"
+                                onClick={resetFilters}
+                                title="Clear filters"
+                            >
+                                <X size={15} /> Reset
+                            </button>
+                        ) : null}
+                    </div>
+
+                    <div className="design-dashboard__header-actions" role="group">
+                        <button className="design-dashboard__action-button design-dashboard__action-button--primary" onClick={() => setShowTrack(true)}>
+                            <Plus size={15} /> Add Shipment
+                        </button>
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" style={{ width: 'auto', padding: '0 10px', fontSize: 13, fontWeight: 500 }} onClick={importExcelPrompt} title="Import Excel">
+                            <FileSpreadsheet size={16} style={{marginRight: 6}} /> Import
+                        </button>
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" style={{ width: 'auto', padding: '0 10px', fontSize: 13, fontWeight: 500 }} onClick={exportExcel} disabled={loading} title="Export Excel">
+                            <Download size={16} style={{marginRight: 6}} /> Export
+                        </button>
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" onClick={refreshTracking} disabled={loading} title="Refresh Tracking">
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
                 </div>
-
-                <div className="shipments-header__excel-actions">
-                    <button type="button" className="premium-action-button" onClick={importExcelPrompt}>
-                        <FileSpreadsheet size={14} />
-                        Import Excel
-                    </button>
-                    <button type="button" className="premium-action-button" onClick={exportExcel} disabled={loading}>
-                        <Download size={14} />
-                        Export Excel
-                    </button>
-                </div>
-            </div>
-        </header>
+            </header>
+        </>
     );
 
     return (
         <>
-            {showTrack ? <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} /> : null}
-            {selected ? <ShipmentDetailPanel shipment={selected} onClose={() => setSelected(null)} onDeleted={loadData} /> : null}
-
-            <input
-                id="excel-file-input"
-                type="file"
-                accept=".xlsx,.xls"
-                style={{ display: 'none' }}
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                        importExcel(file);
-                    }
-                    event.target.value = '';
-                }}
-            />
+            <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"
+                onChange={e => { const f = e.target.files[0]; if (f) importExcel(f); e.target.value = ''; }} />
 
             <AppShell
                 activeNav="dashboard"
                 header={header}
-                pageClassName="shipments-page"
-                mainClassName="shipments-main"
                 showGlobalDate={false}
+                mainClassName="premium-main--design"
+                pageClassName="design-dashboard-page"
+                sidebarOverlay
             >
-                <div className="premium-grid shipments-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-                    <KpiCard icon={Truck} label="Active Shipments" value={stats.total ?? 0} detail="Master and child shipments in flow" tone="blue" className="shipments-kpi shipments-kpi--active" />
-                    <KpiCard icon={Package} label="In Transit" value={stats.transit ?? 0} detail="Live movement across carriers" tone="orange" className="shipments-kpi shipments-kpi--transit" />
-                    <KpiCard icon={CheckCircle} label="Delivered" value={stats.delivered ?? 0} detail="Completed deliveries" tone="green" className="shipments-kpi shipments-kpi--delivered" />
+                <AlertBanner message={error} />
+
+                <div className="design-dashboard__kpi-grid">
+                    <KpiCard
+                        icon={Truck}
+                        label="Total Shipments"
+                        value={`${stats.total ?? 0}`}
+                        active={filter === 'All'}
+                        onClick={() => setFilter('All')}
+                        className="design-dashboard__kpi design-dashboard__kpi--all"
+                    />
+                    <KpiCard
+                        icon={Package}
+                        label="In Transit"
+                        value={`${stats.transit ?? 0}`}
+                        tone="blue"
+                        active={filter === 'Active'}
+                        onClick={() => setFilter('Active')}
+                        className="design-dashboard__kpi design-dashboard__kpi--pending"
+                    />
+                    <KpiCard
+                        icon={CheckCircle}
+                        label="Delivered"
+                        value={`${stats.delivered ?? 0}`}
+                        tone="green"
+                        active={filter === 'Delivered'}
+                        onClick={() => setFilter('Delivered')}
+                        className="design-dashboard__kpi design-dashboard__kpi--won"
+                    />
                     <KpiCard
                         icon={AlertTriangle}
                         label="Exceptions"
-                        value={stats.exceptions ?? alertCount}
-                        detail="Shipments needing attention"
+                        value={`${stats.exceptions ?? 0}`}
                         tone="red"
-                        active={activeKpi === 'exceptions'}
-                        onClick={() => setActiveKpi((value) => (value === 'exceptions' ? 'all' : 'exceptions'))}
-                        className="shipments-kpi shipments-kpi--exceptions"
+                        active={filter === 'Exception'}
+                        onClick={() => setFilter('Exception')}
+                        className="design-dashboard__kpi design-dashboard__kpi--lost"
                     />
                 </div>
 
-                {error ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', color: 'var(--red)' }}>
-                        {error}
-                    </div>
-                ) : null}
+                <div className="design-dashboard__table-shell" style={{ position: 'relative', overflow: 'hidden' }}>
+                    {showTrack && <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} />}
+                    {selectedShipment && <ShipmentDetailPanel shipment={selectedShipment} onClose={() => setSelectedShipment(null)} onDeleted={loadData} />}
 
-                <div className="premium-panel" style={{ overflow: 'hidden' }}>
-                    {quickFilteredShipments.length === 0 && !loading ? (
-                        <div className="shipments-empty-state">
-                            <AlertTriangle size={40} />
-                            <strong>No shipments match the current filters</strong>
-                            <span>Try broadening your search, date range, or carrier selection.</span>
-                            <button type="button" className="premium-action-button" onClick={clearAllFilters}>
-                                Clear Filters
-                            </button>
-                        </div>
+                    {loading && shipments.length === 0 ? (
+                        <div className="loading-row design-dashboard__loading">Loading shipments...</div>
                     ) : (
                         <ShipmentTable
-                            shipments={quickFilteredShipments}
+                            shipments={filteredShipments}
                             allShipments={shipments}
                             loading={loading}
-                            onSelectShipment={setSelected}
-                            onDeleteShipment={(id) => {
-                                if (window.confirm('Delete this shipment?')) {
-                                    deleteShipment(id);
-                                }
-                            }}
-                            onArchiveShipment={archiveShipment}
+                            onSelectShipment={setSelectedShipment}
+                            onDeleteShipment={handleDelete}
+                            onArchiveShipment={handleArchive}
                             onRefreshShipment={refreshTracking}
                             onTracked={loadData}
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
-                            onClearFilters={clearAllFilters}
                         />
                     )}
-                </div>
 
-                {selectedIds.length > 0 ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--tx)' }}>
-                            {selectedIds.length} shipment{selectedIds.length > 1 ? 's' : ''} selected
+                    {/* Batch Actions Toolbar */}
+                    {selectedIds.length > 0 && (
+                        <div className="batch-toolbar animate-in-up" style={{ position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+                            <div className="bt-info">
+                                <div className="bt-count">{selectedIds.length}</div>
+                                <span>shipments selected</span>
+                            </div>
+                            <div className="bt-actions">
+                                <button className="bt-btn archive" onClick={handleBatchArchive}>
+                                    <Archive size={14} /> Move to Storage
+                                </button>
+                                <button className="bt-btn delete" onClick={handleBatchDelete}>
+                                    <Trash2 size={14} /> Delete
+                                </button>
+                                <button className="bt-close" onClick={() => setSelectedIds([])}>Cancel</button>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                            <button type="button" className="premium-action-button" onClick={() => { batchArchive(selectedIds, true); setSelectedIds([]); }}>
-                                Move to Storage
-                            </button>
-                            <button
-                                type="button"
-                                className="premium-action-button"
-                                onClick={() => {
-                                    if (window.confirm(`Delete ${selectedIds.length} shipments?`)) {
-                                        batchDelete(selectedIds);
-                                        setSelectedIds([]);
-                                    }
-                                }}
-                            >
-                                Delete
-                            </button>
-                            <button type="button" className="premium-action-button" onClick={() => setSelectedIds([])}>
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                ) : null}
+                    )}
+                </div>
             </AppShell>
         </>
     );

@@ -255,11 +255,7 @@ const ShipmentRowGroup = ({
     const hasChildren = s.child_parcels && s.child_parcels.length > 0;
     const canExpand = Boolean(s.is_master || hasChildren);
 
-    useEffect(() => {
-        if (hasChildren) {
-            setIsExpanded(true);
-        }
-    }, [hasChildren]);
+
 
     const handleTrackChild = async (child) => {
         setLoadingChild(child.tracking_number);
@@ -321,12 +317,12 @@ const ShipmentRowGroup = ({
     return (
         <Fragment>
             <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={`design-table__row ${isSelected ? 'row-selected' : ''}`}>
-                <td onClick={onSelectRow}>
+                <td className="design-table__td" onClick={onSelectRow}>
                     <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                         {isSelected && <Check size={10} />}
                     </div>
                 </td>
-                <td>
+                <td className="design-table__td">
                     <div className="tid-cell">
                         {canExpand && (
                             <div 
@@ -352,13 +348,13 @@ const ShipmentRowGroup = ({
                     </div>
                 </td>
 
-                <td>
+                <td className="design-table__td">
                     <StatusBadge status={s.status} />
                     {s.status !== 'Delivered' && s.progress != null && (
                         <ProgressBar percentage={s.progress} status={s.status} mini />
                     )}
                 </td>
-                <td className="current-status-cell">
+                <td className="design-table__td current-status-cell">
                     <div className="cs-text" title={s.history && s.history.length > 0 ? (s.history[0].location || s.history[0].description) : s.status}>
                         {(() => {
                             if (s.history && s.history.length > 0) {
@@ -383,8 +379,8 @@ const ShipmentRowGroup = ({
                         })()}
                     </div>
                 </td>
-                <td className="carrier-cell">{s.carrier || '—'}</td>
-                <td>
+                <td className="design-table__td carrier-cell">{s.carrier || '—'}</td>
+                <td className="design-table__td">
                     {s.origin ? (
                         <div className="route-mini">
                             <span className="rm-label">FROM </span>{s.origin.split(',')[0]}<br />
@@ -392,7 +388,7 @@ const ShipmentRowGroup = ({
                         </div>
                     ) : '—'}
                 </td>
-                <td className="eta-cell">
+                <td className="design-table__td eta-cell">
                     {(() => {
                         const formatted = formatDateTime(s.eta);
                         if (typeof formatted === 'object') {
@@ -406,7 +402,7 @@ const ShipmentRowGroup = ({
                         return formatted || 'TBD';
                     })()}
                 </td>
-                <td className="action-cell" onClick={e => e.stopPropagation()}>
+                <td className="design-table__td action-cell" onClick={e => e.stopPropagation()}>
                     <button className="track-btn" onClick={() => onSelectShipment(s)}>Track</button>
                     {onArchiveShipment && (
                         <button className="archive-btn" onClick={e => { e.stopPropagation(); onArchiveShipment(s.id); }} title={s.is_archived ? "Restore to Dashboard" : "Move to Storage"}>
@@ -425,8 +421,8 @@ const ShipmentRowGroup = ({
                     onClick={() => handleTrackChild(child)}
                     style={{ cursor: 'pointer' }}
                 >
-                    <td></td> {/* Checkbox placeholder */}
-                    <td>
+                    <td className="design-table__td"></td> {/* Checkbox placeholder */}
+                    <td className="design-table__td">
                         <div className="child-indicator">
                             <div className="tid-num" style={{ fontWeight: 600 }}>
                                 ↳ {child.tracking_number}
@@ -434,10 +430,10 @@ const ShipmentRowGroup = ({
                         </div>
                     </td>
 
-                    <td>
+                    <td className="design-table__td">
                         <StatusBadge status={child.status} />
                     </td>
-                    <td className="current-status-cell">
+                    <td className="design-table__td current-status-cell">
                         <div className="cs-text" title={child.raw_status || child.status}>
                             {(() => {
                                 if (child.last_date) {
@@ -477,8 +473,8 @@ const ShipmentRowGroup = ({
                             })()}
                         </div>
                     </td>
-                    <td className="carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
-                    <td style={{ opacity: 0.7 }}>
+                    <td className="design-table__td carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
+                    <td className="design-table__td" style={{ opacity: 0.7 }}>
                         {child.origin ? (
                             <div className="route-mini">
                                 <span className="rm-label">FROM </span>{child.origin.split(',')[0]}<br />
@@ -492,7 +488,7 @@ const ShipmentRowGroup = ({
                             </div>
                         )}
                     </td>
-                    <td className="eta-cell" style={{ opacity: 0.7 }}>
+                    <td className="design-table__td eta-cell" style={{ opacity: 0.7 }}>
                         {(() => {
                             const formatted = formatDateTime(child.eta || s.eta);
                             if (typeof formatted === 'object') {
@@ -506,7 +502,7 @@ const ShipmentRowGroup = ({
                             return formatted || 'TBD';
                         })()}
                     </td>
-                    <td className="action-cell" onClick={e => e.stopPropagation()}>
+                    <td className="design-table__td action-cell" onClick={e => e.stopPropagation()}>
                         <button 
                             className="track-btn piece-btn" 
                             disabled={loadingChild === child.tracking_number}

@@ -124,9 +124,8 @@ def track_shipment(
     _key: str = Depends(verify_api_key),
 ):
     """Track a shipment via carrier API and save/update in DB."""
-    if body.project_id is None:
-        raise HTTPException(status_code=400, detail="project_id is required")
-    _validate_project_reference(db, body.project_id)
+    if body.project_id is not None:
+        _validate_project_reference(db, body.project_id)
     result = track_and_save(
         tracking_number=tracking_number.upper(),
         recipient=body.recipient,

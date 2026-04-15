@@ -85,17 +85,21 @@ const TrackModal = ({ onClose, onTracked }) => {
     };
 
     return (
-        <div className="panel-overlay">
-            <div className="panel-backdrop" onClick={onClose} />
-            <div className="panel" style={{ maxWidth: 440 }}>
-                <div className="panel-header">
+        <div className="panel-overlay saas-theme" style={{ zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+            <div className="panel-backdrop" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+            <div className="panel saas-modal" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '450px', transform: 'none', borderRadius: '16px 0 0 16px', margin: 0, borderRight: 'none', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div className="saas-modal__header">
                     <div>
-                        <h2 className="panel-title">Add New Shipment</h2>
-                        <p className="panel-subtitle">Enter details to track a specific parcel</p>
+                        <h2 className="panel-title" style={{ margin: '0 0 4px 0', fontSize: '20px', color: 'var(--text-primary)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>Add New Shipment</h2>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Enter details to track a specific parcel</span>
                     </div>
-                    <button className="panel-close" onClick={onClose}><X size={20} /></button>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <button className="premium-icon-button premium-icon-button--danger" onClick={onClose} title="Close Panel">
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
-                <div className="panel-body">
+                <div className="saas-modal__body no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
                     <div className="form-group">
                         <label className="form-label">Tracking Number</label>
                         <input

@@ -48,44 +48,52 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
     return (
         <>
             {confirmOpen && (
-                <ConfirmDialog
-                    message={`Delete shipment "${s.recipient || s.tracking_number}"? This cannot be undone.`}
-                    onConfirm={handleDelete}
-                    onCancel={() => setConfirmOpen(false)}
-                />
+                <div className="saas-modal-backdrop" style={{ zIndex: 1100, position: 'absolute' }}>
+                    <div className="saas-modal-confirm">
+                        <div className="confirm-icon"><AlertTriangle size={24} color="var(--red)" /></div>
+                        <h3>Delete Shipment {s.tracking_number}</h3>
+                        <p>This action cannot be undone. All transit history will be lost.</p>
+                        <div className="confirm-actions">
+                            <button className="btn-outline-sm" onClick={() => setConfirmOpen(false)} disabled={deleting}>Cancel</button>
+                            <button className="btn-primary-sm btn-danger" onClick={handleDelete} disabled={deleting}>
+                                {deleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
-            <div className="panel-overlay">
-                <div className="panel-backdrop" onClick={onClose} />
-                <div className="panel">
-                    <div className="panel-header">
+            <div className="panel-overlay saas-theme" style={{ zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                <div className="panel-backdrop" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+                <div className="panel saas-modal" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '450px', transform: 'none', borderRadius: '16px 0 0 16px', margin: 0, borderRight: 'none', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <div className="saas-modal__header">
                         <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <h2 className="panel-title">{s.items || s.recipient || 'Package'}</h2>
-                                <button
-                                    className="panel-copy-btn"
-                                    style={{ color: 'var(--status-exception-text)', marginLeft: 'auto' }}
-                                    onClick={() => setConfirmOpen(true)}
-                                    disabled={deleting}
-                                    title="Delete Shipment"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
+                            <div className="saas-eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                <span style={{ fontFamily: 'var(--font-mono)' }}>{s.tracking_number}</span>
+                                <button className="panel-copy-btn" style={{ background: 'none', border: 'none', color: 'var(--text-accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }} onClick={() => navigator.clipboard.writeText(s.tracking_number)}>COPY</button>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                                    {s.tracking_number}
-                                </span>
-                                <button
-                                    className="panel-copy-btn"
-                                    onClick={() => navigator.clipboard.writeText(s.tracking_number)}
-                                >
-                                    Copy
-                                </button>
+                            <h2 style={{ margin: '0 0 12px 0', fontSize: '24px', color: 'var(--text-primary)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>
+                                {s.items || s.recipient || 'Package'}
+                            </h2>
+                            <div className="saas-inline-meta">
+                                <StatusBadge status={s.status} />
                             </div>
-                            <StatusBadge status={s.status} />
                         </div>
-                        <button className="panel-close" onClick={onClose}><X size={20} /></button>
+
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                            <button
+                                className="premium-icon-button"
+                                style={{ color: 'var(--status-exception-text)', background: 'var(--status-exception-bg)' }}
+                                onClick={() => setConfirmOpen(true)}
+                                disabled={deleting}
+                                title="Delete Shipment"
+                            >
+                                <Trash2 size={20} />
+                            </button>
+                            <button className="premium-icon-button premium-icon-button--danger" onClick={onClose} title="Close Panel">
+                                <X size={24} />
+                            </button>
+                        </div>
                     </div>
 
                     {deleteError && (
@@ -99,7 +107,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted }) => {
                         </div>
                     )}
 
-                    <div className="panel-body">
+                    <div className="saas-modal__body no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
                         {/* Progress */}
                         <div className="progress-section">
                             <div className="progress-label-row">

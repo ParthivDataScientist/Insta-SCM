@@ -1,92 +1,29 @@
-import React, { useState, useMemo } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { Menu, RefreshCw, Filter, Search, Copy, CheckSquare, Box, MapPin, AlertTriangle, User, Calendar, ChevronRight, CheckCircle2, Factory, Briefcase, Truck, PackageCheck, Anchor, Plane, ArrowRightCircle, CheckCircle, Clock, Archive, LogOut, Cloud, Bell, Zap, X, FilterX, DownloadCloud, PenTool, Layout, ArrowUpRight, Package, Plus, FileSpreadsheet, Download, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw } from 'lucide-react';
 import { useShipments } from '../hooks/useShipments';
-import { useAuth } from '../contexts/AuthContext';
 import ShipmentTable from '../components/ShipmentTable';
 import TrackModal from '../components/TrackModal';
 import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
+import AppShell from '../components/app/AppShell';
+import KpiCard from '../components/app/KpiCard';
+import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import AlertBanner from '../components/AlertBanner';
 
-/* ── iNSTa Logo SVG ── */
-const Logo = () => (
-    <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ width: '130px', height: 'auto' }} />
-);
-
-/* ── Helpers ── */
-const formatDate = (dateStr) => {
-    if (!dateStr || dateStr === 'TBD' || dateStr === '—') return dateStr;
-    try {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return dateStr;
-        return d.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric',
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true
-        });
-    } catch (e) {
-        return dateStr;
-    }
-};
-
-const classify = (s = '') => {
-    const v = s.toLowerCase();
-    if (v.includes('delivered')) return 'delivered';
-    if (v.includes('transit')) return 'transit';
-    if (v.includes('out for')) return 'ofd';
-    if (v.includes('exception')) return 'exception';
-    return 'unknown';
-};
-const statusLabel = (s = '') => {
-    const v = s.toLowerCase();
-    if (v.includes('delivered')) return 'Delivered';
-    if (v.includes('transit')) return 'In Transit';
-    if (v.includes('out for')) return 'Out for Delivery';
-    if (v.includes('exception')) return 'Delayed';
-    return s || 'Unknown';
-};
-const city = (loc = '') => (loc || '').split(',')[0].trim() || '—';
-
-/* ─────────────────────────────────────────────────────────────
-   DASHBOARD — Main tracking view
-───────────────────────────────────────────────────────────── */
 export default function ShipmentDashboard() {
-    const [isDark, setIsDark] = useState(() => localStorage.getItem('insta_theme') === 'dark');
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    
-    const toggleTheme = () => {
-        const newTheme = !isDark;
-        setIsDark(newTheme);
-        localStorage.setItem('insta_theme', newTheme ? 'dark' : 'light');
-    };
-    const [selected, setSelected] = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
-    const [showTrack, setShowTrack] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState(null);
-    const { user, logout } = useAuth();
-
     const {
         shipments, stats, loading, error, loadData, filteredShipments,
-        filter, setFilter, setSearchQuery, setCarrierFilter, setDateFilter,
+        filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
 
-    const handleRefresh = async () => {
-        await refreshTracking();
-        setLastUpdated(new Date());
-    };
+    const [selectedShipment, setSelectedShipment] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [showTrack, setShowTrack] = useState(false);
 
     const importExcelPrompt = () => {
         const el = document.getElementById('excel-file-input');
         if (el) el.click();
     };
-
-    const alerts = useMemo(
-        () => shipments.filter(s => classify(s.status) === 'exception').slice(0, 3),
-        [shipments]
-    );
 
     const handleDelete = (id) => {
         if (window.confirm('Delete this shipment?')) deleteShipment(id);
@@ -108,271 +45,192 @@ export default function ShipmentDashboard() {
         setSelectedIds([]);
     };
 
+    const resetFilters = () => {
+        setFilter('All');
+        setSearchQuery('');
+        setCarrierFilter('All');
+        setDateFilter('All');
+        setSelectedShipment(null);
+    };
+
+    const hasActiveFilters = filter !== 'All' || searchQuery !== '';
+
+    const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
+        <>
+            {sidebarOverlay ? (
+                <button
+                    type="button"
+                    className="design-dashboard__sidebar-rail-btn"
+                    onClick={toggleSidebar}
+                    title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    aria-expanded={sidebarOpen}
+                    aria-controls="app-primary-sidebar"
+                >
+                    <PanelLeft size={18} strokeWidth={2} aria-hidden />
+                </button>
+            ) : null}
+
+            <header className="design-dashboard__header">
+                <div className="design-dashboard__header-scroll">
+                    {!sidebarOverlay ? (
+                        <button
+                            type="button"
+                            className="design-dashboard__icon-button mobile-only"
+                            onClick={toggleSidebar}
+                            title="Open navigation"
+                        >
+                            <Menu size={16} />
+                        </button>
+                    ) : null}
+
+                    <div className="design-dashboard__header-filters">
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
+                            <span className="design-dashboard__filter-label">Search</span>
+                            <label className="design-dashboard__search">
+                                <Search size={16} aria-hidden />
+                                <input
+                                    type="search"
+                                    placeholder="Search ID, Exhibition..."
+                                    value={searchQuery || ''}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                />
+                            </label>
+                        </div>
+                        
+                        <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
+                            <span className="design-dashboard__filter-label">Date range</span>
+                            <GlobalDateRangePicker
+                                compact
+                                label={false}
+                                className="design-dashboard__date-range projects-dashboard__date-range"
+                            />
+                        </div>
+
+                        {hasActiveFilters ? (
+                            <button
+                                type="button"
+                                className="design-dashboard__action-button projects-dashboard__reset-button"
+                                onClick={resetFilters}
+                                title="Clear filters"
+                            >
+                                <X size={15} /> Reset
+                            </button>
+                        ) : null}
+                    </div>
+
+                    <div className="design-dashboard__header-actions" role="group">
+                        <button className="design-dashboard__action-button design-dashboard__action-button--primary" onClick={() => setShowTrack(true)}>
+                            <Plus size={15} /> Add Shipment
+                        </button>
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" style={{ width: 'auto', padding: '0 10px', fontSize: 13, fontWeight: 500 }} onClick={importExcelPrompt} title="Import Excel">
+                            <FileSpreadsheet size={16} style={{marginRight: 6}} /> Import
+                        </button>
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" style={{ width: 'auto', padding: '0 10px', fontSize: 13, fontWeight: 500 }} onClick={exportExcel} disabled={loading} title="Export Excel">
+                            <Download size={16} style={{marginRight: 6}} /> Export
+                        </button>
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" onClick={refreshTracking} disabled={loading} title="Refresh Tracking">
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
+                </div>
+            </header>
+        </>
+    );
+
     return (
-        <div className={isDark ? 'dark' : 'light'} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-            <div className={`app-layout ${sidebarOpen ? '' : 'sidebar-closed'}`}>
+        <>
+            {showTrack && <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} />}
+            {selectedShipment && <ShipmentDetailPanel shipment={selectedShipment} onClose={() => setSelectedShipment(null)} onDeleted={loadData} />}
 
-                {/* Modals */}
-                {showTrack && <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} />}
-                {selected && <ShipmentDetailPanel shipment={selected} onClose={() => setSelected(null)} onDeleted={loadData} />}
+            <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"
+                onChange={e => { const f = e.target.files[0]; if (f) importExcel(f); e.target.value = ''; }} />
 
-                {/* Hidden file input for Excel import */}
-                <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"
-                    onChange={e => { const f = e.target.files[0]; if (f) importExcel(f); e.target.value = ''; }} />
+            <AppShell
+                activeNav="dashboard"
+                header={header}
+                showGlobalDate={false}
+                mainClassName="premium-main--design"
+                pageClassName="design-dashboard-page"
+                sidebarOverlay
+            >
+                <AlertBanner message={error} />
 
-                {/* ═══════ SIDEBAR ═══════ */}
-                <aside className="sidebar">
-                    <div className="sidebar-logo"><Logo /></div>
-                    <div className="sidebar-tagline">Excellence in Exhibition Logistics</div>
+                <div className="design-dashboard__kpi-grid">
+                    <KpiCard
+                        icon={Truck}
+                        label="Total Shipments"
+                        value={`${stats.total ?? 0}`}
+                        active={filter === 'All'}
+                        onClick={() => setFilter('All')}
+                        className="design-dashboard__kpi design-dashboard__kpi--all"
+                    />
+                    <KpiCard
+                        icon={Package}
+                        label="In Transit"
+                        value={`${stats.transit ?? 0}`}
+                        tone="blue"
+                        active={filter === 'Active'}
+                        onClick={() => setFilter('Active')}
+                        className="design-dashboard__kpi design-dashboard__kpi--pending"
+                    />
+                    <KpiCard
+                        icon={CheckCircle}
+                        label="Delivered"
+                        value={`${stats.delivered ?? 0}`}
+                        tone="green"
+                        active={filter === 'Delivered'}
+                        onClick={() => setFilter('Delivered')}
+                        className="design-dashboard__kpi design-dashboard__kpi--won"
+                    />
+                    <KpiCard
+                        icon={AlertTriangle}
+                        label="Exceptions"
+                        value={`${stats.exceptions ?? 0}`}
+                        tone="red"
+                        active={filter === 'Exception'}
+                        onClick={() => setFilter('Exception')}
+                        className="design-dashboard__kpi design-dashboard__kpi--lost"
+                    />
+                </div>
 
-                    <nav className="sidebar-nav">
-                        <Link to="/projects" className="sidebar-item">
-                            <Briefcase size={17} /> Projects List
-                        </Link>
-                        <Link to="/board" className="sidebar-item">
-                            <Layout size={17} /> Project Board
-                        </Link>
-                        <Link to="/timeline" className="sidebar-item">
-                            <RefreshCw size={17} /> Resource Timeline
-                        </Link>
-                        <Link to="/dashboard" className="sidebar-item active">
-                            <Truck size={17} /> Shipment Tracking
-                        </Link>
-                        <Link to="/storage" className="sidebar-item">
-                            <Archive size={17} /> Storage
-                        </Link>
-                    </nav>
-                    
-                    <div className="sidebar-footer-area">
-                        <a href="mailto:kalyan.karande@insta-group.com" className="sidebar-footer-support">
-                            <div className="sf-icon"><AlertTriangle size={13} /></div>
-                            <div>
-                                <div className="sf-label">Help &amp; Support</div>
-                                <div className="sf-sub">kalyan.karande@insta-group.com</div>
+                <div className="design-dashboard__table-shell">
+                    {loading && shipments.length === 0 ? (
+                        <div className="loading-row design-dashboard__loading">Loading shipments...</div>
+                    ) : (
+                        <ShipmentTable
+                            shipments={filteredShipments}
+                            allShipments={shipments}
+                            loading={loading}
+                            onSelectShipment={setSelectedShipment}
+                            onDeleteShipment={handleDelete}
+                            onArchiveShipment={handleArchive}
+                            onRefreshShipment={refreshTracking}
+                            onTracked={loadData}
+                            selectedIds={selectedIds}
+                            onSelectionChange={setSelectedIds}
+                        />
+                    )}
+
+                    {/* Batch Actions Toolbar */}
+                    {selectedIds.length > 0 && (
+                        <div className="batch-toolbar animate-in-up" style={{ position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+                            <div className="bt-info">
+                                <div className="bt-count">{selectedIds.length}</div>
+                                <span>shipments selected</span>
                             </div>
-                            <ChevronRight size={13} className="sf-arrow" />
-                        </a>
-                    </div>
-                </aside>
-
-                {/* ═══════ MAIN ═══════ */}
-                <main className="main-content">
-
-                    {/* Header */}
-                    <header className="main-header">
-                        <div className="header-welcome" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <button className="icon-btn" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle Sidebar">
-                                <Menu size={20} />
-                            </button>
-                            <div>
-                                <h1>Welcome, <strong>{user?.full_name || 'Operations Manager'}</strong></h1>
-                                <p className="header-role">Insta Exhibition SCM — Shipment Tracking</p>
-                            </div>
-                        </div>
-                        <div className="header-right">
-                            {lastUpdated && (
-                                <span style={{ fontSize: 12, color: 'var(--tx3)', whiteSpace: 'nowrap' }}>
-                                    Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                            )}
-                            <button className="icon-btn" onClick={handleRefresh} title="Refresh tracking data" disabled={loading}
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', width: 'auto', fontSize: 13, fontWeight: 600 }}>
-                                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-                                Refresh
-                            </button>
-                            <div className="theme-switch">
-                                <span className={!isDark ? 'ts-label active' : 'ts-label'}>Light</span>
-                                <button className="ts-track" onClick={toggleTheme}>
-                                    <div className="ts-thumb" />
+                            <div className="bt-actions">
+                                <button className="bt-btn archive" onClick={handleBatchArchive}>
+                                    <Archive size={14} /> Move to Storage
                                 </button>
-                                <span className={isDark ? 'ts-label active' : 'ts-label'}>Dark</span>
-                            </div>
-                            <button className="icon-btn" onClick={logout} title="Logout" style={{ marginLeft: '0.5rem', color: '#E53935' }}>
-                                <LogOut size={16} />
-                            </button>
-                        </div>
-                    </header>
-                    <div className="header-accent-bar" />
-
-                    {/* ═══════ TRACKING BODY ═══════ */}
-                    <div className="tracking-body">
-
-                        {/* ── KPI Cards ── */}
-                        <div className="kpi-row">
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Active Shipments</div>
-                                    <div className="kpi-value">{stats.total ?? 0}</div>
-                                    <div className="kpi-sub green">
-                                        <ArrowUpRight size={12} />
-                                        {stats.child_stats?.total > 0 ? (
-                                            <span>
-                                                {stats.total} Master • {stats.child_stats.total} Child pieces
-                                            </span>
-                                        ) : (
-                                            stats.delivered > 0 ? `${stats.delivered} delivered` : 'Track your first'
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="kpi-icon red-icon"><Truck size={22} /></div>
-                            </div>
-
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">In Transit</div>
-                                    <div className="kpi-value">{stats.transit ?? 0}</div>
-                                    <div className={`kpi-sub ${stats.exceptions > 0 || stats.child_stats?.exceptions > 0 ? 'orange' : 'muted'}`}>
-                                        {stats.child_stats?.transit > 0 ? (
-                                            <span>
-                                                {stats.transit} Master • {stats.child_stats.transit} Child in transit
-                                            </span>
-                                        ) : (
-                                            stats.exceptions > 0 ? `${stats.exceptions} delayed` : 'On schedule'
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="kpi-icon orange-icon"><Package size={22} /></div>
-                            </div>
-
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Delivered</div>
-                                    <div className="kpi-value">{stats.delivered ?? 0}</div>
-                                    <div className="kpi-sub green">
-                                        {stats.child_stats?.delivered > 0 ? (
-                                            <span>
-                                                {stats.delivered} Master • {stats.child_stats.delivered} Child delivered
-                                            </span>
-                                        ) : (
-                                            stats.total > 0 ? `${Math.round((stats.delivered / stats.total) * 100)}% success` : '—'
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="kpi-icon green-icon"><CheckCircle size={22} /></div>
-                            </div>
-
-                            <div className="kpi-card">
-                                <div className="kpi-left">
-                                    <div className="kpi-title">Exceptions</div>
-                                    <div className="kpi-value">{stats.exceptions ?? 0}</div>
-                                    <div className={`kpi-sub ${stats.exceptions > 0 || stats.child_stats?.exceptions > 0 ? 'red' : 'muted'}`}>
-                                        {stats.child_stats?.exceptions > 0 ? (
-                                            <span>
-                                                {stats.exceptions} Master • {stats.child_stats.exceptions} Child exceptions
-                                            </span>
-                                        ) : (
-                                            stats.exceptions > 0 ? 'Needs attention' : 'All clear'
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="kpi-icon red-icon"><AlertTriangle size={22} /></div>
-                            </div>
-                        </div>
-
-                        {/* ── Action Bar: Title + Buttons ── */}
-                        <div className="tracking-header">
-                            <div>
-                                <h2 className="tracking-title">Shipment Tracking</h2>
-                                <p className="tracking-sub">Monitor and manage all your active shipments</p>
-                            </div>
-                            <div className="tracking-actions">
-                                <button className="btn-primary-sm" onClick={() => setShowTrack(true)}>
-                                    <Plus size={14} /> Add Shipment
+                                <button className="bt-btn delete" onClick={handleBatchDelete}>
+                                    <Trash2 size={14} /> Delete
                                 </button>
-                                <button 
-                                    className="btn-outline-sm" 
-                                    onClick={importExcelPrompt}
-                                    title="Required: tracking_number. Optional: exhibition_name, recipient, show_date, items/name"
-                                >
-                                    <FileSpreadsheet size={14} /> Import Excel
-                                </button>
-                                <button className="btn-outline-sm" onClick={exportExcel} disabled={loading}>
-                                    <Download size={14} /> Export Excel
-                                </button>
+                                <button className="bt-close" onClick={() => setSelectedIds([])}>Cancel</button>
                             </div>
                         </div>
-
-                        {error && <div className="error-banner">⚠️ {error}</div>}
-
-                        {/* ── Filters Toolbar ── */}
-                        <div className="tracking-toolbar">
-                            <div className="filter-tabs-row">
-                                {['All', 'Active', 'Delivered', 'Exception'].map(f => (
-                                    <button key={f} className={`ftab${filter === f ? ' active' : ''}`}
-                                        onClick={() => setFilter(f)}>
-                                        {f}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="toolbar-search">
-                                <Search size={14} className="ts-icon" />
-                                <input className="ts-input" placeholder="Search Exhibition, ID, Recipient..."
-                                    onChange={e => setSearchQuery(e.target.value)} />
-                            </div>
-                            <div className="toolbar-selects">
-                                <select className="tselect" onChange={e => setCarrierFilter(e.target.value)}>
-                                    <option value="All">All Carriers</option>
-                                    <option value="FedEx">FedEx</option>
-                                    <option value="DHL">DHL</option>
-                                    <option value="UPS">UPS</option>
-                                </select>
-                                <select className="tselect" onChange={e => setDateFilter(e.target.value)}>
-                                    <option value="All">All Time</option>
-                                    <option value="Today">Today</option>
-                                    <option value="Last 7 Days">Last 7 Days</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* ── Main Content Row: Table + Alerts ── */}
-                        <div className="bottom-row">
-
-                            {/* Shipments Table */}
-                            <div className="tracking-table-wrap">
-                                {loading
-                                    ? <div className="loading-row">Loading shipments…</div>
-                                    : filteredShipments.length === 0
-                                        ? <div className="empty-row">No shipments found. Click "Add Shipment" to start tracking.</div>
-                                        : (
-                                            <ShipmentTable
-                                                shipments={filteredShipments}
-                                                allShipments={shipments}
-                                                loading={loading}
-                                                onSelectShipment={setSelected}
-                                                onDeleteShipment={handleDelete}
-                                                onArchiveShipment={handleArchive}
-                                                onRefreshShipment={refreshTracking}
-                                                onTracked={loadData}
-                                                selectedIds={selectedIds}
-                                                onSelectionChange={setSelectedIds}
-                                            />
-                                        )}
-                            </div>
-
-                            {/* Batch Actions Toolbar */}
-                            {selectedIds.length > 0 && (
-                                <div className="batch-toolbar animate-in-up">
-                                    <div className="bt-info">
-                                        <div className="bt-count">{selectedIds.length}</div>
-                                        <span>shipments selected</span>
-                                    </div>
-                                    <div className="bt-actions">
-                                        <button className="bt-btn archive" onClick={handleBatchArchive}>
-                                            <Archive size={14} /> Move to Storage
-                                        </button>
-                                        <button className="bt-btn delete" onClick={handleBatchDelete}>
-                                            <Trash2 size={14} /> Delete
-                                        </button>
-                                        <button className="bt-close" onClick={() => setSelectedIds([])}>Cancel</button>
-                                    </div>
-                                </div>
-                            )}
-
-                        </div>
-
-                    </div>
-                </main>
-            </div>
-        </div>
+                    )}
+                </div>
+            </AppShell>
+        </>
     );
 }
