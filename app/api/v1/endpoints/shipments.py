@@ -47,6 +47,22 @@ class RefreshRequest(BaseModel):
     """Request body for re-syncing saved shipment records."""
     shipment_ids: Optional[List[int]] = None
 
+class SheetRow(BaseModel):
+    ship_to_location: Optional[str] = None
+    client_name: Optional[str] = None
+    booking_date: Optional[str] = None
+    show_date: Optional[str] = None
+    show_city: Optional[str] = None
+    cs_type: Optional[str] = None
+    no_of_box: Optional[str] = None
+    courier: Optional[str] = None
+    master_awb: Optional[str] = None
+    child_awb: Optional[str] = None
+    remarks: Optional[str] = None
+
+class WebhookPayload(BaseModel):
+    rows: List[SheetRow]
+
 
 def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
     project = db.get(DashboardProject, shipment.project_id) if shipment.project_id else None
@@ -240,6 +256,84 @@ async def import_excel(
     }
 
 
+def _process_webhook_payload(payload: WebhookPayload, db: Session):
+    success = 0
+    failed = 0
+    errors = []
+    
+    last_master_awb = None
+    
+    for row in payload.rows:
+        tracking_number = row.master_awb or row.child_awb
+        if not tracking_number or not str(tracking_number).strip():
+            continue
+            
+        tracking_number = str(tracking_number).strip().upper()
+        
+        is_master = bool(row.master_awb and not row.child_awb)
+        master_to_use = None
+        
+        # Vertical Logic
+        if row.child_awb and not row.master_awb:
+            master_to_use = last_master_awb
+            is_master = False
+        elif row.master_awb:
+            master_to_use = tracking_number
+            last_master_awb = tracking_number
+            is_master = True
+
+        try:
+            res = track_and_save(
+                tracking_number=tracking_number,
+                recipient=row.client_name,
+                items=None, # Not explicitly in sheet as an item field
+                show_date=row.show_date,
+                exhibition_name="Unknown Exhibition", # We can update if sheet adds it
+                db=db,
+                cs=row.cs_type,
+                no_of_box=row.no_of_box,
+                project_id=None,
+                booking_date=row.booking_date,
+                show_city=row.show_city,
+                cs_type=row.cs_type,
+                remarks=row.remarks,
+                master_tracking_number=master_to_use if not is_master else None,
+                is_master=is_master
+            )
+            if "error" in res:
+                failed += 1
+                errors.append(f"{tracking_number}: {res['error']}")
+            else:
+                success += 1
+        except Exception as e:
+            logger.error(f"Error processing webhook row {tracking_number}: {str(e)}")
+            failed += 1
+            errors.append(f"{tracking_number}: {str(e)}")
+            
+    return {"success": success, "failed": failed, "errors": errors}
+
+
+@router.post("/webhook/google-sheet", status_code=200)
+async def google_sheet_webhook(
+    payload: WebhookPayload,
+    db: Session = Depends(get_session),
+    # Optional API key for Google Apps Script to authenticate
+    _key: str = Depends(verify_api_key),
+):
+    """
+    Webhook to receive batch imports from Google Sheet.
+    Implements Vertical Logic for Master/Child AWBs.
+    """
+    result = await run_in_threadpool(_process_webhook_payload, payload, db)
+    return {
+        "status": "completed",
+        "success": result["success"],
+        "failed": result["failed"],
+        "errors": result["errors"],
+        "message": f"Processed {result['success']} shipments. {result['failed']} failed.",
+    }
+
+
 @router.get("/export-excel")
 def export_shipments(
     db: Session = Depends(get_session),
@@ -263,7 +357,7 @@ def export_shipments(
     headers = [
         "Ship to location", "Client Name", "Booking dt.", "Show date", 
         "Show City", "C/S", "No of Box", "Courier", "Master AWB", 
-        "Child AWB #", today_str
+        "Child AWB #", "Current Status", "Remarks", "Last Scan date / Same place"
     ]
     
     # Styles
@@ -284,9 +378,9 @@ def export_shipments(
     current_row = 2
     for s in shipments:
         # Latest Update logic
+        h_date = ""
         if s.history:
             latest = s.history[0]
-            h_date = ""
             try:
                 dt = datetime.fromisoformat(latest["date"].replace("Z", "+00:00"))
                 h_date = dt.strftime("%d.%m.%Y")
@@ -295,24 +389,27 @@ def export_shipments(
             
             loc = f" {latest.get('location', '')}" if latest.get('location') else ""
             eta_str = f" ETA : {s.eta}" if s.eta and s.eta not in ("Unknown", "TBD", "Pending") else ""
-            latest_status = f"{h_date} : {latest.get('description', '')}{loc}{eta_str}"
+            latest_status = f"{latest.get('description', '')}{loc}{eta_str}"
         else:
             eta_str = f" ETA : {s.eta}" if s.eta and s.eta not in ("Unknown", "TBD", "Pending") else ""
             latest_status = f"{s.status}{eta_str}"
+            h_date = s.last_scan_date or ""
 
         # Master Row
         row_data = [
             s.destination or "—",
             s.recipient or "—",
-            s.created_at.strftime("%d.%m.%Y") if s.created_at else "—",
+            s.booking_date or (s.created_at.strftime("%d.%m.%Y") if s.created_at else "—"),
             s.show_date or "—",
-            s.exhibition_name or "—",
-            s.cs or "—",
+            s.show_city or s.exhibition_name or "—",
+            s.cs_type or s.cs or "—",
             s.no_of_box or "—",
             s.carrier.upper() if s.carrier else "—",
             s.tracking_number,
             "",  # Child AWB is empty on master row
-            latest_status
+            latest_status,
+            s.remarks or "—",
+            h_date or "—"
         ]
         
         for col, val in enumerate(row_data, 1):
@@ -360,21 +457,23 @@ def export_shipments(
                     c_eta = s.eta
                 
                 eta_str = f" ETA : {c_eta}" if c_eta and c_eta not in ("Unknown", "TBD", "Pending") else ""
-                c_latest = f"{c_date} : {c_status}{c_loc_str}{eta_str}"
+                c_latest = f"{c_status}{c_loc_str}{eta_str}"
                 
                 
                 child_data = [
                     s.destination or "—",
                     s.recipient or "—",
-                    s.created_at.strftime("%d.%m.%Y") if s.created_at else "—",
+                    s.booking_date or (s.created_at.strftime("%d.%m.%Y") if s.created_at else "—"),
                     s.show_date or "—",
-                    s.exhibition_name or "—",
-                    s.cs or "—",
+                    s.show_city or s.exhibition_name or "—",
+                    s.cs_type or s.cs or "—",
                     "",  # No of Box empty for child
                     s.carrier.upper() if s.carrier else "—",
                     "",  # Master AWB empty for child
                     c.get("tracking_number"),
-                    c_latest
+                    c_latest,
+                    s.remarks or "—",
+                    c_date or "—"
                 ]
                 for col, val in enumerate(child_data, 1):
                     cell = ws.cell(row=current_row, column=col, value=val)

@@ -27,6 +27,13 @@ def track_and_save(
     cs: Optional[str] = None,
     no_of_box: Optional[str] = None,
     project_id: Optional[int] = None,
+    booking_date: Optional[str] = None,
+    show_city: Optional[str] = None,
+    cs_type: Optional[str] = None,
+    remarks: Optional[str] = None,
+    last_scan_date: Optional[str] = None,
+    master_tracking_number: Optional[str] = None,
+    is_master: Optional[bool] = None,
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -77,8 +84,13 @@ def track_and_save(
             history=result.get("history", []),
             cs=cs,
             no_of_box=no_of_box,
-            master_tracking_number=result.get("master_tracking_number"),
-            is_master=result.get("is_master", False),
+            booking_date=booking_date,
+            show_city=show_city,
+            cs_type=cs_type,
+            remarks=remarks,
+            last_scan_date=result.get("last_scan_date", last_scan_date),
+            master_tracking_number=master_tracking_number or result.get("master_tracking_number"),
+            is_master=is_master if is_master is not None else result.get("is_master", False),
             child_parcels=result.get("child_parcels", []),
         )
         logger.info("Created new shipment record for %s (%s)", tracking_number, carrier_name)
@@ -95,10 +107,21 @@ def track_and_save(
             shipment.exhibition_name = exhibition_name
         if cs:
             shipment.cs = cs
-        if no_of_box:
+        if no_of_box is not None:
             shipment.no_of_box = no_of_box
         if project_id is not None:
             shipment.project_id = project_id
+        if booking_date is not None:
+            shipment.booking_date = booking_date
+        if show_city is not None:
+            shipment.show_city = show_city
+        if cs_type is not None:
+            shipment.cs_type = cs_type
+        if remarks is not None:
+            shipment.remarks = remarks
+        if last_scan_date is not None:
+            shipment.last_scan_date = last_scan_date
+
 
         # Only update fields if the API returned meaningful data
         if result.get("origin") and result.get("origin") != "Unknown":
@@ -113,9 +136,14 @@ def track_and_save(
             shipment.history = result["history"]
             
         # MPS updates
-        if result.get("master_tracking_number"):
+        if master_tracking_number is not None:
+            shipment.master_tracking_number = master_tracking_number
+        elif result.get("master_tracking_number"):
             shipment.master_tracking_number = result["master_tracking_number"]
-        if "is_master" in result:
+            
+        if is_master is not None:
+            shipment.is_master = is_master
+        elif "is_master" in result:
             shipment.is_master = result["is_master"]
         if result.get("child_parcels") is not None:
             # Reassigning the list so SQLModel detects the JSON change

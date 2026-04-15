@@ -18,6 +18,11 @@ class ShipmentBase(SQLModel):
     show_date: Optional[str] = None
     cs: Optional[str] = None
     no_of_box: Optional[str] = None
+    booking_date: Optional[str] = None
+    show_city: Optional[str] = None
+    cs_type: Optional[str] = None
+    remarks: Optional[str] = None
+    last_scan_date: Optional[str] = None
     history: List[dict] = Field(default=[], sa_column=Column(JSON))
     master_tracking_number: Optional[str] = None
     project_id: Optional[int] = Field(default=None, foreign_key="dashboardproject.id")

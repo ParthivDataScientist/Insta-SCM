@@ -172,19 +172,7 @@ const ShipmentTable = ({
                                     </div>
                                 </FilterPopover>
 
-                                <FilterPopover title="Project / Exhibition" isActive={exhibitionFilter.length > 0} onClear={() => setExhibitionFilter([])}>
-                                    <div className="fp-check-list">
-                                        {allExhibitions.length === 0 ? <div className="fp-empty">No data</div> : allExhibitions.map(ex => (
-                                            <label key={ex} className="fp-check-item">
-                                                <div className={`custom-checkbox ${exhibitionFilter.includes(ex) ? 'checked' : ''}`}>
-                                                    {exhibitionFilter.includes(ex) && <Check size={10} />}
-                                                </div>
-                                                <input type="checkbox" style={{ display: 'none' }} checked={exhibitionFilter.includes(ex)} onChange={() => toggleArrayItem(exhibitionFilter, setExhibitionFilter, ex)} />
-                                                <span className="fp-label">{ex}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </FilterPopover>
+
 
                                 <FilterPopover title="Status" isActive={statusFilter.length > 0} onClear={() => setStatusFilter([])}>
                                     <div className="fp-check-list">
@@ -363,16 +351,7 @@ const ShipmentRowGroup = ({
                         </div>
                     </div>
                 </td>
-                <td style={{ fontWeight: 600, color: 'var(--tx)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span>{s.project_name || s.exhibition_name || 'N/A'}</span>
-                        {(s.project_client_name || s.exhibition_name) ? (
-                            <span style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 500 }}>
-                                {s.project_client_name || s.exhibition_name}
-                            </span>
-                        ) : null}
-                    </div>
-                </td>
+
                 <td>
                     <StatusBadge status={s.status} />
                     {s.status !== 'Delivered' && s.progress != null && (
@@ -380,8 +359,28 @@ const ShipmentRowGroup = ({
                     )}
                 </td>
                 <td className="current-status-cell">
-                    <div className="cs-text" title={s.history && s.history.length > 0 ? s.history[0].description : s.status}>
-                        {s.history && s.history.length > 0 ? s.history[0].description : s.status}
+                    <div className="cs-text" title={s.history && s.history.length > 0 ? (s.history[0].location || s.history[0].description) : s.status}>
+                        {(() => {
+                            if (s.history && s.history.length > 0) {
+                                const latest = s.history[0];
+                                let h_date = "";
+                                try {
+                                    const dt = new Date(latest.date);
+                                    if (!isNaN(dt)) {
+                                        h_date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
+                                    } else {
+                                        h_date = latest.date.substring(0, 10);
+                                    }
+                                } catch(e) {
+                                    h_date = latest.date.substring(0, 10);
+                                }
+                                const loc = latest.location || latest.description || s.status;
+                                return `${h_date} : ${loc}`;
+                            } else if (s.last_scan_date) {
+                                return `${s.last_scan_date} : ${s.status}`;
+                            }
+                            return s.status;
+                        })()}
                     </div>
                 </td>
                 <td className="carrier-cell">{s.carrier || '—'}</td>
@@ -434,24 +433,48 @@ const ShipmentRowGroup = ({
                             </div>
                         </div>
                     </td>
-                    <td style={{ fontWeight: 600, color: 'var(--tx)', opacity: 0.7 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span>{s.project_name || s.exhibition_name || 'N/A'}</span>
-                            {(s.project_client_name || s.exhibition_name) ? (
-                                <span style={{ fontSize: '11px', color: 'var(--tx3)', fontWeight: 500 }}>
-                                    {s.project_client_name || s.exhibition_name}
-                                </span>
-                            ) : null}
-                        </div>
-                    </td>
+
                     <td>
                         <StatusBadge status={child.status} />
                     </td>
                     <td className="current-status-cell">
-                        <div className="cs-text" title={child.raw_status}>
-                            {(child.raw_status && !['Unknown', 'Delivery updated', 'In Transit'].includes(child.raw_status)) 
-                                ? child.raw_status 
-                                : (s.history && s.history.length > 0 ? s.history[0].description : (child.raw_status || child.status))}
+                        <div className="cs-text" title={child.raw_status || child.status}>
+                            {(() => {
+                                if (child.last_date) {
+                                    let h_date = "";
+                                    try {
+                                        const dt = new Date(child.last_date);
+                                        if (!isNaN(dt)) {
+                                            h_date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
+                                        } else {
+                                            h_date = child.last_date.substring(0, 10);
+                                        }
+                                    } catch(e) {
+                                        h_date = child.last_date.substring(0, 10);
+                                    }
+                                    const loc = child.last_location || child.raw_status || child.status;
+                                    return `${h_date} : ${loc}`;
+                                }
+                                
+                                const c_status = child.raw_status || child.status || "Unknown";
+                                if ((!child.last_location || c_status.toLowerCase() === 'in transit') && s.history && s.history.length > 0) {
+                                    const latest = s.history[0];
+                                    let h_date = "";
+                                    try {
+                                        const dt = new Date(latest.date);
+                                        if (!isNaN(dt)) {
+                                            h_date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
+                                        } else {
+                                            h_date = latest.date.substring(0, 10);
+                                        }
+                                    } catch(e) {
+                                        h_date = latest.date.substring(0, 10);
+                                    }
+                                    const loc = latest.location || latest.description || c_status;
+                                    return `${h_date} : ${loc}`;
+                                }
+                                return child.raw_status || child.status || "Unknown";
+                            })()}
                         </div>
                     </td>
                     <td className="carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
