@@ -195,13 +195,15 @@ def admin_reseed(session: Session = Depends(get_session)):
                     return None
                 try:
                     dt = pd.to_datetime(val, errors='coerce')
-                    if pd.isna(dt): return None
+                    if pd.isna(dt):
+                        return None
                     return dt.date()
                 except Exception:
                     return None
 
             def safe_str(val):
-                if val is None or (isinstance(val, float) and math.isnan(val)): return None
+                if val is None or (isinstance(val, float) and math.isnan(val)):
+                    return None
                 s = str(val).strip()
                 return s if s else None
 
