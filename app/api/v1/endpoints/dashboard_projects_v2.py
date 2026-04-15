@@ -25,7 +25,7 @@ from app.schemas.dashboard_project import (
     ProjectResourceVersionCreate,
     ProjectResourceVersionRead,
 )
-from app.services.availability import is_manager_available
+from app.services.availability import get_managers_availability, is_manager_available
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1086,16 +1086,15 @@ def check_availability(
         }
 
     managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
-    results = {}
-    for manager in managers:
-        results[str(manager.id)] = is_manager_available(
-            session=session,
-            new_start=start_date,
-            new_end=end_date,
-            manager_id=manager.id,
-            exclude_project_id=project_id,
-        )
-    return results
+    manager_ids = [manager.id for manager in managers if manager.id is not None]
+
+    return get_managers_availability(
+        session=session,
+        new_start=start_date,
+        new_end=end_date,
+        manager_ids=manager_ids,
+        exclude_project_id=project_id,
+    )
 
 
 @router.get("/timeline")
