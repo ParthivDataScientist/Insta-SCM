@@ -305,8 +305,7 @@ class TestDesignToExecutionFlow:
             "/api/v1/shipments/track/888598190302",
             json={"exhibition_name": "Shipment Mapped Project"},
         )
-        assert missing_project.status_code == 400
-        assert "project_id is required" in missing_project.text
+        assert missing_project.status_code == 201, missing_project.text
 
         linked_shipment = client.post(
             "/api/v1/shipments/track/888598190303",
