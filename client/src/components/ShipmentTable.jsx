@@ -248,7 +248,15 @@ const ShipmentRowGroup = ({
     const [isExpanded, setIsExpanded] = useState(false);
     const [loadingChild, setLoadingChild] = useState(null);
     const [syncingMaster, setSyncingMaster] = useState(false);
-    const hasChildren = s.child_parcels && s.child_parcels.length > 0;
+    // Find actual child records in the database that link to this master
+    const dbChildren = allShipments.filter(item => item.master_tracking_number === s.tracking_number);
+    
+    // Legacy children from the API (child_parcels JSON) - exclude any already found in DB to prevent duplicates
+    const apiChildren = (s.child_parcels || []).filter(ac => 
+        !dbChildren.find(dc => dc.tracking_number === ac.tracking_number)
+    );
+
+    const hasChildren = dbChildren.length > 0 || apiChildren.length > 0;
     const canExpand = Boolean(s.is_master || hasChildren);
 
 
@@ -335,8 +343,8 @@ const ShipmentRowGroup = ({
                             <div className="tid-num" style={{ lineHeight: 1.2 }}>
                                 {s.tracking_number}
                                 {hasChildren && (
-                                    <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
-                                        📦 +{s.child_parcels.length}
+                                    <span style={{ marginLeft: 6, fontSize: 10, background: 'rgba(37, 99, 235, 0.08)', color: '#2563eb', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
+                                        📦 +{dbChildren.length + apiChildren.length}
                                     </span>
                                 )}
                             </div>
@@ -410,102 +418,87 @@ const ShipmentRowGroup = ({
                     </button>
                 </td>
             </tr>
-            {isExpanded && hasChildren && s.child_parcels.map((child, idx) => (
+            {/* Expanded Child Rows */}
+            {isExpanded && dbChildren.map((child) => (
                 <tr 
-                    key={`${s.id}-child-${idx}`} 
-                    className={`design-table__row child-row clickable-row ${isSelected ? 'row-selected' : ''}`}
-                    onClick={() => handleTrackChild(child)}
-                    style={{ cursor: 'pointer' }}
+                    key={child.id} 
+                    className={`design-table__row child-row ${isSelected ? 'row-selected' : ''}`}
+                    onClick={() => onSelectShipment(child)}
+                    style={{ cursor: 'pointer', backgroundColor: 'rgba(248, 250, 252, 0.4)' }}
                 >
-                    <td className="design-table__td shipping-col-check"></td> {/* Checkbox placeholder */}
+                    <td className="design-table__td shipping-col-check"></td>
                     <td className="design-table__td shipping-col-id">
-                        <div className="child-indicator">
-                            <div className="tid-num" style={{ fontWeight: 600 }}>
-                                ↳ {child.tracking_number}
+                        <div className="tid-cell nested-cell" style={{ paddingLeft: '24px' }}>
+                            <div className="hierarchy-connector"></div>
+                            <div className="tid-icon child-icon" style={{ backgroundColor: 'rgba(37, 99, 235, 0.05)', color: '#2563eb' }}><Package size={12} /></div>
+                            <div className="truncate-cell" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <div className="tid-name child-name" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx2)' }}>{child.items && child.items !== 'Package' ? child.items : 'Sub-Parcel'}</div>
+                                <div className="tid-num" style={{ fontSize: '11px' }}>{child.tracking_number}</div>
                             </div>
                         </div>
                     </td>
-
                     <td className="design-table__td shipping-col-status">
                         <StatusBadge status={child.status} />
                     </td>
                     <td className="design-table__td current-status-cell shipping-col-current">
-                        <div className="cs-text" title={child.raw_status || child.status}>
+                        <div className="cs-text truncate-cell" style={{ opacity: 0.8, fontSize: '11px' }}>
                             {(() => {
-                                if (child.last_date) {
-                                    let h_date = "";
-                                    try {
-                                        const dt = new Date(child.last_date);
-                                        if (!isNaN(dt)) {
-                                            h_date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
-                                        } else {
-                                            h_date = child.last_date.substring(0, 10);
-                                        }
-                                    } catch(e) {
-                                        h_date = child.last_date.substring(0, 10);
-                                    }
-                                    const loc = child.last_location || child.raw_status || child.status;
-                                    return `${h_date} : ${loc}`;
+                                if (child.history && child.history.length > 0) {
+                                    const latest = child.history[0];
+                                    return latest.location || latest.description || child.status;
                                 }
-                                
-                                const c_status = child.raw_status || child.status || "Unknown";
-                                if ((!child.last_location || c_status.toLowerCase() === 'in transit') && s.history && s.history.length > 0) {
-                                    const latest = s.history[0];
-                                    let h_date = "";
-                                    try {
-                                        const dt = new Date(latest.date);
-                                        if (!isNaN(dt)) {
-                                            h_date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
-                                        } else {
-                                            h_date = latest.date.substring(0, 10);
-                                        }
-                                    } catch(e) {
-                                        h_date = latest.date.substring(0, 10);
-                                    }
-                                    const loc = latest.location || latest.description || c_status;
-                                    return `${h_date} : ${loc}`;
-                                }
-                                return child.raw_status || child.status || "Unknown";
+                                return child.status;
                             })()}
                         </div>
                     </td>
-                    <td className="design-table__td carrier-cell shipping-col-carrier" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
-                    <td className="design-table__td shipping-col-route" style={{ opacity: 0.7 }}>
-                        {child.origin ? (
-                            <div className="route-mini">
-                                <span className="rm-label">FROM </span>{child.origin.split(',')[0]}<br />
-                                <span className="rm-label">TO </span>{child.destination.split(',')[0]}
-                            </div>
-                        ) : (
-                            <div className="route-mini" style={{ opacity: 0.5 }}>
-                                <span className="rm-label">FROM </span>{(s.origin || '').split(',')[0]}<br />
-                                <span className="rm-label">TO </span>{(s.destination || '').split(',')[0]}
-                                <div style={{ fontSize: 9 }}>(Inherited)</div>
-                            </div>
-                        )}
-                    </td>
-                    <td className="design-table__td eta-cell" style={{ opacity: 0.7 }}>
-                        {(() => {
-                            const formatted = formatDateTime(child.eta || s.eta);
-                            if (typeof formatted === 'object') {
-                                return (
-                                    <div style={{ lineAlpha: 1.2 }}>
-                                        <div style={{ fontWeight: 600, color: 'var(--tx)' }}>{formatted.datePart}</div>
-                                        <div style={{ fontSize: 11 }}>{formatted.timePart}</div>
-                                    </div>
-                                );
-                            }
-                            return formatted || 'TBD';
-                        })()}
+                    <td className="design-table__td carrier-cell shipping-col-carrier" style={{ opacity: 0.8 }}>{child.carrier || s.carrier}</td>
+                    <td className="design-table__td shipping-col-route" style={{ opacity: 0.6 }}>—</td>
+                    <td className="design-table__td eta-cell shipping-col-eta" style={{ opacity: 0.8 }}>
+                        {child.eta && child.eta !== 'TBD' ? child.eta.split(' ')[0] : '—'}
                     </td>
                     <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
+                        <button className="track-btn mini-btn" onClick={() => onSelectShipment(child)} style={{ padding: '3px 10px', fontSize: '10px' }}>Details</button>
+                    </td>
+                </tr>
+            ))}
+
+            {isExpanded && apiChildren.map((child, idx) => (
+                <tr 
+                    key={`api-child-${idx}`} 
+                    className={`design-table__row child-row ${isSelected ? 'row-selected' : ''}`}
+                    onClick={() => handleTrackChild(child)}
+                    style={{ cursor: 'pointer', backgroundColor: 'rgba(248, 250, 252, 0.4)' }}
+                >
+                    <td className="design-table__td shipping-col-check"></td>
+                    <td className="design-table__td shipping-col-id">
+                        <div className="tid-cell nested-cell" style={{ paddingLeft: '24px' }}>
+                            <div className="hierarchy-connector"></div>
+                            <div className="tid-icon child-icon" style={{ backgroundColor: 'rgba(148, 163, 184, 0.1)', color: '#64748b' }}><Package size={12} /></div>
+                            <div className="truncate-cell" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <div className="tid-name child-name" style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>Virtual Piece</div>
+                                <div className="tid-num" style={{ fontSize: '11px' }}>{child.tracking_number}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td className="design-table__td shipping-col-status">
+                        <StatusBadge status={child.status} />
+                    </td>
+                    <td className="design-table__td current-status-cell shipping-col-current">
+                        <div className="cs-text truncate-cell" style={{ opacity: 0.6, fontSize: '11px', fontStyle: 'italic' }}>
+                            Awaiting Full Activation
+                        </div>
+                    </td>
+                    <td className="design-table__td carrier-cell shipping-col-carrier" style={{ opacity: 0.6 }}>{s.carrier}</td>
+                    <td className="design-table__td shipping-col-route" style={{ opacity: 0.4 }}>—</td>
+                    <td className="design-table__td eta-cell shipping-col-eta" style={{ opacity: 0.4 }}>—</td>
+                    <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
                         <button 
-                            className="track-btn piece-btn" 
+                            className="track-btn mini-btn" 
                             disabled={loadingChild === child.tracking_number}
                             onClick={() => handleTrackChild(child)}
-                            style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--red)', color: '#fff', minWidth: 52 }}
+                            style={{ padding: '3px 10px', fontSize: '10px', background: 'var(--blue)' }}
                         >
-                            {loadingChild === child.tracking_number ? '...' : 'Track'}
+                            {loadingChild === child.tracking_number ? '...' : 'Activate'}
                         </button>
                     </td>
                 </tr>
