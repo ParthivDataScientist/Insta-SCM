@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+ï»¿import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Check,
     ChevronDown,
@@ -310,7 +310,6 @@ const ShipmentTable = ({
         .map((group) => group.master.id)
         .filter((id) => id != null);
     const allVisibleSelected = visibleMasterIds.length > 0 && visibleMasterIds.every((id) => selectedIds.includes(id));
-    const totalVisibleChildren = filteredGroups.reduce((sum, group) => sum + group.childRows.length, 0);
     const hasFilters = Boolean(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length);
 
     const handleSelectAll = () => {
@@ -346,15 +345,8 @@ const ShipmentTable = ({
 
     return (
         <div className="shipment-table-shell">
-            <div className="shipment-table-toolbar">
-                <div className="shipment-table-toolbar__summary">
-                    <strong>{filteredGroups.length}</strong>
-                    <span>masters</span>
-                    <span className="shipment-table-toolbar__dot">•</span>
-                    <strong>{totalVisibleChildren}</strong>
-                    <span>child packages</span>
-                </div>
-                {hasFilters ? (
+            {hasFilters ? (
+                <div className="shipment-table-toolbar">
                     <button
                         type="button"
                         className="btn-outline-sm shipment-table-toolbar__clear"
@@ -368,8 +360,8 @@ const ShipmentTable = ({
                     >
                         Clear All Filters
                     </button>
-                ) : null}
-            </div>
+                </div>
+            ) : null}
 
             {loading ? (
                 <div className="shipment-table-loading">
@@ -647,3 +639,4 @@ const ShipmentTable = ({
 };
 
 export default ShipmentTable;
+
