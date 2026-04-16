@@ -147,52 +147,57 @@ def track_shipment(
 # ---------------------------------------------------------------------------
 
 def _process_excel_import(contents: bytes, db: Session):
-    """Parse Excel rows and track each shipment synchronously."""
+    """Parse Excel rows and track each shipment, supporting Master/Child vertical nesting logic."""
     df = pd.read_excel(io.BytesIO(contents))
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+    # Normalize column names for easier lookup
+    df.columns = [c.strip().lower().replace(" ", "_").replace("#", "").replace("/", "") for c in df.columns]
 
-    if "tracking_number" not in df.columns:
-        logger.error("Excel import: missing required 'tracking_number' column")
-        return {"error": "Missing required 'tracking_number' column", "success": 0, "failed": 0}
+    # Required columns check (allowing for either tracking_number OR master/child structure)
+    has_legacy = "tracking_number" in df.columns
+    has_mps = "master_awb" in df.columns or "child_awb" in df.columns
+    
+    if not has_legacy and not has_mps:
+        logger.error("Excel import: missing tracking columns (tracking_number or master_awb/child_awb)")
+        return {"error": "Missing required tracking columns. Ensure 'Master AWB' or 'Tracking Number' exists.", "success": 0, "failed": 0}
 
     success = 0
     failed = 0
     errors = []
     
+    last_master_awb = None
+    
     for _, row in df.iterrows():
-        tracking_num = str(row.get("tracking_number", "")).strip()
-        if not tracking_num or tracking_num.lower() == "nan":
+        # Source resolution with vertical logic
+        m_awb = str(row.get("master_awb", "")).strip() if pd.notna(row.get("master_awb")) else ""
+        c_awb = str(row.get("child_awb", "")).strip() if pd.notna(row.get("child_awb")) else ""
+        legacy_awb = str(row.get("tracking_number", "")).strip() if pd.notna(row.get("tracking_number")) else ""
+        
+        tracking_num = m_awb or c_awb or legacy_awb
+        if not tracking_num or tracking_num.lower() in ("nan", ""):
             continue
 
-        # Attempt to get 'name' or 'items' from Excel row for both manual label and items field
-        items_name = (
-            str(row.get("name") or row.get("items") or "")
-            if ("name" in df.columns or "items" in df.columns)
-            and (pd.notna(row.get("name")) or pd.notna(row.get("items")))
-            else None
-        )
+        # Vertical Relationship Logic
+        is_master = bool(m_awb and not c_awb)
+        master_to_use = None
+        
+        if c_awb and not m_awb:
+            master_to_use = last_master_awb
+            is_master = False
+            # Child records follow master, so use tracking_num (c_awb) as primary
+        elif m_awb:
+            master_to_use = tracking_num
+            last_master_awb = tracking_num
+            is_master = True
 
-        recipient = (
-            str(row.get("recipient"))
-            if "recipient" in df.columns and pd.notna(row.get("recipient"))
-            else items_name
-        )
-
-        show_date = (
-            str(row.get("show_date"))
-            if "show_date" in df.columns and pd.notna(row.get("show_date"))
-            else None
-        )
-
-        # Attempt to get exhibition_name
-        exhibition_name = str(row.get("exhibition_name", "")).strip()
-        if not exhibition_name or exhibition_name.lower() == "nan":
-            exhibition_name = "Unknown Exhibition"
-
-        cs = str(row.get("cs") or row.get("c/s") or "").strip() if pd.notna(row.get("cs")) or pd.notna(row.get("c/s")) else None
-        no_of_box = str(row.get("no_of_box") or row.get("boxes") or "").strip() if pd.notna(row.get("no_of_box")) or pd.notna(row.get("boxes")) else None
-
-        # Call track_and_save with correct arguments
+        # Metadata extraction
+        items_name = str(row.get("name") or row.get("items") or "").strip() if pd.notna(row.get("name")) or pd.notna(row.get("items")) else None
+        recipient = str(row.get("client_name") or row.get("recipient") or "").strip() if pd.notna(row.get("client_name")) or pd.notna(row.get("recipient")) else items_name
+        show_date = str(row.get("show_date")).strip() if pd.notna(row.get("show_date")) else None
+        
+        exhibition_name = str(row.get("exhibition_name") or row.get("show_city") or "Unknown Exhibition").strip()
+        cs = str(row.get("cs") or row.get("cs_type")).strip() if pd.notna(row.get("cs")) or pd.notna(row.get("cs_type")) else None
+        no_of_box = str(row.get("no_of_box") or row.get("boxes")).strip() if pd.notna(row.get("no_of_box")) or pd.notna(row.get("boxes")) else None
+        
         project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
 
         if project_id is not None and not db.get(DashboardProject, project_id):
@@ -210,12 +215,17 @@ def _process_excel_import(contents: bytes, db: Session):
             cs=cs,
             no_of_box=no_of_box,
             project_id=project_id,
+            # Pass MPS flags
+            master_tracking_number=master_to_use if not is_master else None,
+            is_master=is_master,
+            remarks=str(row.get("remarks")).strip() if pd.notna(row.get("remarks")) else None,
+            booking_date=str(row.get("booking_dt")).strip() if pd.notna(row.get("booking_dt")) else None
         )
+        
         if "error" in res:
-            err_msg = res["error"]
-            logger.warning("Import failed for %s: %s", tracking_num, err_msg)
+            logger.warning("Import failed for %s: %s", tracking_num, res["error"])
             failed += 1
-            errors.append(f"{tracking_num}: {err_msg}")
+            errors.append(f"{tracking_num}: {res['error']}")
         else:
             success += 1
 

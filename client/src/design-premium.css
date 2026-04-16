@@ -765,13 +765,13 @@
 }
 
 /* Redefined column widths for perfect proportional alignment */
-.shipping-col-check { width: 44px; }
-.shipping-col-id { width: 320px; }
-.shipping-col-status { width: 140px; }
-.shipping-col-current { width: auto; min-width: 220px; } /* Proportional growth */
-.shipping-col-carrier { width: 110px; }
-.shipping-col-route { width: 180px; }
-.shipping-col-eta { width: 150px; }
+.shipping-col-select { width: 36px !important; }
+.shipping-col-id { width: 210px !important; }
+.shipping-col-status { width: 115px !important; }
+.shipping-col-current { width: 260px !important; }
+.shipping-col-carrier { width: 80px !important; }
+.shipping-col-route { width: 155px !important; }
+.shipping-col-eta { width: 135px !important; }
 .shipping-col-actions { width: 180px; }
 
 .truncate-cell {
