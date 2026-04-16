@@ -122,11 +122,11 @@ export default function ShipmentDashboard() {
                         <button className="design-dashboard__action-button design-dashboard__action-button--primary" onClick={() => setShowTrack(true)}>
                             <Plus size={15} /> Add Shipment
                         </button>
-                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" style={{ width: 'auto', padding: '0 10px', fontSize: 13, fontWeight: 500 }} onClick={importExcelPrompt} title="Import Excel">
-                            <FileSpreadsheet size={16} style={{marginRight: 6}} /> Import
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--text" onClick={importExcelPrompt} title="Import Excel">
+                            <FileSpreadsheet size={16} className="design-dashboard__button-icon" /> Import
                         </button>
-                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" style={{ width: 'auto', padding: '0 10px', fontSize: 13, fontWeight: 500 }} onClick={exportExcel} disabled={loading} title="Export Excel">
-                            <Download size={16} style={{marginRight: 6}} /> Export
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--text" onClick={exportExcel} disabled={loading} title="Export Excel">
+                            <Download size={16} className="design-dashboard__button-icon" /> Export
                         </button>
                         <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" onClick={refreshTracking} disabled={loading} title="Refresh Tracking">
                             <RefreshCw size={16} />
@@ -142,7 +142,7 @@ export default function ShipmentDashboard() {
             {showTrack && <TrackModal onClose={() => setShowTrack(false)} onTracked={loadData} />}
             {selectedShipment && <ShipmentDetailPanel shipment={selectedShipment} onClose={() => setSelectedShipment(null)} onDeleted={loadData} />}
 
-            <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"
+            <input type="file" accept=".xlsx,.xls" className="app-hidden-input" id="excel-file-input"
                 onChange={e => { const f = e.target.files[0]; if (f) importExcel(f); e.target.value = ''; }} />
 
             <AppShell
@@ -199,13 +199,10 @@ export default function ShipmentDashboard() {
                     ) : (
                         <ShipmentTable
                             shipments={filteredShipments}
-                            allShipments={shipments}
                             loading={loading}
                             onSelectShipment={setSelectedShipment}
                             onDeleteShipment={handleDelete}
                             onArchiveShipment={handleArchive}
-                            onRefreshShipment={refreshTracking}
-                            onTracked={loadData}
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
                         />
@@ -213,7 +210,7 @@ export default function ShipmentDashboard() {
 
                     {/* Batch Actions Toolbar */}
                     {selectedIds.length > 0 && (
-                        <div className="batch-toolbar animate-in-up" style={{ position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+                        <div className="batch-toolbar shipping-batch-toolbar animate-in-up">
                             <div className="bt-info">
                                 <div className="bt-count">{selectedIds.length}</div>
                                 <span>shipments selected</span>

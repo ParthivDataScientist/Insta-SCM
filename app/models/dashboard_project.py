@@ -1,8 +1,12 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, TYPE_CHECKING
 from datetime import date as py_date, datetime, timezone
 from sqlmodel import Field, Relationship, Column, SQLModel
 from sqlalchemy import DateTime, JSON, String, UniqueConstraint, func
 from .base import AuditMixin
+
+if TYPE_CHECKING:
+    from .user import User
+
 
 class Client(AuditMixin, table=True):
     """Normalized client table."""

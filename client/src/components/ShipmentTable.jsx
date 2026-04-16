@@ -1,11 +1,17 @@
-import React, { useState, useRef, useEffect, Fragment } from 'react';
-import { Package, Filter, Search, ChevronDown, ChevronRight, Check, Trash2, FolderInput } from 'lucide-react';
-import { Loader } from 'lucide-react';
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Filter,
+    Loader,
+    Package,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
-import shipmentsService from '../api/shipments';
 
-// Custom Hook for clicking outside popovers
 function useOnClickOutside(ref, handler) {
     useEffect(() => {
         const listener = (event) => {
@@ -21,489 +27,622 @@ function useOnClickOutside(ref, handler) {
     }, [ref, handler]);
 }
 
-/* ── Helpers ── */
+const normalizeToken = (value) => String(value ?? '').trim();
+
+const displayValue = (value) => {
+    const token = normalizeToken(value);
+    return token ? token : '-';
+};
+
+const shortLocation = (value) => {
+    const token = normalizeToken(value);
+    if (!token) return '-';
+    return token.split(',')[0].trim();
+};
+
+const parseTrackingTokens = (value) => {
+    if (Array.isArray(value)) {
+        return [...new Set(value.flatMap((entry) => parseTrackingTokens(entry)))];
+    }
+
+    const raw = normalizeToken(value);
+    if (!raw) return [];
+
+    return [...new Set(
+        raw
+            .split(/[\n,;|]+/)
+            .map((token) => token.trim())
+            .filter(Boolean)
+            .filter((token) => !['n/a', 'na', 'null', 'undefined', '-'].includes(token.toLowerCase())),
+    )];
+};
+
+const readChildPackages = (shipment) => (
+    parseTrackingTokens(
+        shipment?.child_package
+        ?? shipment?.child_awb
+        ?? shipment?.child_tracking_number
+        ?? shipment?.child_tracking_numbers,
+    )
+);
+
 const formatDateTime = (dateStr) => {
-    if (!dateStr || dateStr === 'TBD' || dateStr === '—' || dateStr === 'Unknown' || dateStr === 'Pending') return '—';
+    if (!dateStr || ['TBD', '-', 'Unknown', 'Pending'].includes(dateStr)) return '-';
     try {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return dateStr;
-        // Feb 11, 2026
-        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        // 01:54 PM
-        const timePart = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-        return { datePart, timePart };
-    } catch (e) {
+        const date = new Date(dateStr);
+        if (Number.isNaN(date.getTime())) return dateStr;
+        return {
+            datePart: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            timePart: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        };
+    } catch (_) {
         return dateStr;
     }
 };
 
-const FilterPopover = ({ title, isActive, onClear, children }) => {
+const formatCurrentStatus = (shipment) => {
+    if (shipment.history && shipment.history.length > 0) {
+        const latest = shipment.history[0];
+        let historyDate = '';
+        try {
+            const date = new Date(latest.date);
+            if (!Number.isNaN(date.getTime())) {
+                historyDate = date
+                    .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                    .replace(/\//g, '.');
+            } else {
+                historyDate = (latest.date || '').slice(0, 10);
+            }
+        } catch (_) {
+            historyDate = (latest.date || '').slice(0, 10);
+        }
+        return `${historyDate} : ${latest.location || latest.description || shipment.status}`;
+    }
+
+    if (shipment.last_scan_date) {
+        return `${shipment.last_scan_date} : ${shipment.status}`;
+    }
+
+    return shipment.status || '-';
+};
+
+const buildPositionalGroups = (rows = []) => {
+    const groups = [];
+    let currentGroup = null;
+
+    rows.forEach((row) => {
+        if (!row) return;
+
+        const trackingNumber = normalizeToken(row.tracking_number);
+        const explicitParent = normalizeToken(row.master_tracking_number);
+        const childPackages = readChildPackages(row);
+
+        const rowDeclaresMaster = row.is_master === true;
+        const rowDeclaresChild = Boolean(explicitParent || childPackages.length);
+        const currentMasterTracking = normalizeToken(currentGroup?.master?.tracking_number);
+
+        const startsNewMaster =
+            rowDeclaresMaster
+            || !currentGroup
+            || (!rowDeclaresChild && trackingNumber && trackingNumber !== currentMasterTracking);
+
+        if (startsNewMaster) {
+            currentGroup = { master: row, children: [] };
+            groups.push(currentGroup);
+            return;
+        }
+
+        currentGroup.children.push(row);
+    });
+
+    return groups;
+};
+
+const expandChildRows = (children, master) => children.flatMap((child, childIndex) => {
+    const packages = readChildPackages(child);
+    const baseKey = child.id ?? `${master.tracking_number || 'master'}-${childIndex}`;
+
+    if (packages.length <= 1) {
+        const resolvedTracking = packages[0] || child.tracking_number;
+        return [{
+            ...child,
+            tracking_number: resolvedTracking,
+            __displayTracking: resolvedTracking,
+            __sourceChild: child,
+            __rowKey: `child-${baseKey}`,
+        }];
+    }
+
+    return packages.map((pkg, packageIndex) => ({
+        ...child,
+        tracking_number: pkg,
+        __displayTracking: pkg,
+        __sourceChild: child,
+        __rowKey: `child-${baseKey}-${packageIndex}`,
+    }));
+});
+
+const buildInlineChildrenFromMaster = (master, masterKey) => {
+    const packages = readChildPackages(master);
+    if (!packages.length) return [];
+
+    return packages.map((pkg, index) => ({
+        ...master,
+        tracking_number: pkg,
+        __displayTracking: pkg,
+        __sourceChild: master,
+        __rowKey: `inline-${masterKey}-${index}`,
+    }));
+};
+
+const toChildSelectionPayload = (child, master) => ({
+    ...(child.__sourceChild || child),
+    ...child,
+    tracking_number: child.__displayTracking || child.tracking_number,
+    master_tracking_number: master?.tracking_number || child.master_tracking_number || null,
+    is_master: false,
+});
+
+const FilterPopover = ({ title, className = '', isActive, onClear, children }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef();
     useOnClickOutside(ref, () => setIsOpen(false));
 
     return (
-        <th className="filter-th design-table__th design-table__th--left" ref={ref}>
-            <div className="th-content" onClick={() => setIsOpen(!isOpen)}>
-                {title}
-                <div className={`filter-icon-wrapper ${isActive ? 'active' : ''}`}>
+        <th className={`filter-th design-table__th design-table__th--left ${className}`} ref={ref}>
+            <button type="button" className="th-content shipment-table__filter-trigger" onClick={() => setIsOpen((prev) => !prev)}>
+                <span>{title}</span>
+                <span className={`filter-icon-wrapper ${isActive ? 'active' : ''}`}>
                     <Filter size={13} />
                     <ChevronDown size={12} className={`chevron ${isOpen ? 'open' : ''}`} />
-                </div>
-            </div>
+                </span>
+            </button>
             {isOpen && (
-                <div className="filter-popover" onClick={e => e.stopPropagation()}>
+                <div className="filter-popover" onClick={(event) => event.stopPropagation()}>
                     <div className="fp-header">
                         <span className="fp-title">Filter {title}</span>
-                        {isActive && <button className="fp-clear" onClick={() => { onClear(); setIsOpen(false); }}>Clear</button>}
+                        {isActive ? (
+                            <button
+                                type="button"
+                                className="fp-clear"
+                                onClick={() => {
+                                    onClear();
+                                    setIsOpen(false);
+                                }}
+                            >
+                                Clear
+                            </button>
+                        ) : null}
                     </div>
-                    <div className="fp-body">
-                        {children}
-                    </div>
+                    <div className="fp-body">{children}</div>
                 </div>
             )}
         </th>
     );
 };
 
-const ShipmentTable = ({ 
-    shipments, 
-    allShipments, 
-    loading, 
-    onSelectShipment, 
-    onDeleteShipment, 
-    onArchiveShipment, 
-    onRefreshShipment,
-    onTracked,
+const ShipmentTable = ({
+    shipments,
+    loading,
+    onSelectShipment,
+    onDeleteShipment,
+    onArchiveShipment,
     selectedIds = [],
     onSelectionChange = () => {},
-    onClearFilters = () => {}
+    onClearFilters = () => {},
 }) => {
-    // Per-column filter states
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
     const [statusFilter, setStatusFilter] = useState([]);
     const [carrierFilter, setCarrierFilter] = useState([]);
+    const [expandedRows, setExpandedRows] = useState(() => new Set());
 
-    // Derived unique options for multi-selects based on ALL data
-    const allExhibitions = [...new Set(shipments.map(s => s.exhibition_name))].filter(Boolean);
-    const allStatuses = [...new Set(shipments.map(s => s.status))].filter(Boolean);
-    const allCarriers = [...new Set(shipments.map(s => s.carrier))].filter(Boolean);
+    const groupedShipments = useMemo(() => (
+        buildPositionalGroups(shipments).map((group, index) => {
+            const master = group.master;
+            const masterKey = master.id != null ? `id:${master.id}` : `tn:${master.tracking_number || index}`;
+            const childRows = group.children.length
+                ? expandChildRows(group.children, master)
+                : buildInlineChildrenFromMaster(master, masterKey);
 
-    // Apply Filters
-    const filteredShipments = shipments.filter(s => {
-        // 1. Tracking ID / Items Search
-        const searchTarget = `${s.tracking_number} ${s.items} ${s.recipient}`.toLowerCase();
-        if (idSearch && !searchTarget.includes(idSearch.toLowerCase())) return false;
+            return {
+                ...group,
+                masterKey,
+                childRows,
+            };
+        })
+    ), [shipments]);
 
-        // 2. Exhibition Name Multi-select
-        const exName = s.exhibition_name || 'N/A';
-        if (exhibitionFilter.length > 0 && !exhibitionFilter.includes(exName) && !exhibitionFilter.includes(s.exhibition_name)) return false;
+    const allStatuses = useMemo(
+        () => [...new Set(groupedShipments.map((group) => group.master.status).filter(Boolean))],
+        [groupedShipments],
+    );
+    const allCarriers = useMemo(
+        () => [...new Set(groupedShipments.map((group) => group.master.carrier).filter(Boolean))],
+        [groupedShipments],
+    );
 
-        // 3. Status Multi-select
-        if (statusFilter.length > 0 && !statusFilter.includes(s.status)) return false;
+    const matchesTrackingSearch = (row) => {
+        const query = idSearch.trim().toLowerCase();
+        if (!query) return true;
+        const target = `${row.tracking_number || ''} ${row.child_package || ''} ${row.items || ''} ${row.recipient || ''}`.toLowerCase();
+        return target.includes(query);
+    };
 
-        // 4. Carrier Multi-select
-        if (carrierFilter.length > 0 && !carrierFilter.includes(s.carrier)) return false;
+    const filteredGroups = useMemo(() => (
+        groupedShipments.filter((group) => {
+            const master = group.master;
+            const exhibitionName = master.exhibition_name || 'N/A';
+            const matchesSearch = matchesTrackingSearch(master) || group.childRows.some((child) => matchesTrackingSearch(child));
+            if (!matchesSearch) return false;
+            if (exhibitionFilter.length > 0 && !exhibitionFilter.includes(exhibitionName)) return false;
+            if (statusFilter.length > 0 && !statusFilter.includes(master.status)) return false;
+            if (carrierFilter.length > 0 && !carrierFilter.includes(master.carrier)) return false;
+            return true;
+        })
+    ), [groupedShipments, exhibitionFilter, statusFilter, carrierFilter, idSearch]);
 
-        return true;
-    });
+    useEffect(() => {
+        const validKeys = new Set(filteredGroups.map((group) => group.masterKey));
+        setExpandedRows((prev) => {
+            let changed = false;
+            const next = new Set();
+            prev.forEach((key) => {
+                if (validKeys.has(key)) {
+                    next.add(key);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [filteredGroups]);
 
-    // Checkbox toggle helper
     const toggleArrayItem = (array, setArray, item) => {
         if (array.includes(item)) {
-            setArray(array.filter(i => i !== item));
+            setArray(array.filter((entry) => entry !== item));
         } else {
             setArray([...array, item]);
         }
     };
 
+    const visibleMasterIds = filteredGroups
+        .map((group) => group.master.id)
+        .filter((id) => id != null);
+    const allVisibleSelected = visibleMasterIds.length > 0 && visibleMasterIds.every((id) => selectedIds.includes(id));
+    const totalVisibleChildren = filteredGroups.reduce((sum, group) => sum + group.childRows.length, 0);
+    const hasFilters = Boolean(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length);
+
     const handleSelectAll = () => {
-        if (selectedIds.length === filteredShipments.length && filteredShipments.length > 0) {
-            onSelectionChange([]);
+        if (allVisibleSelected) {
+            onSelectionChange(selectedIds.filter((id) => !visibleMasterIds.includes(id)));
         } else {
-            onSelectionChange(filteredShipments.map(s => s.id));
+            onSelectionChange([...new Set([...selectedIds, ...visibleMasterIds])]);
         }
     };
 
-    const handleSelectRow = (e, id) => {
-        e.stopPropagation();
+    const handleSelectMaster = (event, id) => {
+        event.stopPropagation();
+        if (id == null) return;
         if (selectedIds.includes(id)) {
-            onSelectionChange(selectedIds.filter(i => i !== id));
+            onSelectionChange(selectedIds.filter((entry) => entry !== id));
         } else {
             onSelectionChange([...selectedIds, id]);
         }
     };
 
+    const toggleExpanded = (event, masterKey) => {
+        event.stopPropagation();
+        setExpandedRows((prev) => {
+            const next = new Set(prev);
+            if (next.has(masterKey)) {
+                next.delete(masterKey);
+            } else {
+                next.add(masterKey);
+            }
+            return next;
+        });
+    };
+
     return (
-        <div className="design-dashboard__table-shell">
-            {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
-                <div style={{ padding: '0 16px', marginBottom: 8, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                    <button className="btn-outline-sm" onClick={() => {
-                        setIdSearch(''); setExhibitionFilter([]); setStatusFilter([]); setCarrierFilter([]);
-                        onClearFilters();
-                    }}>Clear All Filters</button>
+        <div className="shipment-table-shell">
+            <div className="shipment-table-toolbar">
+                <div className="shipment-table-toolbar__summary">
+                    <strong>{filteredGroups.length}</strong>
+                    <span>masters</span>
+                    <span className="shipment-table-toolbar__dot">�</span>
+                    <strong>{totalVisibleChildren}</strong>
+                    <span>child packages</span>
                 </div>
-            ) : null}
+                {hasFilters ? (
+                    <button
+                        type="button"
+                        className="btn-outline-sm shipment-table-toolbar__clear"
+                        onClick={() => {
+                            setIdSearch('');
+                            setExhibitionFilter([]);
+                            setStatusFilter([]);
+                            setCarrierFilter([]);
+                            onClearFilters();
+                        }}
+                    >
+                        Clear All Filters
+                    </button>
+                ) : null}
+            </div>
 
             {loading ? (
-                <div style={{ padding: 60, textAlign: 'center', color: 'var(--tx3)' }}>
-                    <Loader size={32} className="animate-spin" style={{ margin: '0 auto 16px', display: 'block' }} />
+                <div className="shipment-table-loading">
+                    <Loader size={32} className="animate-spin shipment-table-loading__icon" />
                     Loading shipments...
                 </div>
             ) : (
                 <table className="design-table shipping-table">
                     <thead className="design-table__thead">
                         <tr>
-                            <th className="design-table__th design-table__th--left shipping-col-check" style={{ paddingRight: 0 }}>
-                                <div 
-                                    className={`custom-checkbox ${selectedIds.length === filteredShipments.length && filteredShipments.length > 0 ? 'checked' : ''}`}
-                                    onClick={handleSelectAll}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    {selectedIds.length === filteredShipments.length && filteredShipments.length > 0 && <Check size={10} />}
-                                </div>
+                            <th className="design-table__th design-table__th--left shipping-col-check">
+                                <button type="button" className={`custom-checkbox ${allVisibleSelected ? 'checked' : ''}`} onClick={handleSelectAll}>
+                                    {allVisibleSelected ? <Check size={10} /> : null}
+                                </button>
                             </th>
-                            <FilterPopover title="Tracking ID / Items" isActive={!!idSearch} onClear={() => setIdSearch('')} className="shipping-col-id">
+
+                            <FilterPopover title="Master Tracking ID" className="shipping-col-id" isActive={Boolean(idSearch)} onClear={() => setIdSearch('')}>
                                 <div className="fp-search">
                                     <Search size={14} className="fps-icon" />
-                                    <input autoFocus placeholder="Search ID or Items..." value={idSearch} onChange={e => setIdSearch(e.target.value)} />
+                                    <input
+                                        placeholder="Search tracking, items, recipient..."
+                                        value={idSearch}
+                                        onChange={(event) => setIdSearch(event.target.value)}
+                                    />
                                 </div>
                             </FilterPopover>
 
-                            <FilterPopover title="Status" isActive={statusFilter.length > 0} onClear={() => setStatusFilter([])} className="shipping-col-status">
+                            <FilterPopover title="Status" className="shipping-col-status" isActive={statusFilter.length > 0} onClear={() => setStatusFilter([])}>
                                 <div className="fp-check-list">
-                                    {allStatuses.length === 0 ? <div className="fp-empty">No data</div> : allStatuses.map(st => (
-                                        <label key={st} className="fp-check-item">
-                                            <div className={`custom-checkbox ${statusFilter.includes(st) ? 'checked' : ''}`}>
-                                                {statusFilter.includes(st) && <Check size={10} />}
-                                            </div>
-                                            <input type="checkbox" style={{ display: 'none' }} checked={statusFilter.includes(st)} onChange={() => toggleArrayItem(statusFilter, setStatusFilter, st)} />
-                                            <span className="fp-label">{st}</span>
+                                    {allStatuses.length === 0 ? <div className="fp-empty">No data</div> : allStatuses.map((status) => (
+                                        <label key={status} className="fp-check-item">
+                                            <span className={`custom-checkbox ${statusFilter.includes(status) ? 'checked' : ''}`}>
+                                                {statusFilter.includes(status) ? <Check size={10} /> : null}
+                                            </span>
+                                            <input
+                                                type="checkbox"
+                                                className="fp-check-input"
+                                                checked={statusFilter.includes(status)}
+                                                onChange={() => toggleArrayItem(statusFilter, setStatusFilter, status)}
+                                            />
+                                            <span className="fp-label">{status}</span>
                                         </label>
                                     ))}
                                 </div>
                             </FilterPopover>
 
                             <th className="design-table__th design-table__th--left shipping-col-current">Current Status</th>
+                            <th className="design-table__th design-table__th--left shipping-col-eta">Date</th>
 
-                            <FilterPopover title="Carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])} className="shipping-col-carrier">
+                            <FilterPopover title="Carrier" className="shipping-col-carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
                                 <div className="fp-check-list">
-                                    {allCarriers.length === 0 ? <div className="fp-empty">No data</div> : allCarriers.map(cr => (
-                                        <label key={cr} className="fp-check-item">
-                                            <div className={`custom-checkbox ${carrierFilter.includes(cr) ? 'checked' : ''}`}>
-                                                {carrierFilter.includes(cr) && <Check size={10} />}
-                                            </div>
-                                            <input type="checkbox" style={{ display: 'none' }} checked={carrierFilter.includes(cr)} onChange={() => toggleArrayItem(carrierFilter, setCarrierFilter, cr)} />
-                                            <span className="fp-label">{cr}</span>
+                                    {allCarriers.length === 0 ? <div className="fp-empty">No data</div> : allCarriers.map((carrier) => (
+                                        <label key={carrier} className="fp-check-item">
+                                            <span className={`custom-checkbox ${carrierFilter.includes(carrier) ? 'checked' : ''}`}>
+                                                {carrierFilter.includes(carrier) ? <Check size={10} /> : null}
+                                            </span>
+                                            <input
+                                                type="checkbox"
+                                                className="fp-check-input"
+                                                checked={carrierFilter.includes(carrier)}
+                                                onChange={() => toggleArrayItem(carrierFilter, setCarrierFilter, carrier)}
+                                            />
+                                            <span className="fp-label">{carrier}</span>
                                         </label>
                                     ))}
                                 </div>
                             </FilterPopover>
 
                             <th className="design-table__th design-table__th--left shipping-col-route">Route</th>
-                            <th className="design-table__th design-table__th--left shipping-col-eta">ETA</th>
                             <th className="design-table__th design-table__th--left shipping-col-actions">Actions</th>
                         </tr>
                     </thead>
+
                     <tbody>
-                        {filteredShipments.map(s => (
-                            <ShipmentRowGroup 
-                                key={s.id} 
-                                shipment={s} 
-                                allShipments={allShipments}
-                                onSelectShipment={onSelectShipment} 
-                                onDeleteShipment={onDeleteShipment} 
-                                onArchiveShipment={onArchiveShipment}
-                                onRefreshShipment={onRefreshShipment}
-                                onTracked={onTracked}
-                                isSelected={selectedIds.includes(s.id)}
-                                onSelectRow={(e) => handleSelectRow(e, s.id)}
-                            />
-                        ))}
+                        {filteredGroups.map(({ master, childRows, masterKey }) => {
+                            const hasChildren = childRows.length > 0;
+                            const isExpanded = expandedRows.has(masterKey);
+                            const isSelected = master.id != null && selectedIds.includes(master.id);
+
+                            return (
+                                <Fragment key={masterKey}>
+                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''}`} onClick={() => onSelectShipment(master)}>
+                                        <td className="design-table__td shipping-col-check" onClick={(event) => handleSelectMaster(event, master.id)}>
+                                            <span className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
+                                                {isSelected ? <Check size={10} /> : null}
+                                            </span>
+                                        </td>
+
+                                        <td className="design-table__td shipping-col-id">
+                                            <div className="shipment-main-cell">
+                                                {hasChildren ? (
+                                                    <button
+                                                        type="button"
+                                                        className="child-nav"
+                                                        aria-label={isExpanded ? 'Collapse child packages' : 'Expand child packages'}
+                                                        aria-expanded={isExpanded}
+                                                        onClick={(event) => toggleExpanded(event, masterKey)}
+                                                    >
+                                                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                    </button>
+                                                ) : (
+                                                    <span className="shipment-nav-spacer" />
+                                                )}
+
+                                                <span className="tid-icon">
+                                                    <Package size={14} />
+                                                </span>
+
+                                                <div className="shipment-main-cell__content truncate-cell" title={master.items || master.recipient || 'Shipment'}>
+                                                    <div className="tid-name">{master.items && master.items !== 'Package' ? master.items : (master.recipient || 'Shipment')}</div>
+                                                    <div className="tid-num">
+                                                        {displayValue(master.tracking_number)}
+                                                        {hasChildren ? <span className="shipment-child-count">+{childRows.length}</span> : null}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td className="design-table__td shipping-col-status">
+                                            <div className="shipment-status-cell">
+                                                <StatusBadge status={master.status} />
+                                                {master.status !== 'Delivered' && master.progress != null ? (
+                                                    <ProgressBar percentage={master.progress} status={master.status} mini />
+                                                ) : null}
+                                            </div>
+                                        </td>
+
+                                        <td className="design-table__td shipping-col-current">
+                                            <div className="shipment-current-status truncate-cell" title={formatCurrentStatus(master)}>
+                                                {formatCurrentStatus(master)}
+                                            </div>
+                                        </td>
+
+                                        <td className="design-table__td shipping-col-eta">
+                                            <div className="shipment-date-cell">
+                                                {(() => {
+                                                    const formatted = formatDateTime(master.eta);
+                                                    if (typeof formatted === 'object') {
+                                                        return (
+                                                            <>
+                                                                <span className="shipment-date-cell__date">{formatted.datePart}</span>
+                                                                <span className="shipment-date-cell__time">{formatted.timePart}</span>
+                                                            </>
+                                                        );
+                                                    }
+                                                    return <span className="shipment-date-cell__date">{formatted || '-'}</span>;
+                                                })()}
+                                            </div>
+                                        </td>
+
+                                        <td className="design-table__td shipping-col-carrier">
+                                            <span className="carrier-cell">{displayValue(master.carrier)}</span>
+                                        </td>
+
+                                        <td className="design-table__td shipping-col-route">
+                                            <div className="shipment-route-cell">
+                                                <div className="shipment-route-line">
+                                                    <span className="shipment-route-label">FROM</span>
+                                                    <span>{shortLocation(master.origin)}</span>
+                                                </div>
+                                                <div className="shipment-route-line">
+                                                    <span className="shipment-route-label">TO</span>
+                                                    <span>{shortLocation(master.destination)}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
+                                            <button type="button" className="track-btn" onClick={() => onSelectShipment(master)}>Track</button>
+                                            {onArchiveShipment ? (
+                                                <button
+                                                    type="button"
+                                                    className="archive-btn"
+                                                    title={master.is_archived ? 'Restore to Dashboard' : 'Move to Storage'}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onArchiveShipment(master.id);
+                                                    }}
+                                                >
+                                                    {master.is_archived ? 'Restore' : 'Move'}
+                                                </button>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                className="delete-btn"
+                                                title="Delete shipment"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    onDeleteShipment(master.id);
+                                                }}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    {isExpanded ? childRows.map((child) => (
+                                        <tr
+                                            key={child.__rowKey}
+                                            className="design-table__row shipping-row shipping-row--child"
+                                            onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
+                                        >
+                                            <td className="design-table__td shipping-col-check" />
+
+                                            <td className="design-table__td shipping-col-id">
+                                                <div className="shipment-main-cell nested-cell">
+                                                    <span className="hierarchy-connector" />
+                                                    <span className="tid-icon child-icon">
+                                                        <Package size={12} />
+                                                    </span>
+                                                    <div className="shipment-main-cell__content truncate-cell">
+                                                        <div className="tid-name child-name">{child.items && child.items !== 'Package' ? child.items : 'Child Package'}</div>
+                                                        <div className="tid-num">{displayValue(child.__displayTracking || child.tracking_number)}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <td className="design-table__td shipping-col-status">
+                                                <StatusBadge status={child.status || master.status} />
+                                            </td>
+
+                                            <td className="design-table__td shipping-col-current">
+                                                <div className="shipment-current-status shipment-current-status--child truncate-cell">
+                                                    {formatCurrentStatus(child)}
+                                                </div>
+                                            </td>
+
+                                            <td className="design-table__td shipping-col-eta">
+                                                <div className="shipment-date-cell shipment-date-cell--child">
+                                                    {(() => {
+                                                        const formatted = formatDateTime(child.eta);
+                                                        if (typeof formatted === 'object') return <span className="shipment-date-cell__date">{formatted.datePart}</span>;
+                                                        return <span className="shipment-date-cell__date">{formatted || '-'}</span>;
+                                                    })()}
+                                                </div>
+                                            </td>
+
+                                            <td className="design-table__td shipping-col-carrier">
+                                                <span className="carrier-cell carrier-cell--child">{displayValue(child.carrier || master.carrier)}</span>
+                                            </td>
+
+                                            <td className="design-table__td shipping-col-route">
+                                                <div className="shipment-route-cell shipment-route-cell--child">
+                                                    <div className="shipment-route-line">{shortLocation(child.origin)}</div>
+                                                    <div className="shipment-route-line">{shortLocation(child.destination)}</div>
+                                                </div>
+                                            </td>
+
+                                            <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    className="track-btn mini-btn"
+                                                    onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
+                                                >
+                                                    Details
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )) : null}
+                                </Fragment>
+                            );
+                        })}
                     </tbody>
                 </table>
             )}
-            {filteredShipments.length === 0 && !loading && (
-                <div className="table-empty" style={{ padding: '60px 20px', textAlign: 'center' }}>
-                    <Package size={48} style={{ color: 'var(--tx3)', margin: '0 auto 16px', opacity: 0.5 }} />
-                    <p style={{ color: 'var(--tx2)' }}>{shipments.length === 0 ? 'No shipments tracked yet.' : 'No shipments match your filters.'}</p>
+
+            {filteredGroups.length === 0 && !loading ? (
+                <div className="shipment-table-empty">
+                    <Package size={40} className="shipment-table-empty__icon" />
+                    <p>{groupedShipments.length === 0 ? 'No shipments tracked yet.' : 'No shipments match your filters.'}</p>
                 </div>
-            )}
+            ) : null}
         </div>
-    );
-};
-
-const ShipmentRowGroup = ({ 
-    shipment: s, 
-    allShipments, 
-    onSelectShipment, 
-    onDeleteShipment, 
-    onArchiveShipment, 
-    onRefreshShipment,
-    onTracked,
-    isSelected,
-    onSelectRow
-}) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [loadingChild, setLoadingChild] = useState(null);
-    const [syncingMaster, setSyncingMaster] = useState(false);
-    // Find actual child records in the database that link to this master
-    const dbChildren = allShipments.filter(item => item.master_tracking_number === s.tracking_number);
-    
-    // Legacy children from the API (child_parcels JSON) - exclude any already found in DB to prevent duplicates
-    const apiChildren = (s.child_parcels || []).filter(ac => 
-        !dbChildren.find(dc => dc.tracking_number === ac.tracking_number)
-    );
-
-    const hasChildren = dbChildren.length > 0 || apiChildren.length > 0;
-    const canExpand = Boolean(s.is_master || hasChildren);
-
-
-
-    const handleTrackChild = async (child) => {
-        setLoadingChild(child.tracking_number);
-        try {
-            const data = await shipmentsService.previewTrackShipment(child.tracking_number);
-            // Build a full shipment-shaped object from the live API response
-            const progress_map = { 'Delivered': 100, 'Out for Delivery': 80, 'In Transit': 40, 'Exception': 10 };
-            const syntheticShipment = {
-                id: null,
-                tracking_number: child.tracking_number,
-                items: 'Child Piece',
-                carrier: data.carrier || s.carrier,
-                status: data.status || child.status || 'Unknown',
-                raw_status: data.raw_status || child.raw_status || '',
-                origin: data.origin || child.origin || s.origin,
-                destination: data.destination || child.destination || s.destination,
-                eta: data.eta || child.eta || s.eta,
-                exhibition_name: s.exhibition_name,
-                show_date: s.show_date,
-                recipient: s.recipient,
-                progress: progress_map[data.status] ?? (progress_map[child.status] ?? 0),
-                history: data.history || [],
-                child_parcels: [],
-                child_tracking_numbers: [],
-                is_master: false,
-                master_tracking_number: s.tracking_number,
-                created_at: s.created_at,
-            };
-            onSelectShipment(syntheticShipment);
-        } catch (err) {
-            alert(`Could not load details: ${err.message}`);
-        } finally {
-            setLoadingChild(null);
-        }
-    };
-
-    const handleToggleChildren = async (e) => {
-        e.stopPropagation();
-
-        if (hasChildren) {
-            setIsExpanded(prev => !prev);
-            return;
-        }
-
-        if (!s.is_master || !onRefreshShipment) {
-            return;
-        }
-
-        setSyncingMaster(true);
-        try {
-            await onRefreshShipment([s.id]);
-        } catch (err) {
-            alert(err.message || 'Could not load child packages');
-        } finally {
-            setSyncingMaster(false);
-        }
-    };
-
-    return (
-        <Fragment>
-            <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={`design-table__row ${isSelected ? 'row-selected' : ''}`}>
-                <td className="design-table__td shipping-col-check" onClick={onSelectRow}>
-                    <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
-                        {isSelected && <Check size={10} />}
-                    </div>
-                </td>
-                <td className="design-table__td shipping-col-id">
-                    <div className="tid-cell">
-                        {canExpand && (
-                            <div 
-                                className="child-nav" 
-                                onClick={handleToggleChildren}
-                                title={hasChildren ? 'Show child packages' : 'Sync child packages'}
-                            >
-                                {syncingMaster ? <Loader size={14} className="animate-spin" /> : (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                            </div>
-                        )}
-                        <div className="tid-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={14} /></div>
-                        <div className="truncate-cell" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }} title={s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}>
-                            <div className="tid-name" style={{ lineHeight: 1.2 }}>{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
-                            <div className="tid-num" style={{ lineHeight: 1.2 }}>
-                                {s.tracking_number}
-                                {hasChildren && (
-                                    <span style={{ marginLeft: 6, fontSize: 10, background: 'rgba(37, 99, 235, 0.08)', color: '#2563eb', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
-                                        📦 +{dbChildren.length + apiChildren.length}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </td>
-
-                <td className="design-table__td shipping-col-status">
-                    <StatusBadge status={s.status} />
-                    {s.status !== 'Delivered' && s.progress != null && (
-                        <ProgressBar percentage={s.progress} status={s.status} mini />
-                    )}
-                </td>
-                <td className="design-table__td current-status-cell shipping-col-current">
-                    <div className="cs-text truncate-cell" title={s.history && s.history.length > 0 ? (s.history[0].location || s.history[0].description) : s.status}>
-                        {(() => {
-                            if (s.history && s.history.length > 0) {
-                                const latest = s.history[0];
-                                let h_date = "";
-                                try {
-                                    const dt = new Date(latest.date);
-                                    if (!isNaN(dt)) {
-                                        h_date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
-                                    } else {
-                                        h_date = latest.date.substring(0, 10);
-                                    }
-                                } catch(e) {
-                                    h_date = latest.date.substring(0, 10);
-                                }
-                                const loc = latest.location || latest.description || s.status;
-                                return `${h_date} : ${loc}`;
-                            } else if (s.last_scan_date) {
-                                return `${s.last_scan_date} : ${s.status}`;
-                            }
-                            return s.status;
-                        })()}
-                    </div>
-                </td>
-                <td className="design-table__td carrier-cell shipping-col-carrier">{s.carrier || '—'}</td>
-                <td className="design-table__td shipping-col-route">
-                    {s.origin ? (
-                        <div className="route-mini" style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '2px', justifyContent: 'center' }}>
-                            <div style={{ whiteSpace: 'nowrap' }}><span className="rm-label" style={{ fontWeight: 700, color: '#94a3b8', fontSize: '9px' }}>FROM </span>{s.origin.split(',')[0]}</div>
-                            <div style={{ whiteSpace: 'nowrap' }}><span className="rm-label" style={{ fontWeight: 700, color: '#94a3b8', fontSize: '9px' }}>TO </span>{s.destination.split(',')[0]}</div>
-                        </div>
-                    ) : '—'}
-                </td>
-                <td className="design-table__td eta-cell shipping-col-eta">
-                    {(() => {
-                        const formatted = formatDateTime(s.eta);
-                        if (typeof formatted === 'object') {
-                            return (
-                                <div style={{ lineAlpha: 1.2 }}>
-                                    <div style={{ fontWeight: 600, color: 'var(--tx)' }}>{formatted.datePart}</div>
-                                    <div style={{ fontSize: 11, opacity: 0.8 }}>{formatted.timePart}</div>
-                                </div>
-                            );
-                        }
-                        return formatted || 'TBD';
-                    })()}
-                </td>
-                <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
-                    <button className="track-btn" onClick={() => onSelectShipment(s)}>Track</button>
-                    {onArchiveShipment && (
-                        <button className="archive-btn" onClick={e => { e.stopPropagation(); onArchiveShipment(s.id); }} title={s.is_archived ? "Restore to Dashboard" : "Move to Storage"}>
-                            {s.is_archived ? "Restore" : "Move"}
-                        </button>
-                    )}
-                    <button className="delete-btn" onClick={e => { e.stopPropagation(); onDeleteShipment(s.id); }} title="Delete shipment">
-                        <Trash2 size={14} />
-                    </button>
-                </td>
-            </tr>
-            {/* Expanded Child Rows */}
-            {isExpanded && dbChildren.map((child) => (
-                <tr 
-                    key={child.id} 
-                    className={`design-table__row child-row ${isSelected ? 'row-selected' : ''}`}
-                    onClick={() => onSelectShipment(child)}
-                    style={{ cursor: 'pointer', backgroundColor: 'rgba(248, 250, 252, 0.4)' }}
-                >
-                    <td className="design-table__td shipping-col-check"></td>
-                    <td className="design-table__td shipping-col-id">
-                        <div className="tid-cell nested-cell" style={{ paddingLeft: '24px' }}>
-                            <div className="hierarchy-connector"></div>
-                            <div className="tid-icon child-icon" style={{ backgroundColor: 'rgba(37, 99, 235, 0.05)', color: '#2563eb' }}><Package size={12} /></div>
-                            <div className="truncate-cell" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <div className="tid-name child-name" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--tx2)' }}>{child.items && child.items !== 'Package' ? child.items : 'Sub-Parcel'}</div>
-                                <div className="tid-num" style={{ fontSize: '11px' }}>{child.tracking_number}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td className="design-table__td shipping-col-status">
-                        <StatusBadge status={child.status} />
-                    </td>
-                    <td className="design-table__td current-status-cell shipping-col-current">
-                        <div className="cs-text truncate-cell" style={{ opacity: 0.8, fontSize: '11px' }}>
-                            {(() => {
-                                if (child.history && child.history.length > 0) {
-                                    const latest = child.history[0];
-                                    return latest.location || latest.description || child.status;
-                                }
-                                return child.status;
-                            })()}
-                        </div>
-                    </td>
-                    <td className="design-table__td carrier-cell shipping-col-carrier" style={{ opacity: 0.8 }}>{child.carrier || s.carrier}</td>
-                    <td className="design-table__td shipping-col-route" style={{ opacity: 0.6 }}>—</td>
-                    <td className="design-table__td eta-cell shipping-col-eta" style={{ opacity: 0.8 }}>
-                        {child.eta && child.eta !== 'TBD' ? child.eta.split(' ')[0] : '—'}
-                    </td>
-                    <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
-                        <button className="track-btn mini-btn" onClick={() => onSelectShipment(child)} style={{ padding: '3px 10px', fontSize: '10px' }}>Details</button>
-                    </td>
-                </tr>
-            ))}
-
-            {isExpanded && apiChildren.map((child, idx) => (
-                <tr 
-                    key={`api-child-${idx}`} 
-                    className={`design-table__row child-row ${isSelected ? 'row-selected' : ''}`}
-                    onClick={() => handleTrackChild(child)}
-                    style={{ cursor: 'pointer', backgroundColor: 'rgba(248, 250, 252, 0.4)' }}
-                >
-                    <td className="design-table__td shipping-col-check"></td>
-                    <td className="design-table__td shipping-col-id">
-                        <div className="tid-cell nested-cell" style={{ paddingLeft: '24px' }}>
-                            <div className="hierarchy-connector"></div>
-                            <div className="tid-icon child-icon" style={{ backgroundColor: 'rgba(148, 163, 184, 0.1)', color: '#64748b' }}><Package size={12} /></div>
-                            <div className="truncate-cell" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <div className="tid-name child-name" style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>Virtual Piece</div>
-                                <div className="tid-num" style={{ fontSize: '11px' }}>{child.tracking_number}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td className="design-table__td shipping-col-status">
-                        <StatusBadge status={child.status} />
-                    </td>
-                    <td className="design-table__td current-status-cell shipping-col-current">
-                        <div className="cs-text truncate-cell" style={{ opacity: 0.6, fontSize: '11px', fontStyle: 'italic' }}>
-                            Awaiting Full Activation
-                        </div>
-                    </td>
-                    <td className="design-table__td carrier-cell shipping-col-carrier" style={{ opacity: 0.6 }}>{s.carrier}</td>
-                    <td className="design-table__td shipping-col-route" style={{ opacity: 0.4 }}>—</td>
-                    <td className="design-table__td eta-cell shipping-col-eta" style={{ opacity: 0.4 }}>—</td>
-                    <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
-                        <button 
-                            className="track-btn mini-btn" 
-                            disabled={loadingChild === child.tracking_number}
-                            onClick={() => handleTrackChild(child)}
-                            style={{ padding: '3px 10px', fontSize: '10px', background: 'var(--blue)' }}
-                        >
-                            {loadingChild === child.tracking_number ? '...' : 'Activate'}
-                        </button>
-                    </td>
-                </tr>
-            ))}
-        </Fragment>
     );
 };
 

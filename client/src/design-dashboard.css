@@ -499,6 +499,19 @@
     color: var(--text-secondary);
 }
 
+.design-dashboard__header-actions .design-dashboard__icon-button--text {
+    width: auto;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.design-dashboard__button-icon {
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
 .design-dashboard__header-actions .design-dashboard__icon-button--grouped:hover {
     background: rgba(15, 23, 42, 0.06);
     color: var(--text-primary);

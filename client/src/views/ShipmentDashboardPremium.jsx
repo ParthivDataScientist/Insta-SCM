@@ -7,7 +7,6 @@ import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
 import ShipmentSidePanel from '../components/ShipmentSidePanel';
 import AppShell from '../components/app/AppShell';
 import KpiCard from '../components/app/KpiCard';
-import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
 import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import AlertBanner from '../components/AlertBanner';
 import '../design-premium.css';
@@ -63,9 +62,8 @@ export default function ShipmentDashboardPremium() {
             {sidebarOverlay ? (
                 <button
                     type="button"
-                    className="design-dashboard__sidebar-rail-btn"
+                    className="design-dashboard__sidebar-rail-btn shipping-sidebar-rail-btn"
                     onClick={toggleSidebar}
-                    style={{ marginRight: '8px' }}
                 >
                     <PanelLeft size={18} strokeWidth={2} />
                 </button>
@@ -73,7 +71,7 @@ export default function ShipmentDashboardPremium() {
 
             <header className="design-premium-header">
                 <div className="design-premium-header__inner">
-                    <div className="design-premium-header__brand" style={{ marginRight: '16px' }}>
+                    <div className="design-premium-header__brand design-premium-header__brand--offset">
                         <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
                     </div>
 
@@ -100,8 +98,7 @@ export default function ShipmentDashboardPremium() {
                         {hasActiveFilters && (
                             <button
                                 type="button"
-                                className="design-premium-btn"
-                                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
+                                className="design-premium-btn design-premium-btn--danger-ghost"
                                 onClick={resetFilters}
                                 title="Clear all filters"
                             >
@@ -110,15 +107,15 @@ export default function ShipmentDashboardPremium() {
                         )}
 
                         <button className="design-premium-btn" onClick={importExcelPrompt} title="Import Excel">
-                            <FileSpreadsheet size={15} style={{marginRight: 6}} /> Import
+                            <FileSpreadsheet size={15} className="design-premium-btn__icon" /> Import
                         </button>
 
                         <button className="design-premium-btn" onClick={exportExcel} disabled={loading} title="Export Excel">
-                            <Download size={15} style={{marginRight: 6}} /> Export
+                            <Download size={15} className="design-premium-btn__icon" /> Export
                         </button>
 
                         <button className="design-premium-icon-btn" onClick={refreshTracking} disabled={loading} title="Refresh Tracking">
-                            <RefreshCw size={16} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                            <RefreshCw size={16} className={loading ? 'design-premium-icon-btn__spin' : ''} />
                         </button>
 
                         <button className="design-premium-btn design-premium-btn--primary" onClick={() => setShowTrack(true)}>
@@ -141,7 +138,7 @@ export default function ShipmentDashboardPremium() {
 
     return (
         <>
-            <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} id="excel-file-input"
+            <input type="file" accept=".xlsx,.xls" className="app-hidden-input" id="excel-file-input"
                 onChange={e => { const f = e.target.files[0]; if (f) importExcel(f); e.target.value = ''; }} />
 
             <AppShell
@@ -154,7 +151,7 @@ export default function ShipmentDashboardPremium() {
             >
                 <AlertBanner message={error} />
 
-                <div className="premium-sliding-layout" style={{ marginTop: '-12px' }}>
+                <div className="premium-sliding-layout premium-sliding-layout--compact">
                     <div className={`premium-sliding-main ${selectedShipment || showTrack ? 'is-shrunk' : ''}`}>
                         <div className="design-dashboard__kpi-grid">
                             <KpiCard
@@ -194,13 +191,12 @@ export default function ShipmentDashboardPremium() {
                             />
                         </div>
 
-                        <div className="design-dashboard__table-shell" style={{ position: 'relative' }}>
+                        <div className="design-dashboard__table-shell shipping-table-panel">
                             {loading && shipments.length === 0 ? (
                                 <div className="loading-row design-dashboard__loading">Loading shipments...</div>
                             ) : (
                                 <ShipmentTable
                                     shipments={filteredShipments}
-                                    allShipments={shipments}
                                     loading={loading}
                                     onSelectShipment={(s) => {
                                         setSelectedShipment(s);
@@ -208,8 +204,6 @@ export default function ShipmentDashboardPremium() {
                                     }}
                                     onDeleteShipment={handleDelete}
                                     onArchiveShipment={handleArchive}
-                                    onRefreshShipment={refreshTracking}
-                                    onTracked={loadData}
                                     selectedIds={selectedIds}
                                     onSelectionChange={setSelectedIds}
                                 />
@@ -251,7 +245,7 @@ export default function ShipmentDashboardPremium() {
 
                     {/* Batch Actions Toolbar */}
                     {selectedIds.length > 0 && (
-                        <div className="batch-toolbar animate-in-up" style={{ position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+                        <div className="batch-toolbar shipping-batch-toolbar animate-in-up">
                             <div className="bt-info">
                                 <div className="bt-count">{selectedIds.length}</div>
                                 <span>shipments selected</span>

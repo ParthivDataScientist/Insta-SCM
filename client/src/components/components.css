@@ -9,16 +9,16 @@
 }
 
 /* Master/Child Rows (MPS) */
-.child-row {
+.tracking-table .child-row {
     background: var(--bg-ralt) !important;
     border-top: none !important;
 }
 
-.dark .child-row {
+.dark .tracking-table .child-row {
     background: rgba(255, 255, 255, 0.015) !important;
 }
 
-.child-row td {
+.tracking-table .child-row td {
     padding-top: 8px !important;
     padding-bottom: 8px !important;
     color: var(--tx2) !important;
@@ -53,7 +53,7 @@
     background: var(--bd-in);
 }
 
-.child-nav {
+.tracking-table .child-nav {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -66,7 +66,7 @@
     transition: all 0.2s;
 }
 
-.child-nav:hover {
+.tracking-table .child-nav:hover {
     background: var(--red-ghost);
     color: var(--red-v);
 }

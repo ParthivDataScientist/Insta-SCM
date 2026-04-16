@@ -15,7 +15,7 @@ export default function Storage() {
     const [selectedIds, setSelectedIds] = useState([]);
     const { user } = useAuth();
     const {
-        shipments, loading, error, loadData, filteredShipments,
+        loading, error, loadData, filteredShipments,
         deleteShipment, archiveShipment, batchDelete, batchArchive
     } = useShipments();
 
@@ -139,12 +139,10 @@ export default function Storage() {
                                 ) : (
                                     <ShipmentTable
                                         shipments={filteredShipments}
-                                        allShipments={shipments}
                                         loading={loading}
                                         onSelectShipment={setSelected}
                                         onDeleteShipment={handleDelete}
                                         onArchiveShipment={archiveShipment} // Toggle back to active
-                                        onTracked={() => loadData(true)}
                                         selectedIds={selectedIds}
                                         onSelectionChange={setSelectedIds}
                                     />

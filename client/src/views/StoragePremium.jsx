@@ -9,7 +9,6 @@ export default function StoragePremium() {
     const [selected, setSelected] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
     const {
-        shipments,
         loading,
         error,
         loadData,
@@ -88,7 +87,6 @@ export default function StoragePremium() {
                     ) : (
                         <ShipmentTable
                             shipments={filteredShipments}
-                            allShipments={shipments}
                             loading={loading}
                             onSelectShipment={setSelected}
                             onDeleteShipment={(id) => {
@@ -97,7 +95,6 @@ export default function StoragePremium() {
                                 }
                             }}
                             onArchiveShipment={archiveShipment}
-                            onTracked={() => loadData(true)}
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
                         />

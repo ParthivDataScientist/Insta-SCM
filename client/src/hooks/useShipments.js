@@ -169,8 +169,7 @@ export function useShipments() {
                 (item.items || '').toLowerCase().includes(q) ||
                 (item.status || '').toLowerCase().includes(q);
 
-            const isChild = !!item.master_tracking_number;
-            return matchesStatus && matchesCarrier && matchesDate && matchesSearch && !isChild;
+            return matchesStatus && matchesCarrier && matchesDate && matchesSearch;
         });
     }, [filter, carrierFilter, dateFilter, searchQuery, shipments]);
 

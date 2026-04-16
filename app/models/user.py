@@ -1,8 +1,12 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from sqlmodel import Field, Relationship
 from sqlalchemy import Column, String
 from .base import AuditMixin
+
+if TYPE_CHECKING:
+    from .dashboard_project import DashboardProject
+
 
 class User(AuditMixin, table=True):
     """Consolidated User model for both standard users and project managers."""

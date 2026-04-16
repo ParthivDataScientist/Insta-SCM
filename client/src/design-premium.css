@@ -540,13 +540,13 @@
 /* --- Shipping Dashboard & Sliding Panel System --- */
 
 .shipping-dashboard-page {
-    margin-top: -12px !important;
-    gap: 6px !important; /* Reduced from 12px for tighter layout */
+    margin-top: 0 !important;
+    gap: 10px !important;
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    height: calc(100vh - 80px);
+    height: calc(100vh - 84px);
 }
 
 /* Move the whole page up */
@@ -557,12 +557,53 @@
 .premium-sliding-layout {
     display: flex;
     flex: 1;
-    gap: 0px; 
+    gap: 0;
     min-height: 0;
     overflow: hidden;
     position: relative;
     padding: 0 16px 16px;
-    margin-top: 12px; /* Add some space from the AlertBanner */
+    margin-top: 0;
+}
+
+.premium-sliding-layout--compact {
+    margin-top: -4px;
+}
+
+.shipping-sidebar-rail-btn {
+    margin-right: 8px;
+}
+
+.design-premium-header__brand--offset {
+    margin-right: 16px;
+}
+
+.design-premium-btn--danger-ghost {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.18);
+    color: #ef4444;
+}
+
+.design-premium-btn--danger-ghost:hover {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.24);
+}
+
+.design-premium-btn__icon {
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.design-premium-icon-btn__spin {
+    animation: spin 1s linear infinite;
+}
+
+.shipping-table-panel {
+    position: relative;
+    min-height: 420px;
+}
+
+.app-hidden-input {
+    display: none !important;
 }
 
 .premium-sliding-main {
@@ -708,9 +749,9 @@
     height: 16px !important;
 }
 
-/* Table Column Sizing & Truncation */
+/* Shipment Table Layout */
 .design-dashboard__table-shell {
-    padding: 0 !important; 
+    padding: 0 !important;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -718,67 +759,628 @@
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 20px;
     box-shadow: 0 4px 24px rgba(15, 23, 42, 0.02);
-    margin-bottom: 8px; /* Small space at the bottom as requested */
+    margin-bottom: 8px;
     overflow: hidden;
 }
 
+.shipment-table-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.shipment-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: #ffffff;
+}
+
+.shipment-table-toolbar__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.shipment-table-toolbar__summary strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.shipment-table-toolbar__dot {
+    color: #cbd5e1;
+}
+
+.shipment-table-toolbar__clear {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.shipment-table-loading {
+    min-height: 420px;
+    display: grid;
+    place-items: center;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 500;
+    gap: 10px;
+}
+
+.shipment-table-loading__icon {
+    margin: 0 auto;
+}
+
+.shipment-table-empty {
+    min-height: 240px;
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    padding: 36px 24px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.shipment-table-empty__icon {
+    opacity: 0.45;
+}
+
 .shipping-table {
-    table-layout: fixed;
     width: 100%;
-    border-collapse: collapse !important; 
-    margin: 0 !important; 
-    border: none !important; /* Remove individual table borders */
-}
-
-.shipping-table thead th, .shipping-table td {
-    padding: 12px 14px !important;
-    vertical-align: middle !important;
-}
-
-/* Force header bar to be a single solid strip with no vertical gaps */
-.shipping-table thead tr {
-    background-color: #f1f5f9 !important;
+    table-layout: fixed;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    margin: 0 !important;
     border: none !important;
+}
+
+.shipping-table .design-table__th {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
 }
 
 .shipping-table thead th {
-    background-color: #f1f5f9 !important;
-    border: none !important;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: #f8fafc !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
     box-shadow: none !important;
-    outline: none !important;
-    padding: 14px 18px !important; /* Design Page standard padding */
-    height: 44px !important;
+    padding: 12px 14px !important;
+    height: 52px;
+    vertical-align: middle;
 }
 
-/* Remove 'bubble' look from filter headers to match perfect design page */
-.shipping-table .th-content {
+.shipping-table .design-table__td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    color: #334155;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    vertical-align: middle;
+    background: #ffffff;
+}
+
+.shipping-table .design-table__row {
+    height: 64px;
+}
+
+.shipping-row--child {
+    height: 56px !important;
+}
+
+.shipping-table .design-table__row:nth-child(even) .design-table__td {
+    background: #ffffff;
+}
+
+.shipping-table .design-table__row:hover .design-table__td {
+    background: #f8fafc;
+}
+
+.shipping-row--selected .design-table__td {
+    background: #eff6ff !important;
+}
+
+.shipping-row--child .design-table__td {
+    background: #f8fafc !important;
+}
+
+.shipping-row--child:hover .design-table__td {
+    background: #f1f5f9 !important;
+}
+
+.shipping-col-check {
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    text-align: center;
+}
+
+.shipping-col-id {
+    width: 290px !important;
+    min-width: 290px !important;
+    max-width: 290px !important;
+}
+
+.shipping-col-status {
+    width: 138px !important;
+    min-width: 138px !important;
+    max-width: 138px !important;
+}
+
+.shipping-col-current {
+    width: 255px !important;
+    min-width: 255px !important;
+    max-width: 255px !important;
+}
+
+.shipping-col-eta {
+    width: 132px !important;
+    min-width: 132px !important;
+    max-width: 132px !important;
+}
+
+.shipping-col-carrier {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+}
+
+.shipping-col-route {
+    width: 170px !important;
+    min-width: 170px !important;
+    max-width: 170px !important;
+}
+
+.shipping-col-actions {
+    width: 190px !important;
+    min-width: 190px !important;
+    max-width: 190px !important;
+}
+
+.shipping-table .custom-checkbox {
+    margin: 0 auto;
+}
+
+.shipment-table__filter-trigger {
+    width: 100%;
+    justify-content: space-between;
     background: transparent !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-    display: flex !important;
-    width: 100% !important;
-    height: 100% !important;
+    border: none;
+    color: inherit;
+    text-align: left;
 }
 
 .shipping-table .th-content:hover {
     background: transparent !important;
 }
 
-/* Redefined column widths for perfect proportional alignment */
-.shipping-col-select { width: 36px !important; }
-.shipping-col-id { width: 210px !important; }
-.shipping-col-status { width: 115px !important; }
-.shipping-col-current { width: 260px !important; }
-.shipping-col-carrier { width: 80px !important; }
-.shipping-col-route { width: 155px !important; }
-.shipping-col-eta { width: 135px !important; }
-.shipping-col-actions { width: 180px; }
+.fp-check-input {
+    display: none;
+}
 
 .truncate-cell {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
+    min-width: 0;
+}
+
+.shipment-main-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.shipment-main-cell__content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.shipment-nav-spacer {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.shipping-table .child-nav {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: #ffffff;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+}
+
+.shipping-table .child-nav:hover {
+    background: #f1f5f9;
+    border-color: rgba(100, 116, 139, 0.32);
+    color: #0f172a;
+}
+
+.shipping-table .tid-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.shipping-table .tid-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.shipping-table .tid-num {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #64748b;
+    font-family: 'Consolas', 'SFMono-Regular', monospace;
+}
+
+.shipment-child-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.shipment-status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shipment-current-status {
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.shipment-current-status--child {
+    color: #64748b;
+}
+
+.shipment-date-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+.shipment-date-cell__date {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.shipment-date-cell__time {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.shipment-date-cell--child .shipment-date-cell__date {
+    color: #475569;
+    font-weight: 500;
+}
+
+.shipping-table .carrier-cell {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.shipping-table .carrier-cell--child {
+    color: #64748b;
+    text-transform: none;
+}
+
+.shipment-route-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.shipment-route-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    color: #475569;
+    font-size: 11px;
+}
+
+.shipment-route-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+}
+
+.shipment-route-cell--child .shipment-route-line {
+    color: #64748b;
+    font-size: 10px;
+}
+
+.shipping-table .action-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.shipping-table .track-btn,
+.shipping-table .archive-btn {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.shipping-table .delete-btn {
+    width: 30px;
+    height: 30px;
+    margin-left: 0;
+}
+
+.shipping-table .mini-btn {
+    height: 26px !important;
+    padding: 0 10px !important;
+    border-radius: 7px !important;
+    font-size: 11px !important;
+}
+
+.shipping-row--child .nested-cell {
+    position: relative;
+    padding-left: 20px;
+}
+
+.shipping-row--child .hierarchy-connector {
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-left: 1.5px solid #cbd5e1;
+    border-bottom: 1.5px solid #cbd5e1;
+    border-bottom-left-radius: 8px;
+    transform: translateY(-62%);
+}
+
+.shipping-row--child .child-icon {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 7px !important;
+    border: 1px solid rgba(37, 99, 235, 0.16) !important;
+    background: rgba(37, 99, 235, 0.06) !important;
+}
+
+.shipping-row--child .child-name {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.shipping-batch-toolbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+}
+
+.batch-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    background: #0f172a;
+    color: #f8fafc;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    padding: 10px 12px;
+    box-shadow: 0 16px 36px rgba(2, 6, 23, 0.28);
+}
+
+.bt-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #cbd5e1;
+}
+
+.bt-count {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.bt-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bt-btn,
+.bt-close {
+    height: 30px;
+    border-radius: 8px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.bt-btn.archive {
+    background: rgba(59, 130, 246, 0.14);
+    color: #bfdbfe;
+    border-color: rgba(59, 130, 246, 0.32);
+}
+
+.bt-btn.delete {
+    background: rgba(239, 68, 68, 0.14);
+    color: #fecaca;
+    border-color: rgba(239, 68, 68, 0.32);
+}
+
+.bt-close {
+    background: transparent;
+    color: #94a3b8;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.bt-btn.archive:hover {
+    background: rgba(59, 130, 246, 0.22);
+}
+
+.bt-btn.delete:hover {
+    background: rgba(239, 68, 68, 0.22);
+}
+
+.bt-close:hover {
+    background: rgba(148, 163, 184, 0.14);
+    color: #e2e8f0;
+}
+
+@keyframes batchSlideUp {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 12px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+.shipping-batch-toolbar.animate-in-up {
+    animation: batchSlideUp 0.22s ease-out;
+}
+
+.dark .shipment-table-toolbar {
+    background: #1e293b;
+    border-bottom-color: rgba(148, 163, 184, 0.26);
+}
+
+.dark .shipment-table-toolbar__summary strong {
+    color: #f8fafc;
+}
+
+.dark .shipment-table-toolbar__summary {
+    color: #94a3b8;
+}
+
+.dark .shipping-table thead th {
+    background: #0f172a !important;
+    border-bottom-color: rgba(148, 163, 184, 0.24) !important;
+    color: #94a3b8;
+}
+
+.dark .shipping-table .design-table__td {
+    background: #1e293b;
+    border-bottom-color: rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+}
+
+.dark .shipping-table .design-table__row:hover .design-table__td {
+    background: #243244;
+}
+
+.dark .shipping-row--child .design-table__td {
+    background: #223042 !important;
+}
+
+.dark .shipping-row--selected .design-table__td {
+    background: #1e3a5f !important;
+}
+
+.dark .shipping-table .tid-name {
+    color: #f1f5f9;
+}
+
+.dark .shipping-table .tid-num,
+.dark .shipment-current-status,
+.dark .shipment-current-status--child,
+.dark .shipment-route-line,
+.dark .shipping-table .carrier-cell {
+    color: #94a3b8;
+}
+
+.dark .shipment-date-cell__date {
+    color: #e2e8f0;
+}
+
+@media (max-width: 1280px) {
+    .shipping-col-id { width: 250px !important; min-width: 250px !important; max-width: 250px !important; }
+    .shipping-col-current { width: 220px !important; min-width: 220px !important; max-width: 220px !important; }
+    .shipping-col-route { width: 150px !important; min-width: 150px !important; max-width: 150px !important; }
+}
+
+@media (max-width: 980px) {
+    .shipment-table-toolbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .shipping-batch-toolbar {
+        left: 12px;
+        right: 12px;
+        transform: none;
+    }
+
+    .batch-toolbar {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
 }
 
 /* Shipment Detail Panel Content */
@@ -1030,63 +1632,5 @@
     padding: 24px;
     text-align: center;
     box-shadow: 0 20px 50px rgba(0,0,0,0.1);
-}
-
-/* Nested Child Logic & Hierarchy indicators */
-.child-row {
-    border-bottom: 1px solid rgba(15, 23, 42, 0.03) !important;
-    transition: background-color 0.2s ease;
-}
-
-.child-row:hover {
-    background-color: rgba(248, 250, 252, 0.8) !important;
-}
-
-.nested-cell {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.hierarchy-connector {
-    position: absolute;
-    left: 8px;
-    top: -24px; /* Connects from above */
-    bottom: 50%;
-    width: 2px;
-    background-color: #e2e8f0;
-    border-left: 2px solid #e2e8f0;
-    border-bottom: 2px solid #e2e8f0;
-    border-bottom-left-radius: 6px;
-    height: 38px;
-}
-
-.child-icon {
-    width: 24px !important;
-    height: 24px !important;
-    min-width: 24px !important;
-    border-radius: 6px !important;
-    margin-right: 12px !important;
-}
-
-.child-name {
-    color: var(--tx2);
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.mini-btn {
-    padding: 2px 10px !important;
-    height: 24px !important;
-    font-size: 10px !important;
-    border-radius: 6px !important;
-    background-color: rgba(15, 23, 42, 0.05) !important;
-    color: var(--tx2) !important;
-    border: 1px solid rgba(15, 23, 42, 0.1) !important;
-}
-
-.mini-btn:hover {
-    background-color: rgba(15, 23, 42, 0.1) !important;
-    color: var(--tx) !important;
 }
 

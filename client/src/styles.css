@@ -2660,6 +2660,10 @@ select {
     font-style: italic;
     padding: 8px;
 }
+
+.app-hidden-input {
+    display: none !important;
+}
 /* Hide scrollbar for Kanban */
 .no-scrollbar {
   scrollbar-width: none;
