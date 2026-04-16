@@ -11,7 +11,7 @@ import AlertBanner from '../components/AlertBanner';
 
 export default function ShipmentDashboard() {
     const {
-        shipments, stats, loading, error, loadData, filteredShipments,
+        shipments, stats, loading, refreshing, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
@@ -128,8 +128,13 @@ export default function ShipmentDashboard() {
                         <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--text" onClick={exportExcel} disabled={loading} title="Export Excel">
                             <Download size={16} className="design-dashboard__button-icon" /> Export
                         </button>
-                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped" onClick={refreshTracking} disabled={loading} title="Refresh Tracking">
-                            <RefreshCw size={16} />
+                        <button
+                            className="design-dashboard__icon-button design-dashboard__icon-button--grouped"
+                            onClick={() => { void refreshTracking(); }}
+                            disabled={loading || refreshing}
+                            title="Refresh Tracking"
+                        >
+                            <RefreshCw size={16} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
                         </button>
                     </div>
                 </div>

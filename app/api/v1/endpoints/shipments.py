@@ -46,6 +46,7 @@ class BatchRequest(BaseModel):
 class RefreshRequest(BaseModel):
     """Request body for re-syncing saved shipment records."""
     shipment_ids: Optional[List[int]] = None
+    include_children: bool = False
 
 class SheetRow(BaseModel):
     ship_to_location: Optional[str] = None
@@ -616,7 +617,11 @@ def refresh_shipments(
     _key: str = Depends(verify_api_key),
 ):
     """Refresh saved shipments from their carriers and hydrate missing MPS child parcels."""
-    return refresh_tracked_shipments(db=db, shipment_ids=body.shipment_ids)
+    return refresh_tracked_shipments(
+        db=db,
+        shipment_ids=body.shipment_ids,
+        include_children=body.include_children,
+    )
 
 
 # ---------------------------------------------------------------------------

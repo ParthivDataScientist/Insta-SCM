@@ -13,7 +13,7 @@ import '../design-premium.css';
 
 export default function ShipmentDashboardPremium() {
     const {
-        shipments, stats, loading, error, loadData, filteredShipments,
+        shipments, stats, loading, refreshing, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
@@ -114,8 +114,13 @@ export default function ShipmentDashboardPremium() {
                             <Download size={15} className="design-premium-btn__icon" /> Export
                         </button>
 
-                        <button className="design-premium-icon-btn" onClick={refreshTracking} disabled={loading} title="Refresh Tracking">
-                            <RefreshCw size={16} className={loading ? 'design-premium-icon-btn__spin' : ''} />
+                        <button
+                            className="design-premium-icon-btn"
+                            onClick={() => { void refreshTracking(); }}
+                            disabled={loading || refreshing}
+                            title="Refresh Tracking"
+                        >
+                            <RefreshCw size={16} className={refreshing ? 'design-premium-icon-btn__spin' : ''} />
                         </button>
 
                         <button className="design-premium-btn design-premium-btn--primary" onClick={() => setShowTrack(true)}>

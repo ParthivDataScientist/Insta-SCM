@@ -39,11 +39,14 @@ const shipmentsService = {
         return response.data;
     },
 
-    refreshShipments: async (shipmentIds = null) => {
+    refreshShipments: async (shipmentIds = null, options = {}) => {
+        const { includeChildren = false, timeoutMs = 120000 } = options;
         const payload = shipmentIds && shipmentIds.length > 0
-            ? { shipment_ids: shipmentIds }
-            : { shipment_ids: null };
-        const response = await apiClient.post('/api/v1/shipments/refresh', payload);
+            ? { shipment_ids: shipmentIds, include_children: includeChildren }
+            : { shipment_ids: null, include_children: includeChildren };
+        const response = await apiClient.post('/api/v1/shipments/refresh', payload, {
+            timeout: timeoutMs,
+        });
         return response.data;
     },
 

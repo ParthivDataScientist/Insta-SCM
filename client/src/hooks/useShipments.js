@@ -9,6 +9,7 @@ export function useShipments() {
     const [shipments, setShipments] = useState([]);
     const [stats, setStats] = useState({ total: 0, transit: 0, delivered: 0, exceptions: 0 });
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
 
     // Filter state
@@ -22,11 +23,12 @@ export function useShipments() {
         return err?.response?.data?.detail || err?.message || 'Something went wrong';
     }, []);
 
-    const loadData = useCallback(async (includeArchived = null) => {
+    const loadData = useCallback(async (includeArchived = null, options = {}) => {
+        const { silent = false } = options;
         const archivedState = includeArchived !== null ? includeArchived : isArchivedView;
         if (includeArchived !== null) setIsArchivedView(includeArchived);
         
-        setLoading(true);
+        if (!silent) setLoading(true);
         setError(null);
         try {
             let [shipmentsData, statsData] = await Promise.all([
@@ -40,7 +42,7 @@ export function useShipments() {
             setError(getErrorMessage(err));
             console.error('Failed to load data from backend:', err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [getErrorMessage, isArchivedView]);
 
@@ -112,24 +114,31 @@ export function useShipments() {
     }, [getErrorMessage, loadData]);
 
     const refreshTracking = useCallback(async (shipmentIds = null) => {
-        setLoading(true);
+        setRefreshing(true);
         setError(null);
         try {
-            const result = await shipmentsService.refreshShipments(shipmentIds);
-            await loadData();
+            const result = await shipmentsService.refreshShipments(shipmentIds, {
+                includeChildren: false,
+                timeoutMs: 120000,
+            });
+            await loadData(null, { silent: true });
             if (result.failed > 0) {
                 const message = `Refreshed ${result.refreshed} shipment(s), but ${result.failed} could not be re-synced.`;
                 setError(message);
-                throw new Error(message);
             }
             return result;
         } catch (err) {
             const message = getErrorMessage(err);
             setError(message);
             console.error('Failed to refresh shipments:', err);
-            throw new Error(message);
+            return {
+                requested: 0,
+                refreshed: 0,
+                failed: 1,
+                errors: [message],
+            };
         } finally {
-            setLoading(false);
+            setRefreshing(false);
         }
     }, [getErrorMessage, loadData]);
 
@@ -197,6 +206,7 @@ export function useShipments() {
         shipments,
         stats,
         loading,
+        refreshing,
         error,
         loadData,
         filteredShipments,

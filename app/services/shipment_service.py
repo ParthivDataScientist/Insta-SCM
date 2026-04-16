@@ -242,6 +242,7 @@ def refresh_tracked_shipments(
     db: Session,
     shipment_ids: Optional[Sequence[int]] = None,
     include_archived: bool = False,
+    include_children: bool = False,
 ) -> dict:
     """
     Re-sync one or more saved shipments from the carrier APIs.
@@ -251,6 +252,13 @@ def refresh_tracked_shipments(
     statement = select(Shipment)
     if shipment_ids:
         statement = statement.where(Shipment.id.in_(list(shipment_ids)))
+    # By default, refresh only top-level shipments (masters + standalone)
+    # to avoid expensive N+1 carrier calls for child records.
+    if not shipment_ids and not include_children:
+        statement = statement.where(
+            (Shipment.master_tracking_number.is_(None))
+            | (Shipment.master_tracking_number == "")
+        )
     if not include_archived:
         statement = statement.where(Shipment.is_archived == False)
 
