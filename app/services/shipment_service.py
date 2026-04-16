@@ -163,16 +163,13 @@ def get_stats(db: Session) -> dict:
     Return counts for main shipments and total child parcels.
     A 'main' shipment is either an MPS master or a standalone parcel.
     """
-    # Main shipment counts (where it's not a child of another record in DB)
+    # Simple inclusive count of all non-archived shipments to match the main list view
     main_query = select(
         func.count().label("total"),
         func.sum(case((Shipment.status == "Delivered", 1), else_=0)).label("delivered"),
         func.sum(case((Shipment.status.in_(["In Transit", "Out for Delivery"]), 1), else_=0)).label("transit"),
         func.sum(case((Shipment.status == "Exception", 1), else_=0)).label("exceptions"),
-    ).where(
-        ((Shipment.is_master == True) | (Shipment.master_tracking_number == None)) &
-        (Shipment.is_archived == False)
-    )
+    ).where(Shipment.is_archived == False)
     main_result = db.exec(main_query).one()
 
     # Child parcel counts (summing the JSON arrays from master records)

@@ -15,7 +15,7 @@ const shipmentsService = {
     },
 
     fetchStats: async () => {
-        const response = await apiClient.get('/api/v1/shipments/stats/');
+        const response = await apiClient.get('/api/v1/shipments/stats');
         return response.data;
     },
 

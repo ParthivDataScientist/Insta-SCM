@@ -1,10 +1,11 @@
 import React, { Suspense, lazy } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, FileText, FolderOpen, LogOut, Menu, Moon, PanelLeft, PenTool, RefreshCw, Search, Sun } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, Clock3, FileText, FolderOpen, LogOut, Menu, Moon, PanelLeft, PenTool, RefreshCw, Search, Sun, SlidersHorizontal } from 'lucide-react';
 import { useDesignProjects } from '../hooks/useDesignProjects';
 import AlertBanner from '../components/AlertBanner';
 import DesignTable from '../components/DesignTable';
 import DesignTableSkeleton from '../components/DesignTableSkeleton';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import AppShell from '../components/app/AppShell';
 import KpiCard from '../components/app/KpiCard';
 import '../design-dashboard.css';
@@ -74,95 +75,89 @@ export default function DesignDashboard() {
                     <PanelLeft size={18} strokeWidth={2} aria-hidden />
                 </button>
             ) : null}
-            <header className="design-dashboard__header">
-                <div className="design-dashboard__header-scroll">
-                    {!sidebarOverlay ? (
-                        <button
-                            type="button"
-                            className="design-dashboard__icon-button mobile-only"
-                            onClick={toggleSidebar}
-                            title="Open navigation"
-                        >
-                            <Menu size={16} />
-                        </button>
-                    ) : null}
+            <header className="design-premium-header">
+                <div className="design-premium-header__inner">
+                    
+                    <div className="design-premium-header__brand">
+                        <img src="/logo.jpg" alt="App Logo" className="design-premium-header__logo" />
+                    </div>
 
-                    <div className="design-dashboard__header-filters">
-                    <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
-                        <span className="design-dashboard__filter-label" id="design-search-label">
-                            Search
-                        </span>
-                        <label className="design-dashboard__search">
-                            <Search size={16} aria-hidden />
+                    <div className="design-premium-header__search-container">
+                        <label className="design-premium-search">
+                            <Search size={16} className="design-premium-search__icon" aria-hidden />
                             <input
                                 type="search"
-                                placeholder="Search project, client, or AWB"
+                                placeholder="Search projects, clients, or AWS accounts..."
                                 value={filters.search}
                                 onChange={(event) => setSearchQuery(event.target.value)}
-                                aria-labelledby="design-search-label"
                             />
                         </label>
                     </div>
 
-                    <div className="design-dashboard__filter-field">
-                        <span className="design-dashboard__filter-label" id="design-status-label">
-                            Pipeline status
-                        </span>
-                        <label className="design-dashboard__control design-dashboard__control--select">
-                            <select
-                                value={filters.status}
-                                onChange={(event) => setFilterStatus(event.target.value)}
-                                aria-labelledby="design-status-label"
-                            >
-                                <option value="all">All statuses</option>
-                                <option value="pending">Pending</option>
-                                <option value="in_progress">In Progress</option>
-                                <option value="changes">Changes</option>
-                                <option value="won">Won</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                        </label>
+                    <div className="design-premium-header__filters">
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Status
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft: "4px"}}><path d="M6 9l6 6 6-6"/></svg>
+                            </div>
+                            <label className="design-premium-filter__control">
+                                <SlidersHorizontal size={14} className="design-premium-filter__icon" />
+                                <select
+                                    value={filters.status}
+                                    onChange={(event) => setFilterStatus(event.target.value)}
+                                >
+                                    <option value="all">All statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="changes">Changes</option>
+                                    <option value="won">Won</option>
+                                    <option value="lost">Lost</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Date range</div>
+                            <PremiumDateRangePicker />
+                        </div>
                     </div>
 
-                    <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
-                        <span className="design-dashboard__filter-label" id="design-date-label">
-                            Date range
-                        </span>
-                        <GlobalDateRangePicker
-                            compact
-                            label={false}
-                            className="design-dashboard__date-range"
-                            aria-labelledby="design-date-label"
-                        />
-                    </div>
-                    </div>
+                    <div className="design-premium-header__actions">
+                        <button
+                            type="button"
+                            className="design-premium-btn design-premium-btn--primary"
+                            onClick={handleRefresh}
+                            disabled={loading || isRefreshing}
+                        >
+                            <RefreshCw size={15} style={{ animation: loading || isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+                            Refresh
+                        </button>
+                        
+                        <button
+                            type="button"
+                            className="design-premium-icon-btn"
+                            onClick={toggleTheme}
+                            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
 
-                    <div className="design-dashboard__header-actions" role="group" aria-label="Session actions">
-                    <button
-                        type="button"
-                        className="design-dashboard__action-button design-dashboard__action-button--primary"
-                        onClick={handleRefresh}
-                        disabled={loading || isRefreshing}
-                    >
-                        <RefreshCw size={15} style={{ animation: loading || isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
-                        Refresh
-                    </button>
-                    <button
-                        type="button"
-                        className="design-dashboard__icon-button design-dashboard__icon-button--grouped"
-                        onClick={toggleTheme}
-                        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                    >
-                        {isDark ? <Sun size={17} /> : <Moon size={17} />}
-                    </button>
-                    <button
-                        type="button"
-                        className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--danger"
-                        onClick={logout}
-                        title="Log out"
-                    >
-                        <LogOut size={17} />
-                    </button>
+                        <button
+                            type="button"
+                            className="design-premium-icon-btn"
+                            title="Notifications"
+                        >
+                            <Bell size={18} />
+                            <span className="design-premium-icon-btn__badge"></span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="design-premium-avatar"
+                            onClick={logout}
+                            title="Logout"
+                        >
+                            JD
+                        </button>
                     </div>
                 </div>
             </header>

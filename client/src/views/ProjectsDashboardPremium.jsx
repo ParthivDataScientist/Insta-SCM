@@ -1,11 +1,13 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, FolderKanban, PanelLeft, Search, Users, Workflow, X } from 'lucide-react';
+import { Building2, FolderKanban, PanelLeft, Search, Users, Workflow, X, MapPin, Layout, Bell } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import ProjectTable from '../components/ProjectTable';
 import AppShell from '../components/app/AppShell';
 import KpiCard from '../components/app/KpiCard';
 import AlertBanner from '../components/AlertBanner';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
+import '../design-premium.css';
 import { EXECUTION_BOARD_STAGES } from '../utils/projectStatus';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
@@ -141,114 +143,101 @@ export default function ProjectsDashboardPremium() {
                     type="button"
                     className="design-dashboard__sidebar-rail-btn"
                     onClick={toggleSidebar}
-                    title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-                    aria-expanded={sidebarOpen}
-                    aria-controls="app-primary-sidebar"
+                    style={{ marginRight: '8px' }}
                 >
-                    <PanelLeft size={18} strokeWidth={2} aria-hidden />
+                    <PanelLeft size={18} strokeWidth={2} />
                 </button>
             ) : null}
 
-            <header className="design-dashboard__header projects-dashboard__header">
-                <div className="design-dashboard__header-scroll projects-dashboard__header-scroll">
-                    <div className="design-dashboard__header-filters projects-dashboard__header-filters projects-dashboard__filters-subsection">
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
-                            <span className="design-dashboard__filter-label" id="projects-search-label">
-                                Search
-                            </span>
-                            <label className="design-dashboard__search">
-                                <Search size={16} aria-hidden />
-                                <input
-                                    type="search"
-                                    placeholder="Search project, event, venue, manager..."
-                                    value={searchQuery}
-                                    onChange={(event) => setSearchQuery(event.target.value)}
-                                    aria-labelledby="projects-search-label"
-                                />
-                            </label>
-                        </div>
+            <header className="design-premium-header">
+                <div className="design-premium-header__inner">
+                    <div className="design-premium-header__brand" style={{ marginRight: '16px' }}>
+                        <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                    </div>
 
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--stage">
-                            <span className="design-dashboard__filter-label" id="projects-stage-label">
-                                Execution stage
-                            </span>
-                            <label className="design-dashboard__control design-dashboard__control--select">
-                                <select
-                                    value={filterStatus}
-                                    onChange={(event) => setFilterStatus(event.target.value)}
-                                    aria-labelledby="projects-stage-label"
-                                >
+                    <div className="design-premium-header__search-container">
+                        <label className="design-premium-search">
+                            <Search size={16} className="design-premium-search__icon" aria-hidden />
+                            <input
+                                type="search"
+                                placeholder="Search project, event, venue, manager..."
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                            />
+                        </label>
+                    </div>
+
+                    <div className="design-premium-header__filters">
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Board Stage
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft: "4px"}}><path d="M6 9l6 6 6-6"/></svg>
+                            </div>
+                            <label className="design-premium-filter__control">
+                                <Layout size={14} className="design-premium-filter__icon" />
+                                <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
                                     <option value="All">All stages</option>
                                     {EXECUTION_BOARD_STAGES.map((stage) => (
-                                        <option key={stage} value={stage}>
-                                            {stage}
-                                        </option>
+                                        <option key={stage} value={stage}>{stage}</option>
                                     ))}
                                 </select>
                             </label>
                         </div>
 
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--branch">
-                            <span className="design-dashboard__filter-label" id="projects-branch-label">
-                                Branch
-                            </span>
-                            <label className="design-dashboard__control design-dashboard__control--select">
-                                <select
-                                    value={filterBranch}
-                                    onChange={(event) => setFilterBranch(event.target.value)}
-                                    aria-labelledby="projects-branch-label"
-                                >
-                                    {uniqueBranches.map((branch) => (
-                                        <option key={branch} value={branch}>
-                                            {branch === 'All' ? 'All branches' : branch}
-                                        </option>
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Branch
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft: "4px"}}><path d="M6 9l6 6 6-6"/></svg>
+                            </div>
+                            <label className="design-premium-filter__control">
+                                <MapPin size={14} className="design-premium-filter__icon" />
+                                <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
+                                    {uniqueBranches.map(b => (
+                                        <option key={b} value={b}>{b === 'All' ? 'All branches' : b}</option>
                                     ))}
                                 </select>
                             </label>
                         </div>
 
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--manager">
-                            <span className="design-dashboard__filter-label" id="projects-manager-label">
-                                Manager
-                            </span>
-                            <label className="design-dashboard__control design-dashboard__control--select">
-                                <select
-                                    value={filterPM}
-                                    onChange={(event) => setFilterPM(event.target.value)}
-                                    aria-labelledby="projects-manager-label"
-                                >
-                                    {uniquePMs.map((manager) => (
-                                        <option key={manager} value={manager}>
-                                            {manager === 'All' ? 'All managers' : manager}
-                                        </option>
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Manager
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft: "4px"}}><path d="M6 9l6 6 6-6"/></svg>
+                            </div>
+                            <label className="design-premium-filter__control">
+                                <Users size={14} className="design-premium-filter__icon" />
+                                <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
+                                    {uniquePMs.map(pm => (
+                                        <option key={pm} value={pm}>{pm === 'All' ? 'All managers' : pm}</option>
                                     ))}
                                 </select>
                             </label>
                         </div>
 
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
-                            <span className="design-dashboard__filter-label" id="projects-date-label">
-                                Date range
-                            </span>
-                            <GlobalDateRangePicker
-                                compact
-                                label={false}
-                                className="design-dashboard__date-range projects-dashboard__date-range"
-                                aria-labelledby="projects-date-label"
-                            />
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Date range</div>
+                            <PremiumDateRangePicker />
                         </div>
+                    </div>
 
-                        {hasActiveFilters ? (
+                    <div className="design-premium-header__actions">
+                        {hasActiveFilters && (
                             <button
                                 type="button"
-                                className="design-dashboard__action-button projects-dashboard__reset-button"
+                                className="design-premium-btn"
+                                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
                                 onClick={resetFilters}
-                                title="Clear filters"
+                                title="Clear all filters"
                             >
-                                <X size={15} />
-                                Reset
+                                <X size={14} /> Clear
                             </button>
-                        ) : null}
+                        )}
+
+                        <button
+                            type="button"
+                            className="design-premium-icon-btn"
+                            title="Notifications"
+                        >
+                            <Bell size={18} />
+                            <span className="design-premium-icon-btn__badge"></span>
+                        </button>
                     </div>
                 </div>
             </header>

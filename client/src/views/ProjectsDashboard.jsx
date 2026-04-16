@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
-import { Menu, RefreshCw, Briefcase, MapPin, Truck, LogOut, Search, X, CheckCircle, Users, Layout, Archive, PenTool } from 'lucide-react';
+import { Menu, RefreshCw, Briefcase, MapPin, Truck, LogOut, Search, X, CheckCircle, Users, Layout, Archive, PenTool, Sun, Moon, SlidersHorizontal, Bell } from 'lucide-react';
 
 // Hooks
 import { useProjects } from '../hooks/useProjects';
@@ -9,7 +9,9 @@ import { useAuth } from '../contexts/AuthContext';
 import ProjectTable from '../components/ProjectTable';
 import { CardSkeleton } from '../components/SkeletonLoader';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import { Link } from 'react-router-dom';
+import '../design-premium.css';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 
@@ -47,7 +49,17 @@ export default function ProjectsDashboard() {
         ['All', ...new Set(projects.map(p => p.project_manager).filter(Boolean))].sort(),
     [projects]);
 
-    const isDark = localStorage.getItem('insta_theme') === 'dark';
+    const { theme, toggleTheme } = useTheme?.() || { theme: 'light', toggleTheme: () => {} };
+    // fallback if useTheme isn't mapped
+    const isDarkGlobal = localStorage.getItem('insta_theme') === 'dark';
+    const [isDarkLocal, setIsDarkLocal] = useState(isDarkGlobal);
+    const isDark = isDarkLocal;
+    const toggleThemeLocal = () => {
+        const newMode = !isDarkLocal;
+        setIsDarkLocal(newMode);
+        localStorage.setItem('insta_theme', newMode ? 'dark' : 'light');
+        document.documentElement.classList.toggle('dark', newMode);
+    };
     const isProjectSelected = !!selectedProject;
     const latestActiveProject = projects.find((project) => project.id === activeProjectCard?.id) || activeProjectCard;
     const displayBoardStage = isProjectSelected
@@ -122,33 +134,102 @@ export default function ProjectsDashboard() {
 
                 {/* ═══════ MAIN ═══════ */}
                 <main className="main-content">
-                    <header className="main-header">
-                        <div className="header-welcome" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <button className="icon-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                                <Menu size={20} />
-                            </button>
-                            <div>
-                                <h1>Welcome, <strong>{user?.full_name || 'Operations Manager'}</strong></h1>
-                                <p className="header-role">Insta Exhibition - Projects Dashboard</p>
+                    <header className="design-premium-header" style={{ top: '16px', marginBottom: '32px' }}>
+                        <div className="design-premium-header__inner">
+                            <div className="design-premium-header__brand">
+                                <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                            </div>
+
+                            <div className="design-premium-header__search-container">
+                                <label className="design-premium-search">
+                                    <Search size={16} className="design-premium-search__icon" aria-hidden />
+                                    <input
+                                        type="search"
+                                        placeholder="Search Project ID, Event, Manager..."
+                                        value={searchQuery}
+                                        onChange={(event) => setSearchQuery(event.target.value)}
+                                    />
+                                    <div className="design-premium-search__shortcut">⌘ K</div>
+                                </label>
+                            </div>
+
+                            <div className="design-premium-header__filters">
+                                <div className="design-premium-filter">
+                                    <div className="design-premium-filter__label">Board Stage</div>
+                                    <label className="design-premium-filter__control">
+                                        <Layout size={14} className="design-premium-filter__icon" />
+                                        <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
+                                            {uniqueBoardStages.map(stageName => (
+                                                <option key={stageName} value={stageName}>{stageName === 'All' ? 'All Stages' : stageName}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+
+                                <div className="design-premium-filter">
+                                    <div className="design-premium-filter__label">Branch</div>
+                                    <label className="design-premium-filter__control">
+                                        <MapPin size={14} className="design-premium-filter__icon" />
+                                        <select value={filterBranch} onChange={(event) => setFilterBranch(event.target.value)}>
+                                            {uniqueBranches.map(b => (
+                                                <option key={b} value={b}>{b === 'All' ? 'All Branches' : b}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+
+                                <div className="design-premium-filter">
+                                    <div className="design-premium-filter__label">Manager</div>
+                                    <label className="design-premium-filter__control">
+                                        <Users size={14} className="design-premium-filter__icon" />
+                                        <select value={filterPM} onChange={(event) => setFilterPM(event.target.value)}>
+                                            {uniquePMs.map(pm => (
+                                                <option key={pm} value={pm}>{pm === 'All' ? 'All Managers' : pm}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+
+                                <div className="design-premium-filter">
+                                    <div className="design-premium-filter__label">Date range</div>
+                                    <PremiumDateRangePicker />
+                                </div>
+                            </div>
+
+                            <div className="design-premium-header__actions">
+                                {(filterStage !== 'All' || filterStatus !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || searchQuery !== '' || isProjectSelected || activeProjectCard) && (
+                                    <button
+                                        type="button"
+                                        className="design-premium-btn"
+                                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
+                                        onClick={resetFilters}
+                                        title="Clear all filters"
+                                    >
+                                        <X size={14} /> Clear
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    className="design-premium-btn design-premium-btn--primary"
+                                    onClick={loadData}
+                                    disabled={loading}
+                                >
+                                    <RefreshCw size={15} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                                    {loading ? 'Syncing...' : 'Refresh'}
+                                </button>
+                                
+                                <button
+                                    type="button"
+                                    className="design-premium-icon-btn"
+                                    onClick={toggleThemeLocal}
+                                    title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                                >
+                                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                                </button>
                             </div>
                         </div>
-                        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <GlobalDateRangePicker />
-                            {(filterStage !== 'All' || filterStatus !== 'All' || filterBranch !== 'All' || filterPM !== 'All' || searchQuery !== '' || isProjectSelected || activeProjectCard) && (
-                                <button className="icon-btn btn-animate" onClick={resetFilters} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: 'var(--tx2)' }}>
-                                    <X size={14} /> Disable Filters
-                                </button>
-                            )}
-                            <button className="icon-btn btn-animate" onClick={loadData} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600 }}>
-                                <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-                                {loading ? 'Syncing...' : 'Refresh'}
-                            </button>
-                            <button className="icon-btn btn-animate" onClick={logout} style={{ marginLeft: '0.5rem', color: '#E53935' }}>
-                                <LogOut size={16} />
-                            </button>
-                        </div>
                     </header>
-                <div className="header-accent-bar" />
 
                     <div className="tracking-body">
                         {/* ── KPI Cards ── */}
@@ -227,14 +308,6 @@ export default function ProjectsDashboard() {
                             </div>
                         </div>
 
-                        {/* Search & Actions */}
-                        <div className="tracking-toolbar" style={{ margin: '24px 0' }}>
-                            <div className="toolbar-search">
-                                <Search size={14} className="ts-icon" />
-                                <input className="ts-input" placeholder="Search Project ID, Project, Event, Manager..."
-                                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                            </div>
-                        </div>
 
                         {/* Data Table */}
                         <div className="bottom-row">

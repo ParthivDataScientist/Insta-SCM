@@ -3,7 +3,7 @@ import { X, Truck, Loader, ArrowUpRight } from 'lucide-react';
 import shipmentsService from '../api/shipments';
 import projectsService from '../api/projects';
 
-const TrackModal = ({ onClose, onTracked }) => {
+const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
     const [trackingNum, setTrackingNum] = useState('');
     const [shipmentName, setShipmentName] = useState('');
     const [exhibitionName, setExhibitionName] = useState('');
@@ -13,9 +13,6 @@ const TrackModal = ({ onClose, onTracked }) => {
     const [loading, setLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
     const [error, setError] = useState('');
-    useEffect(() => {
-        // Project fetching removed since tracking is independent
-    }, []);
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
@@ -26,8 +23,6 @@ const TrackModal = ({ onClose, onTracked }) => {
             const result = await shipmentsService.importExcel(file);
             onTracked();
             onClose();
-
-            // Show detailed alert with success and failure counts
             if (result?.status === 'completed') {
                 let msg = `Import complete: ${result.success} succeeded, ${result.failed} failed.`;
                 if (result.failed > 0 && result.errors && result.errors.length > 0) {
@@ -42,7 +37,6 @@ const TrackModal = ({ onClose, onTracked }) => {
             setError(err.message);
         } finally {
             setImportLoading(false);
-            // reset file input
             e.target.value = null;
         }
     };
@@ -84,126 +78,121 @@ const TrackModal = ({ onClose, onTracked }) => {
         }
     };
 
-    return (
-        <div className="panel-overlay saas-theme" style={{ zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-            <div className="panel-backdrop" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
-            <div className="panel saas-modal" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '450px', transform: 'none', borderRadius: '16px 0 0 16px', margin: 0, borderRight: 'none', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div className="saas-modal__header">
-                    <div>
-                        <h2 className="panel-title" style={{ margin: '0 0 4px 0', fontSize: '20px', color: 'var(--text-primary)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>Add New Shipment</h2>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Enter details to track a specific parcel</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                        <button className="premium-icon-button premium-icon-button--danger" onClick={onClose} title="Close Panel">
-                            <X size={24} />
-                        </button>
-                    </div>
+    const content = (
+        <div className="shipment-detail-content no-scrollbar">
+            <div className="form-group">
+                <label className="dmc-label">Tracking Number</label>
+                <input
+                    type="text"
+                    className="form-input"
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                    placeholder="e.g. 888123456789"
+                    value={trackingNum}
+                    onChange={e => setTrackingNum(e.target.value)}
+                />
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                    <label className="dmc-label">Shipment Name</label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                        placeholder="e.g. Laptop Stand"
+                        value={shipmentName}
+                        onChange={e => setShipmentName(e.target.value)}
+                    />
                 </div>
-                <div className="saas-modal__body no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    <div className="form-group">
-                        <label className="form-label">Tracking Number</label>
-                        <input
-                            type="text"
-                            className="form-input"
-                            placeholder="e.g. 888123456789"
-                            value={trackingNum}
-                            onChange={e => setTrackingNum(e.target.value)}
-                        />
-                    </div>
-                    <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div className="form-group">
-                            <label className="form-label">Shipment Name</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g. Laptop Stand"
-                                value={shipmentName}
-                                onChange={e => setShipmentName(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Exhibition Name</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g. Tech Expo 2026"
-                                value={exhibitionName}
-                                onChange={e => setExhibitionName(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">C/S (e.g. C-DDP)</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g. C-DDP"
-                                value={cs}
-                                onChange={e => setCs(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">No of Box</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g. 5"
-                                value={noOfBox}
-                                onChange={e => setNoOfBox(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                            <label className="form-label">Event Date / Extra Info</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g. March 15th"
-                                value={showDate}
-                                onChange={e => setShowDate(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleTrack()}
-                            />
-                        </div>
-                    </div>
-                    {error && (
-                        <div className="status-badge" style={{
-                            color: 'var(--red)',
-                            background: 'var(--red-ghost)',
-                            padding: '10px 14px',
-                            borderRadius: 'var(--r-md)',
-                            fontSize: 13,
-                        }}>
-                            {error}
-                        </div>
-                    )}
-                    <button
-                        className="btn-primary"
-                        onClick={handleTrack}
-                        disabled={loading || importLoading}
-                        style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}
-                    >
-                        {loading ? <Loader size={16} className="animate-spin" /> : <><Truck size={16} /> Track Shipment</>}
-                    </button>
+                <div className="form-group">
+                    <label className="dmc-label">Exhibition</label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                        placeholder="e.g. Tech Expo"
+                        value={exhibitionName}
+                        onChange={e => setExhibitionName(e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="dmc-label">C/S (e.g. C-DDP)</label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                        placeholder="e.g. C-DDP"
+                        value={cs}
+                        onChange={e => setCs(e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="dmc-label">No of Box</label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                        placeholder="e.g. 5"
+                        value={noOfBox}
+                        onChange={e => setNoOfBox(e.target.value)}
+                    />
+                </div>
+            </div>
 
-                    <div style={{ margin: '16px 0', borderTop: '1px solid var(--color-border-light)', paddingTop: 16 }}>
-                        <p className="form-label" style={{ marginBottom: 12 }}>Or Batch Import from Excel</p>
-                        <input
-                            type="file"
-                            id="excel-upload"
-                            style={{ display: 'none' }}
-                            accept=".xlsx,.xls"
-                            onChange={handleFileUpload}
-                        />
-                        <button
-                            className="btn btn-outline"
-                            disabled={importLoading || loading}
-                            onClick={() => document.getElementById('excel-upload').click()}
-                            style={{ width: '100%', justifyContent: 'center' }}
-                        >
-                            {importLoading
-                                ? <Loader size={16} className="animate-spin" />
-                                : <><ArrowUpRight size={16} /> Import Excel File</>}
-                        </button>
-                    </div>
+            <div className="form-group">
+                <label className="dmc-label">Event Date / Info</label>
+                <input
+                    type="text"
+                    className="form-input"
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                    placeholder="e.g. March 15th"
+                    value={showDate}
+                    onChange={e => setShowDate(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleTrack()}
+                />
+            </div>
+
+            {error && (
+                <div style={{ color: '#ef4444', fontSize: '12px', fontWeight: 600, background: 'rgba(239, 68, 68, 0.05)', padding: '10px', borderRadius: '8px' }}>
+                    {error}
                 </div>
+            )}
+
+            <button
+                className="design-premium-btn design-premium-btn--primary"
+                onClick={handleTrack}
+                disabled={loading || importLoading}
+                style={{ width: '100%', marginTop: '8px' }}
+            >
+                {loading ? <Loader size={16} className="animate-spin" /> : <><Truck size={16} /> Track Shipment</>}
+            </button>
+
+            <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                <p className="dmc-label" style={{ marginBottom: '12px' }}>Bulk Import from Excel</p>
+                <input type="file" id="panel-excel-upload" style={{ display: 'none' }} accept=".xlsx,.xls" onChange={handleFileUpload} />
+                <button
+                    className="design-premium-btn"
+                    style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569' }}
+                    disabled={importLoading || loading}
+                    onClick={() => document.getElementById('panel-excel-upload').click()}
+                >
+                    {importLoading ? <Loader size={16} className="animate-spin" /> : <><ArrowUpRight size={16} /> Upload Excel</>}
+                </button>
+            </div>
+        </div>
+    );
+
+    if (isPanel) return content;
+
+    return (
+        <div className="legacy-modal-overlay">
+            <div className="legacy-modal-backdrop" onClick={onClose} />
+            <div className="legacy-modal-content">
+                <div className="modal-header">
+                    <h2>Track New Shipment</h2>
+                    <button onClick={onClose}><X size={20} /></button>
+                </div>
+                {content}
             </div>
         </div>
     );

@@ -2,12 +2,14 @@ import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'rea
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DndContext, PointerSensor, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Check, PanelLeft, PanelRightClose, PanelRightOpen, Plus, Search, UserSquare2, X } from 'lucide-react';
+import { Check, PanelLeft, PanelRightClose, PanelRightOpen, Plus, Search, UserSquare2, X, Bell } from 'lucide-react';
 import AppShell from '../components/app/AppShell';
 import AlertBanner from '../components/AlertBanner';
 import TimelineHeader from '../components/GanttTimeline/TimelineHeader';
 import ManagerRow from '../components/GanttTimeline/ManagerRow';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
+import '../design-premium.css';
 import projectsService from '../api/projects';
 import { useGlobalDateRange } from '../contexts/GlobalDateRangeContext';
 import {
@@ -504,66 +506,84 @@ export default function ManagerTimelinePremium() {
     };
 
     const header = ({ toggleSidebar, sidebarOpen, sidebarOverlay }) => (
-        <header className="design-dashboard__header project-officer__header">
-            <div className="project-officer__header-row">
-                <div className="project-officer__header-left">
-                    {sidebarOverlay ? (
-                        <button
-                            type="button"
-                            className="project-officer__sidebar-toggle"
-                            onClick={toggleSidebar}
-                            title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-                        >
-                            <PanelLeft size={16} />
-                        </button>
-                    ) : null}
-                    <div className="project-officer__title-chip">
-                        <UserSquare2 size={15} />
-                        <span>Project Officer</span>
-                    </div>
-                    <label className="design-dashboard__search project-officer__search">
-                        <Search size={16} />
-                        <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search project, manager" />
+        <header className="design-premium-header">
+            <div className="design-premium-header__inner">
+                {sidebarOverlay ? (
+                    <button
+                        type="button"
+                        className="design-dashboard__sidebar-rail-btn"
+                        onClick={toggleSidebar}
+                        style={{ marginRight: '8px' }}
+                    >
+                        <PanelLeft size={18} strokeWidth={2} />
+                    </button>
+                ) : null}
+
+                <div className="design-premium-header__brand" style={{ marginRight: '16px' }}>
+                    <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                </div>
+
+                <div className="design-premium-header__search-container">
+                    <label className="design-premium-search">
+                        <Search size={16} className="design-premium-search__icon" aria-hidden />
+                        <input
+                            type="search"
+                            placeholder="Search project, manager..."
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                        />
                     </label>
                 </div>
-                <div className="project-officer__header-right">
-                    <GlobalDateRangePicker compact label={false} className="design-dashboard__date-range project-officer__date-range" />
-                    <div className="design-dashboard__header-actions">
+
+                <div className="design-premium-header__filters">
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(15, 23, 42, 0.02)', border: '1px solid rgba(15, 23, 42, 0.06)', borderRadius: '9999px', padding: '4px', marginRight: '16px' }}>
                         {VIEW_MODES.map((mode) => (
                             <button
                                 key={mode}
                                 type="button"
-                                className={`design-dashboard__action-button ${viewMode === mode ? 'design-dashboard__action-button--primary' : ''}`}
+                                style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '9999px',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    border: 'none',
+                                    background: viewMode === mode ? '#ffffff' : 'transparent',
+                                    color: viewMode === mode ? '#0f172a' : '#64748b',
+                                    boxShadow: viewMode === mode ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
                                 onClick={() => setViewMode(mode)}
                             >
                                 {mode}
                             </button>
                         ))}
                     </div>
-                    <button type="button" className="design-dashboard__action-button" onClick={handleAddManager}>
-                        <Plus size={14} /> Add Manager
-                    </button>
+
+                    <div className="design-premium-filter">
+                        <div className="design-premium-filter__label">Date range</div>
+                        <PremiumDateRangePicker />
+                    </div>
                 </div>
-            </div>
-            {/* legacy row removed; keep compact one-line header */}
-            <div style={{ display: 'none' }}>
-                {sidebarOverlay ? (
+
+                <div className="design-premium-header__actions">
                     <button
                         type="button"
-                        className="project-officer__sidebar-toggle"
-                        onClick={toggleSidebar}
-                        title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+                        className="design-premium-btn design-premium-btn--primary"
+                        onClick={handleAddManager}
                     >
-                        <PanelLeft size={16} />
+                        <Plus size={15} /> Add Manager
                     </button>
-                ) : null}
-                <button
-                    type="button"
-                    className="design-dashboard__action-button"
-                    onClick={handleAddManager}
-                >
-                    <Plus size={14} /> Add Manager
-                </button>
+
+                    <button
+                        type="button"
+                        className="design-premium-icon-btn"
+                        title="Notifications"
+                    >
+                        <Bell size={18} />
+                        <span className="design-premium-icon-btn__badge"></span>
+                    </button>
+                </div>
             </div>
         </header>
     );
@@ -686,7 +706,20 @@ export default function ManagerTimelinePremium() {
                             </button>
                             {drawerOpen ? (
                                 <>
-                                    <h3>Unassigned Projects ({unassignedProjects.length})</h3>
+                                    <div className="project-officer__drawer-header">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <h3>Unassigned Projects</h3>
+                                            <span className="project-officer__drawer-badge">{unassignedProjects.length}</span>
+                                        </div>
+                                        <button 
+                                            type="button" 
+                                            className="project-officer__drawer-close"
+                                            onClick={() => setDrawerOpen(false)}
+                                            title="Close sidebar"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
                                     <div className="project-officer__drawer-list">
                                         {unassignedProjects.map((project) => (
                                             <UnassignedProjectCard key={project.id} project={project} />

@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Menu, Search } from 'lucide-react';
+import { Menu, Search, Bell } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import AppShell from '../components/app/AppShell';
@@ -9,8 +9,10 @@ import AlertBanner from '../components/AlertBanner';
 import KanbanColumn from '../components/KanbanColumn';
 import ProjectKanbanCard from '../components/ProjectKanbanCard';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
+import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import { BoardSkeleton } from '../components/SkeletonLoader';
 import { EXECUTION_BOARD_STAGES, isWonProject, normalizeBoardStage, normalizeProjectPriority } from '../utils/projectStatus';
+import '../design-premium.css';
 
 const ProjectBoardModal = lazy(() => import('../components/ProjectBoardModal'));
 const MOBILE_BOARD_QUERY = '(max-width: 720px)';
@@ -200,60 +202,48 @@ export default function ProjectBoardPremium() {
                     <Menu size={18} strokeWidth={2} aria-hidden />
                 </button>
             ) : null}
-            <header className="design-dashboard__header stages-board__header">
-                <div className="design-dashboard__header-scroll">
-                    {!sidebarOverlay ? (
-                        <button
-                            type="button"
-                            className="design-dashboard__icon-button mobile-only"
-                            onClick={toggleSidebar}
-                            title="Open navigation"
-                        >
-                            <Menu size={16} />
-                        </button>
-                    ) : null}
-                    <div className="stages-board__identity">
-                        <div className="stages-board__title">Execution Pipeline</div>
-                        <div className="stages-board__breadcrumb">Projects / Stages</div>
-                        <div className="stages-board__micro-stats" aria-label="Board quick stats">
-                            <span>Total: {confirmedProjects.length}</span>
-                            <span className="stages-board__stat-sep">|</span>
-                            <span className="stages-board__high-priority">
-                                <i aria-hidden />
-                                High Priority: {highPriorityCount}
-                            </span>
-                            <span className="stages-board__stat-sep">|</span>
-                            <span>Last Sync: Just now</span>
+            <header className="design-premium-header">
+                <div className="design-premium-header__inner">
+                    <div className="design-premium-header__brand">
+                        <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                    </div>
+                    
+                    <div className="design-premium-header__search-container">
+                        <label className="design-premium-search">
+                            <Search size={16} className="design-premium-search__icon" aria-hidden />
+                            <input
+                                type="search"
+                                placeholder="Search project, event, branch, or manager..."
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                            />
+                        </label>
+                    </div>
+
+                    <div className="design-premium-header__filters">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(15, 23, 42, 0.02)', border: '1px solid rgba(15, 23, 42, 0.06)', borderRadius: '9999px', padding: '0 16px', height: '44px', fontSize: '13px', fontWeight: 500, marginRight: '16px' }}>
+                            <span style={{ color: '#64748b' }}>Execution Pipeline</span>
+                            <div style={{ width: '1px', height: '14px', background: 'rgba(15, 23, 42, 0.1)' }} />
+                            <span style={{ color: '#64748b' }}>Total <strong style={{ color: '#0f172a' }}>{confirmedProjects.length}</strong></span>
+                            <div style={{ width: '1px', height: '14px', background: 'rgba(15, 23, 42, 0.1)' }} />
+                            <span style={{ color: '#64748b' }}>Priority <strong style={{ color: '#ef4444' }}>{highPriorityCount}</strong></span>
+                        </div>
+
+                        <div className="design-premium-filter">
+                            <div className="design-premium-filter__label">Date range</div>
+                            <PremiumDateRangePicker />
                         </div>
                     </div>
 
-                    <div className="design-dashboard__header-filters stages-board__filters">
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--search">
-                            <span className="design-dashboard__filter-label" id="stages-search-label">
-                                Searchbox
-                            </span>
-                            <label className="design-dashboard__search stages-board__search">
-                                <Search size={16} aria-hidden />
-                                <input
-                                    type="search"
-                                    placeholder="Search project, event, branch, or manager..."
-                                    value={searchQuery}
-                                    onChange={(event) => setSearchQuery(event.target.value)}
-                                    aria-labelledby="stages-search-label"
-                                />
-                            </label>
-                        </div>
-                        <div className="design-dashboard__filter-field design-dashboard__filter-field--date">
-                            <span className="design-dashboard__filter-label" id="stages-date-label">
-                                Daterange
-                            </span>
-                            <GlobalDateRangePicker
-                                compact
-                                label={false}
-                                className="design-dashboard__date-range stages-board__date-range"
-                                aria-labelledby="stages-date-label"
-                            />
-                        </div>
+                    <div className="design-premium-header__actions">
+                        <button
+                            type="button"
+                            className="design-premium-icon-btn"
+                            title="Notifications"
+                        >
+                            <Bell size={18} />
+                            <span className="design-premium-icon-btn__badge"></span>
+                        </button>
                     </div>
                 </div>
             </header>

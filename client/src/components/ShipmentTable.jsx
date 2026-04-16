@@ -137,103 +137,99 @@ const ShipmentTable = ({
 
     return (
         <div className="design-dashboard__table-shell">
-            <div style={{ padding: '0 16px', marginBottom: 12, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
+            {(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length) ? (
+                <div style={{ padding: '0 16px', marginBottom: 8, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                     <button className="btn-outline-sm" onClick={() => {
                         setIdSearch(''); setExhibitionFilter([]); setStatusFilter([]); setCarrierFilter([]);
                         onClearFilters();
                     }}>Clear All Filters</button>
-                ) : null}
-            </div>
+                </div>
+            ) : null}
 
-            <div style={{ overflowX: 'auto', paddingBottom: 100 }}> {/* Padding for deep popovers */}
-                {loading ? (
-                    <div style={{ padding: 60, textAlign: 'center', color: 'var(--tx3)' }}>
-                        <Loader size={32} className="animate-spin" style={{ margin: '0 auto 16px', display: 'block' }} />
-                        Loading shipments...
-                    </div>
-                ) : (
-                    <table className="design-table">
-                        <thead>
-                            <tr>
-                                <th className="design-table__th design-table__th--left" style={{ width: 40, paddingRight: 0 }}>
-                                    <div 
-                                        className={`custom-checkbox ${selectedIds.length === filteredShipments.length && filteredShipments.length > 0 ? 'checked' : ''}`}
-                                        onClick={handleSelectAll}
-                                        style={{ cursor: 'pointer' }}
-                                    >
-                                        {selectedIds.length === filteredShipments.length && filteredShipments.length > 0 && <Check size={10} />}
-                                    </div>
-                                </th>
-                                <FilterPopover title="Tracking ID / Items" isActive={!!idSearch} onClear={() => setIdSearch('')}>
-                                    <div className="fp-search">
-                                        <Search size={14} className="fps-icon" />
-                                        <input autoFocus placeholder="Search ID or Items..." value={idSearch} onChange={e => setIdSearch(e.target.value)} />
-                                    </div>
-                                </FilterPopover>
+            {loading ? (
+                <div style={{ padding: 60, textAlign: 'center', color: 'var(--tx3)' }}>
+                    <Loader size={32} className="animate-spin" style={{ margin: '0 auto 16px', display: 'block' }} />
+                    Loading shipments...
+                </div>
+            ) : (
+                <table className="design-table shipping-table">
+                    <thead className="design-table__thead">
+                        <tr>
+                            <th className="design-table__th design-table__th--left shipping-col-check" style={{ paddingRight: 0 }}>
+                                <div 
+                                    className={`custom-checkbox ${selectedIds.length === filteredShipments.length && filteredShipments.length > 0 ? 'checked' : ''}`}
+                                    onClick={handleSelectAll}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {selectedIds.length === filteredShipments.length && filteredShipments.length > 0 && <Check size={10} />}
+                                </div>
+                            </th>
+                            <FilterPopover title="Tracking ID / Items" isActive={!!idSearch} onClear={() => setIdSearch('')} className="shipping-col-id">
+                                <div className="fp-search">
+                                    <Search size={14} className="fps-icon" />
+                                    <input autoFocus placeholder="Search ID or Items..." value={idSearch} onChange={e => setIdSearch(e.target.value)} />
+                                </div>
+                            </FilterPopover>
 
+                            <FilterPopover title="Status" isActive={statusFilter.length > 0} onClear={() => setStatusFilter([])} className="shipping-col-status">
+                                <div className="fp-check-list">
+                                    {allStatuses.length === 0 ? <div className="fp-empty">No data</div> : allStatuses.map(st => (
+                                        <label key={st} className="fp-check-item">
+                                            <div className={`custom-checkbox ${statusFilter.includes(st) ? 'checked' : ''}`}>
+                                                {statusFilter.includes(st) && <Check size={10} />}
+                                            </div>
+                                            <input type="checkbox" style={{ display: 'none' }} checked={statusFilter.includes(st)} onChange={() => toggleArrayItem(statusFilter, setStatusFilter, st)} />
+                                            <span className="fp-label">{st}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </FilterPopover>
 
+                            <th className="design-table__th design-table__th--left shipping-col-current">Current Status</th>
 
-                                <FilterPopover title="Status" isActive={statusFilter.length > 0} onClear={() => setStatusFilter([])}>
-                                    <div className="fp-check-list">
-                                        {allStatuses.length === 0 ? <div className="fp-empty">No data</div> : allStatuses.map(st => (
-                                            <label key={st} className="fp-check-item">
-                                                <div className={`custom-checkbox ${statusFilter.includes(st) ? 'checked' : ''}`}>
-                                                    {statusFilter.includes(st) && <Check size={10} />}
-                                                </div>
-                                                <input type="checkbox" style={{ display: 'none' }} checked={statusFilter.includes(st)} onChange={() => toggleArrayItem(statusFilter, setStatusFilter, st)} />
-                                                <span className="fp-label">{st}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </FilterPopover>
+                            <FilterPopover title="Carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])} className="shipping-col-carrier">
+                                <div className="fp-check-list">
+                                    {allCarriers.length === 0 ? <div className="fp-empty">No data</div> : allCarriers.map(cr => (
+                                        <label key={cr} className="fp-check-item">
+                                            <div className={`custom-checkbox ${carrierFilter.includes(cr) ? 'checked' : ''}`}>
+                                                {carrierFilter.includes(cr) && <Check size={10} />}
+                                            </div>
+                                            <input type="checkbox" style={{ display: 'none' }} checked={carrierFilter.includes(cr)} onChange={() => toggleArrayItem(carrierFilter, setCarrierFilter, cr)} />
+                                            <span className="fp-label">{cr}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </FilterPopover>
 
-                                <th className="design-table__th design-table__th--left">Current Status</th>
-
-                                <FilterPopover title="Carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
-                                    <div className="fp-check-list">
-                                        {allCarriers.length === 0 ? <div className="fp-empty">No data</div> : allCarriers.map(cr => (
-                                            <label key={cr} className="fp-check-item">
-                                                <div className={`custom-checkbox ${carrierFilter.includes(cr) ? 'checked' : ''}`}>
-                                                    {carrierFilter.includes(cr) && <Check size={10} />}
-                                                </div>
-                                                <input type="checkbox" style={{ display: 'none' }} checked={carrierFilter.includes(cr)} onChange={() => toggleArrayItem(carrierFilter, setCarrierFilter, cr)} />
-                                                <span className="fp-label">{cr}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </FilterPopover>
-
-                                <th className="design-table__th design-table__th--left">Route</th>
-                                <th className="design-table__th design-table__th--left">ETA</th>
-                                <th className="design-table__th design-table__th--left">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredShipments.map(s => (
-                                <ShipmentRowGroup 
-                                    key={s.id} 
-                                    shipment={s} 
-                                    allShipments={allShipments}
-                                    onSelectShipment={onSelectShipment} 
-                                    onDeleteShipment={onDeleteShipment} 
-                                    onArchiveShipment={onArchiveShipment}
-                                    onRefreshShipment={onRefreshShipment}
-                                    onTracked={onTracked}
-                                    isSelected={selectedIds.includes(s.id)}
-                                    onSelectRow={(e) => handleSelectRow(e, s.id)}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-                {filteredShipments.length === 0 && !loading && (
-                    <div className="table-empty" style={{ padding: '60px 20px', textAlign: 'center' }}>
-                        <Package size={48} style={{ color: 'var(--tx3)', margin: '0 auto 16px', opacity: 0.5 }} />
-                        <p style={{ color: 'var(--tx2)' }}>{shipments.length === 0 ? 'No shipments tracked yet.' : 'No shipments match your filters.'}</p>
-                    </div>
-                )}
-            </div>
+                            <th className="design-table__th design-table__th--left shipping-col-route">Route</th>
+                            <th className="design-table__th design-table__th--left shipping-col-eta">ETA</th>
+                            <th className="design-table__th design-table__th--left shipping-col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredShipments.map(s => (
+                            <ShipmentRowGroup 
+                                key={s.id} 
+                                shipment={s} 
+                                allShipments={allShipments}
+                                onSelectShipment={onSelectShipment} 
+                                onDeleteShipment={onDeleteShipment} 
+                                onArchiveShipment={onArchiveShipment}
+                                onRefreshShipment={onRefreshShipment}
+                                onTracked={onTracked}
+                                isSelected={selectedIds.includes(s.id)}
+                                onSelectRow={(e) => handleSelectRow(e, s.id)}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            )}
+            {filteredShipments.length === 0 && !loading && (
+                <div className="table-empty" style={{ padding: '60px 20px', textAlign: 'center' }}>
+                    <Package size={48} style={{ color: 'var(--tx3)', margin: '0 auto 16px', opacity: 0.5 }} />
+                    <p style={{ color: 'var(--tx2)' }}>{shipments.length === 0 ? 'No shipments tracked yet.' : 'No shipments match your filters.'}</p>
+                </div>
+            )}
         </div>
     );
 };
@@ -317,12 +313,12 @@ const ShipmentRowGroup = ({
     return (
         <Fragment>
             <tr onClick={() => onSelectShipment(s)} style={{ cursor: 'pointer' }} className={`design-table__row ${isSelected ? 'row-selected' : ''}`}>
-                <td className="design-table__td" onClick={onSelectRow}>
+                <td className="design-table__td shipping-col-check" onClick={onSelectRow}>
                     <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                         {isSelected && <Check size={10} />}
                     </div>
                 </td>
-                <td className="design-table__td">
+                <td className="design-table__td shipping-col-id">
                     <div className="tid-cell">
                         {canExpand && (
                             <div 
@@ -333,14 +329,14 @@ const ShipmentRowGroup = ({
                                 {syncingMaster ? <Loader size={14} className="animate-spin" /> : (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                             </div>
                         )}
-                        <div className="tid-icon"><Package size={14} /></div>
-                        <div>
-                    <div className="tid-name">{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
-                    <div className="tid-num">
-                        {s.tracking_number}
+                        <div className="tid-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={14} /></div>
+                        <div className="truncate-cell" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }} title={s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}>
+                            <div className="tid-name" style={{ lineHeight: 1.2 }}>{s.items && s.items !== 'Package' ? s.items : (s.recipient || 'Shipment')}</div>
+                            <div className="tid-num" style={{ lineHeight: 1.2 }}>
+                                {s.tracking_number}
                                 {hasChildren && (
                                     <span style={{ marginLeft: 6, fontSize: 10, background: '#e2f2ff', color: '#0066cc', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
-                                        📦 +{s.child_parcels.length} Child
+                                        📦 +{s.child_parcels.length}
                                     </span>
                                 )}
                             </div>
@@ -348,14 +344,14 @@ const ShipmentRowGroup = ({
                     </div>
                 </td>
 
-                <td className="design-table__td">
+                <td className="design-table__td shipping-col-status">
                     <StatusBadge status={s.status} />
                     {s.status !== 'Delivered' && s.progress != null && (
                         <ProgressBar percentage={s.progress} status={s.status} mini />
                     )}
                 </td>
-                <td className="design-table__td current-status-cell">
-                    <div className="cs-text" title={s.history && s.history.length > 0 ? (s.history[0].location || s.history[0].description) : s.status}>
+                <td className="design-table__td current-status-cell shipping-col-current">
+                    <div className="cs-text truncate-cell" title={s.history && s.history.length > 0 ? (s.history[0].location || s.history[0].description) : s.status}>
                         {(() => {
                             if (s.history && s.history.length > 0) {
                                 const latest = s.history[0];
@@ -379,16 +375,16 @@ const ShipmentRowGroup = ({
                         })()}
                     </div>
                 </td>
-                <td className="design-table__td carrier-cell">{s.carrier || '—'}</td>
-                <td className="design-table__td">
+                <td className="design-table__td carrier-cell shipping-col-carrier">{s.carrier || '—'}</td>
+                <td className="design-table__td shipping-col-route">
                     {s.origin ? (
-                        <div className="route-mini">
-                            <span className="rm-label">FROM </span>{s.origin.split(',')[0]}<br />
-                            <span className="rm-label">TO </span>{s.destination.split(',')[0]}
+                        <div className="route-mini" style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '2px', justifyContent: 'center' }}>
+                            <div style={{ whiteSpace: 'nowrap' }}><span className="rm-label" style={{ fontWeight: 700, color: '#94a3b8', fontSize: '9px' }}>FROM </span>{s.origin.split(',')[0]}</div>
+                            <div style={{ whiteSpace: 'nowrap' }}><span className="rm-label" style={{ fontWeight: 700, color: '#94a3b8', fontSize: '9px' }}>TO </span>{s.destination.split(',')[0]}</div>
                         </div>
                     ) : '—'}
                 </td>
-                <td className="design-table__td eta-cell">
+                <td className="design-table__td eta-cell shipping-col-eta">
                     {(() => {
                         const formatted = formatDateTime(s.eta);
                         if (typeof formatted === 'object') {
@@ -402,7 +398,7 @@ const ShipmentRowGroup = ({
                         return formatted || 'TBD';
                     })()}
                 </td>
-                <td className="design-table__td action-cell" onClick={e => e.stopPropagation()}>
+                <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
                     <button className="track-btn" onClick={() => onSelectShipment(s)}>Track</button>
                     {onArchiveShipment && (
                         <button className="archive-btn" onClick={e => { e.stopPropagation(); onArchiveShipment(s.id); }} title={s.is_archived ? "Restore to Dashboard" : "Move to Storage"}>
@@ -421,8 +417,8 @@ const ShipmentRowGroup = ({
                     onClick={() => handleTrackChild(child)}
                     style={{ cursor: 'pointer' }}
                 >
-                    <td className="design-table__td"></td> {/* Checkbox placeholder */}
-                    <td className="design-table__td">
+                    <td className="design-table__td shipping-col-check"></td> {/* Checkbox placeholder */}
+                    <td className="design-table__td shipping-col-id">
                         <div className="child-indicator">
                             <div className="tid-num" style={{ fontWeight: 600 }}>
                                 ↳ {child.tracking_number}
@@ -430,10 +426,10 @@ const ShipmentRowGroup = ({
                         </div>
                     </td>
 
-                    <td className="design-table__td">
+                    <td className="design-table__td shipping-col-status">
                         <StatusBadge status={child.status} />
                     </td>
-                    <td className="design-table__td current-status-cell">
+                    <td className="design-table__td current-status-cell shipping-col-current">
                         <div className="cs-text" title={child.raw_status || child.status}>
                             {(() => {
                                 if (child.last_date) {
@@ -473,8 +469,8 @@ const ShipmentRowGroup = ({
                             })()}
                         </div>
                     </td>
-                    <td className="design-table__td carrier-cell" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
-                    <td className="design-table__td" style={{ opacity: 0.7 }}>
+                    <td className="design-table__td carrier-cell shipping-col-carrier" style={{ opacity: 0.7 }}>{s.carrier || '—'}</td>
+                    <td className="design-table__td shipping-col-route" style={{ opacity: 0.7 }}>
                         {child.origin ? (
                             <div className="route-mini">
                                 <span className="rm-label">FROM </span>{child.origin.split(',')[0]}<br />
@@ -502,7 +498,7 @@ const ShipmentRowGroup = ({
                             return formatted || 'TBD';
                         })()}
                     </td>
-                    <td className="design-table__td action-cell" onClick={e => e.stopPropagation()}>
+                    <td className="design-table__td action-cell shipping-col-actions" onClick={e => e.stopPropagation()}>
                         <button 
                             className="track-btn piece-btn" 
                             disabled={loadingChild === child.tracking_number}
