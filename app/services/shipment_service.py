@@ -321,12 +321,47 @@ def batch_update_archive(shipment_ids: list[int], archive: bool, db: Session) ->
 
 
 def batch_delete(shipment_ids: list[int], db: Session) -> dict:
-    """Batch delete multiple shipments."""
-    statement = select(Shipment).where(Shipment.id.in_(shipment_ids))
-    shipments = db.exec(statement).all()
-    
-    for s in shipments:
-        db.delete(s)
-    
+    """
+    Batch delete multiple shipments.
+
+    If a top-level/master shipment is deleted, all linked child rows
+    (where child.master_tracking_number == master.tracking_number) are
+    deleted as well so the UI cannot surface orphan child records.
+    """
+    if not shipment_ids:
+        return {"status": "success", "count": 0, "deleted_ids": []}
+
+    requested = db.exec(select(Shipment).where(Shipment.id.in_(shipment_ids))).all()
+    if not requested:
+        return {"status": "success", "count": 0, "deleted_ids": []}
+
+    ids_to_delete: set[int] = {s.id for s in requested if s.id is not None}
+
+    # Only selected top-level records should cascade downward to children.
+    top_level_master_tns = {
+        (s.tracking_number or "").strip().upper()
+        for s in requested
+        if not (s.master_tracking_number or "").strip()
+    }
+
+    if top_level_master_tns:
+        child_rows = db.exec(
+            select(Shipment).where(
+                func.upper(func.trim(func.coalesce(Shipment.master_tracking_number, ""))).in_(
+                    list(top_level_master_tns)
+                )
+            )
+        ).all()
+        for child in child_rows:
+            if child.id is not None:
+                ids_to_delete.add(child.id)
+
+    shipments = db.exec(select(Shipment).where(Shipment.id.in_(list(ids_to_delete)))).all()
+    deleted_ids: list[int] = []
+    for shipment in shipments:
+        if shipment.id is not None:
+            deleted_ids.append(shipment.id)
+        db.delete(shipment)
+
     db.commit()
-    return {"status": "success", "count": len(shipments)}
+    return {"status": "success", "count": len(deleted_ids), "deleted_ids": deleted_ids}

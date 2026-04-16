@@ -63,15 +63,18 @@ export function useShipments() {
     }, [getErrorMessage, loadData]);
 
     const deleteShipment = useCallback(async (id) => {
-        // Optimistic Update
-        setShipments(prev => prev.filter(s => s.id !== id));
+        setError(null);
         try {
-            await shipmentsService.deleteShipment(id);
+            const result = await shipmentsService.deleteShipment(id);
+            const deletedIds = Array.isArray(result?.deleted_ids) && result.deleted_ids.length > 0
+                ? result.deleted_ids
+                : [id];
+            setShipments((prev) => prev.filter((s) => !deletedIds.includes(s.id)));
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
             setError(getErrorMessage(err));
             console.error('Failed to delete shipment:', err);
-            loadData(); // Rollback
+            loadData(); // Recovery
         }
     }, [getErrorMessage, loadData]);
 
@@ -88,13 +91,17 @@ export function useShipments() {
     }, [getErrorMessage, loadData]);
 
     const batchDelete = useCallback(async (ids) => {
-        // Optimistic Update
-        setShipments(prev => prev.filter(s => !ids.includes(s.id)));
+        setError(null);
         try {
-            await shipmentsService.batchDeleteShipments(ids);
+            const result = await shipmentsService.batchDeleteShipments(ids);
+            const deletedIds = Array.isArray(result?.deleted_ids) && result.deleted_ids.length > 0
+                ? result.deleted_ids
+                : ids;
+            setShipments((prev) => prev.filter((s) => !deletedIds.includes(s.id)));
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
             setError(getErrorMessage(err));
+            console.error('Failed to batch delete shipments:', err);
             loadData();
         }
     }, [getErrorMessage, loadData]);

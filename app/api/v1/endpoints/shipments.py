@@ -717,13 +717,22 @@ def delete_shipment(
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
-    shipment = db.get(Shipment, shipment_id)
-    if not shipment:
+    from app.services.shipment_service import batch_delete
+
+    result = batch_delete([shipment_id], db)
+    if result.get("count", 0) == 0:
         raise HTTPException(status_code=404, detail="Shipment not found")
-    db.delete(shipment)
-    db.commit()
-    logger.info("Deleted shipment id=%d", shipment_id)
-    return {"message": "Shipment deleted successfully", "deleted_id": shipment_id}
+    logger.info(
+        "Deleted shipment id=%d with cascade count=%d",
+        shipment_id,
+        result.get("count", 0),
+    )
+    return {
+        "message": "Shipment deleted successfully",
+        "deleted_id": shipment_id,
+        "deleted_count": result.get("count", 0),
+        "deleted_ids": result.get("deleted_ids", []),
+    }
 
 
 # ---------------------------------------------------------------------------
