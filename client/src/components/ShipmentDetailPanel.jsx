@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package, MapPin, Info, Phone, ExternalLink, Copy } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
@@ -16,10 +16,95 @@ const formatHistoryDate = (dateStr) => {
     }
 };
 
+const normalizeHistory = (history = []) => {
+    if (!Array.isArray(history)) return [];
+    return history
+        .map((entry, index) => ({
+            description: entry?.description || entry?.event_description || '',
+            location: entry?.location || entry?.last_location || '',
+            status: entry?.status || entry?.current_status || entry?.description || '',
+            date: entry?.date || entry?.timestamp || entry?.event_time || '',
+            __idx: index,
+        }))
+        .filter((entry) => entry.description || entry.location || entry.status || entry.date)
+        .sort((a, b) => {
+            const ta = Date.parse(a.date || '');
+            const tb = Date.parse(b.date || '');
+            if (!Number.isNaN(ta) && !Number.isNaN(tb)) return tb - ta;
+            if (!Number.isNaN(tb)) return 1;
+            if (!Number.isNaN(ta)) return -1;
+            return a.__idx - b.__idx;
+        })
+        .map(({ __idx, ...entry }) => entry);
+};
+
+const mergeLiveTracking = (baseShipment, liveShipment) => {
+    if (!liveShipment || typeof liveShipment !== 'object') return baseShipment;
+
+    const mergedHistory = normalizeHistory(liveShipment.history);
+
+    return {
+        ...baseShipment,
+        ...liveShipment,
+        history: mergedHistory.length > 0 ? mergedHistory : normalizeHistory(baseShipment.history),
+        status: liveShipment.status || baseShipment.status,
+        eta: liveShipment.eta || liveShipment.estimated_delivery || baseShipment.eta,
+        origin: liveShipment.origin || baseShipment.origin,
+        destination: liveShipment.destination || baseShipment.destination,
+    };
+};
+
 const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [resolvedShipment, setResolvedShipment] = useState(shipment);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+
+        const hydrateShipmentDetails = async () => {
+            setResolvedShipment(shipment);
+            setHistoryLoading(true);
+
+            let nextShipment = shipment;
+
+            try {
+                if (shipment?.id) {
+                    const dbShipment = await shipmentsService.fetchShipment(shipment.id);
+                    if (active && dbShipment) {
+                        nextShipment = mergeLiveTracking(nextShipment, dbShipment);
+                    }
+                }
+            } catch (_) {
+                // Silent fallback to provided row data.
+            }
+
+            try {
+                const trackingNumber = (shipment?.tracking_number || '').trim();
+                const hasHistory = Array.isArray(nextShipment?.history) && nextShipment.history.length > 0;
+                if (trackingNumber && !hasHistory) {
+                    const preview = await shipmentsService.previewTrackShipment(trackingNumber);
+                    if (active && preview) {
+                        nextShipment = mergeLiveTracking(nextShipment, preview);
+                    }
+                }
+            } catch (_) {
+                // Silent fallback when carrier preview is unavailable.
+            }
+
+            if (active) {
+                setResolvedShipment(nextShipment);
+                setHistoryLoading(false);
+            }
+        };
+
+        hydrateShipmentDetails();
+        return () => {
+            active = false;
+        };
+    }, [shipment]);
 
     const handleDelete = async () => {
         setDeleting(true);
@@ -36,7 +121,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
         }
     };
 
-    const s = shipment;
+    const s = useMemo(() => mergeLiveTracking(shipment, resolvedShipment), [shipment, resolvedShipment]);
     const originCity = (s.origin || 'N/A').split(',')[0];
     const originState = (s.origin || '').split(',')[1] || '';
     const destCity = (s.destination || 'N/A').split(',')[0];
@@ -94,19 +179,21 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                     <Clock size={16} />
                     <h4>Tracking Status History</h4>
                 </div>
-                {Array.isArray(s.history) && s.history.length > 0 ? (
-                    <div className="premium-timeline">
+                {historyLoading ? (
+                    <div className="empty-state">Loading latest tracking history...</div>
+                ) : Array.isArray(s.history) && s.history.length > 0 ? (
+                    <div className="history-tree">
                         {s.history.map((ev, i) => (
-                            <div key={i} className="timeline-item">
-                                <div className="timeline-marker">
-                                    <div className={`timeline-dot ${i === 0 ? 'is-active' : ''}`} />
-                                    {i !== s.history.length - 1 && <div className="timeline-connector" />}
+                            <div key={`${ev.date || 'na'}-${ev.status || 'st'}-${i}`} className={`history-tree__node ${i === 0 ? 'is-current' : ''}`}>
+                                <div className="history-tree__branch">
+                                    <div className="history-tree__dot" />
+                                    {i !== s.history.length - 1 && <div className="history-tree__line" />}
                                 </div>
-                                <div className="timeline-content">
-                                    <div className="timeline-time">{formatHistoryDate(ev.date)}</div>
-                                    <div className="timeline-status">{ev.status}</div>
-                                    {ev.location && <div className="timeline-location"><MapPin size={10} /> {ev.location}</div>}
-                                    {ev.description && <div className="timeline-desc">{ev.description}</div>}
+                                <div className="history-tree__card">
+                                    <div className="timeline-time">{formatHistoryDate(ev.date) || 'Timestamp unavailable'}</div>
+                                    <div className="timeline-status">{ev.status || ev.description || 'Status update'}</div>
+                                    {ev.location ? <div className="timeline-location"><MapPin size={10} /> {ev.location}</div> : null}
+                                    {ev.description ? <div className="timeline-desc">{ev.description}</div> : null}
                                 </div>
                             </div>
                         ))}

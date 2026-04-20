@@ -7,18 +7,20 @@ import logging
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Path, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from app.api.middleware.dhl_validation import validate_dhl_awb_or_400
 from app.core.security import verify_api_key
 from app.db.session import get_session
 from app.models.dashboard_project import DashboardProject
 from app.models.shipment import Shipment
 from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
 from app.services.shipment_service import get_stats, track_and_save, preview_track, refresh_tracked_shipments
+from app.services.dhl import DHLService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,6 +32,7 @@ class TrackRequest(BaseModel):
     """Request body for tracking a new shipment."""
     recipient: Optional[str] = None
     shipment_name: Optional[str] = None
+    destination: Optional[str] = None
     show_date: Optional[str] = None
     exhibition_name: Optional[str] = None
     cs: Optional[str] = None
@@ -63,6 +66,54 @@ class SheetRow(BaseModel):
 
 class WebhookPayload(BaseModel):
     rows: List[SheetRow]
+
+
+EMPTY_TRACKING_TOKENS = {"", "nan", "none", "null", "-", "n/a", "na"}
+
+
+def _normalize_tracking_cell(value: Optional[str]) -> str:
+    token = str(value or "").strip()
+    if token.lower() in EMPTY_TRACKING_TOKENS:
+        return ""
+    if token.endswith(".0") and token[:-2].isdigit():
+        token = token[:-2]
+    return token.upper()
+
+
+def _resolve_tracking_row(
+    *,
+    master_awb: Optional[str],
+    child_awb: Optional[str],
+    legacy_tracking: Optional[str] = None,
+    last_master_awb: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str], bool, Optional[str]]:
+    """
+    Resolve the row tracking number and MPS relationship.
+
+    Returns:
+        (tracking_number, master_tracking_number, is_master, next_last_master_awb)
+    """
+    master = _normalize_tracking_cell(master_awb)
+    child = _normalize_tracking_cell(child_awb)
+    legacy = _normalize_tracking_cell(legacy_tracking)
+
+    if master and child:
+        if master == child:
+            return master, None, True, master
+        # Google Sheet flow can provide both columns for child rows:
+        # master_awb is the parent, child_awb is the parcel being tracked.
+        return child, master, False, master
+
+    if master:
+        return master, None, True, master
+
+    if child:
+        return child, _normalize_tracking_cell(last_master_awb), False, _normalize_tracking_cell(last_master_awb)
+
+    if legacy:
+        return legacy, None, False, _normalize_tracking_cell(last_master_awb)
+
+    return None, None, False, _normalize_tracking_cell(last_master_awb)
 
 
 def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
@@ -111,6 +162,32 @@ def preview_shipment(
     return result
 
 
+@router.get("/dhl/track/{awb}/preview")
+def preview_dhl_shipment(
+    awb: str = Path(
+        ...,
+        min_length=10,
+        max_length=20,
+        description="DHL Express India AWB (10 digits)",
+    ),
+    _key: str = Depends(verify_api_key),
+):
+    """
+    DHL-only preview endpoint with strict AWB validation and isolated DHL provider flow.
+    """
+    normalized_awb = validate_dhl_awb_or_400(awb)
+    result = DHLService().track(normalized_awb)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {
+        "carrier": "DHL",
+        "tracking_number": normalized_awb,
+        "current_status": result.get("current_status"),
+        "estimated_delivery": result.get("estimated_delivery"),
+        "last_location": result.get("last_location"),
+    }
+
+
 @router.post("/track/{tracking_number}", status_code=201)
 def track_shipment(
     tracking_number: str = Path(
@@ -131,6 +208,7 @@ def track_shipment(
         tracking_number=tracking_number.upper(),
         recipient=body.recipient,
         items=body.shipment_name,
+        destination=body.destination,
         show_date=body.show_date,
         exhibition_name=body.exhibition_name or "Unknown Exhibition",
         db=db,
@@ -168,27 +246,14 @@ def _process_excel_import(contents: bytes, db: Session):
     last_master_awb = None
     
     for _, row in df.iterrows():
-        # Source resolution with vertical logic
-        m_awb = str(row.get("master_awb", "")).strip() if pd.notna(row.get("master_awb")) else ""
-        c_awb = str(row.get("child_awb", "")).strip() if pd.notna(row.get("child_awb")) else ""
-        legacy_awb = str(row.get("tracking_number", "")).strip() if pd.notna(row.get("tracking_number")) else ""
-        
-        tracking_num = m_awb or c_awb or legacy_awb
-        if not tracking_num or tracking_num.lower() in ("nan", ""):
+        tracking_num, master_to_use, is_master, last_master_awb = _resolve_tracking_row(
+            master_awb=row.get("master_awb"),
+            child_awb=row.get("child_awb"),
+            legacy_tracking=row.get("tracking_number"),
+            last_master_awb=last_master_awb,
+        )
+        if not tracking_num:
             continue
-
-        # Vertical Relationship Logic
-        is_master = bool(m_awb and not c_awb)
-        master_to_use = None
-        
-        if c_awb and not m_awb:
-            master_to_use = last_master_awb
-            is_master = False
-            # Child records follow master, so use tracking_num (c_awb) as primary
-        elif m_awb:
-            master_to_use = tracking_num
-            last_master_awb = tracking_num
-            is_master = True
 
         # Metadata extraction
         items_name = str(row.get("name") or row.get("items") or "").strip() if pd.notna(row.get("name")) or pd.notna(row.get("items")) else None
@@ -198,6 +263,11 @@ def _process_excel_import(contents: bytes, db: Session):
         exhibition_name = str(row.get("exhibition_name") or row.get("show_city") or "Unknown Exhibition").strip()
         cs = str(row.get("cs") or row.get("cs_type")).strip() if pd.notna(row.get("cs")) or pd.notna(row.get("cs_type")) else None
         no_of_box = str(row.get("no_of_box") or row.get("boxes")).strip() if pd.notna(row.get("no_of_box")) or pd.notna(row.get("boxes")) else None
+        destination_hint = (
+            str(row.get("ship_to_location") or row.get("destination") or "").strip()
+            if pd.notna(row.get("ship_to_location")) or pd.notna(row.get("destination"))
+            else None
+        )
         
         project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
 
@@ -216,8 +286,9 @@ def _process_excel_import(contents: bytes, db: Session):
             cs=cs,
             no_of_box=no_of_box,
             project_id=project_id,
+            destination=destination_hint,
             # Pass MPS flags
-            master_tracking_number=master_to_use if not is_master else None,
+            master_tracking_number=master_to_use,
             is_master=is_master,
             remarks=str(row.get("remarks")).strip() if pd.notna(row.get("remarks")) else None,
             booking_date=str(row.get("booking_dt")).strip() if pd.notna(row.get("booking_dt")) else None
@@ -274,23 +345,13 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
     last_master_awb = None
     
     for row in payload.rows:
-        tracking_number = row.master_awb or row.child_awb
-        if not tracking_number or not str(tracking_number).strip():
+        tracking_number, master_to_use, is_master, last_master_awb = _resolve_tracking_row(
+            master_awb=row.master_awb,
+            child_awb=row.child_awb,
+            last_master_awb=last_master_awb,
+        )
+        if not tracking_number:
             continue
-            
-        tracking_number = str(tracking_number).strip().upper()
-        
-        is_master = bool(row.master_awb and not row.child_awb)
-        master_to_use = None
-        
-        # Vertical Logic
-        if row.child_awb and not row.master_awb:
-            master_to_use = last_master_awb
-            is_master = False
-        elif row.master_awb:
-            master_to_use = tracking_number
-            last_master_awb = tracking_number
-            is_master = True
 
         try:
             res = track_and_save(
@@ -303,11 +364,12 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
                 cs=row.cs_type,
                 no_of_box=row.no_of_box,
                 project_id=None,
+                destination=row.ship_to_location,
                 booking_date=row.booking_date,
                 show_city=row.show_city,
                 cs_type=row.cs_type,
                 remarks=row.remarks,
-                master_tracking_number=master_to_use if not is_master else None,
+                master_tracking_number=master_to_use,
                 is_master=is_master
             )
             if "error" in res:
@@ -346,15 +408,37 @@ async def google_sheet_webhook(
 
 @router.get("/export-excel")
 def export_shipments(
+    shipment_ids: Optional[str] = Query(
+        default=None,
+        description="Comma-separated shipment IDs to export. If omitted, exports all active shipments.",
+    ),
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
-    """Export non-archived shipments to Excel with requested formatting."""
+    """Export shipments to Excel with requested formatting."""
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-    from datetime import datetime
+    from datetime import date, datetime, timedelta
 
-    # Fetch all non-archived shipments
-    shipments = db.exec(select(Shipment).where(Shipment.is_archived == False)).all()
+    requested_ids: list[int] = []
+    if shipment_ids:
+        for token in shipment_ids.split(","):
+            part = token.strip()
+            if not part:
+                continue
+            if not part.isdigit():
+                raise HTTPException(status_code=400, detail=f"Invalid shipment id: {part}")
+            requested_ids.append(int(part))
+        if not requested_ids:
+            raise HTTPException(status_code=400, detail="No valid shipment ids provided for export")
+
+    # Fetch non-archived shipments; optionally scoped to requested ids.
+    statement = select(Shipment).where(Shipment.is_archived == False)
+    if requested_ids:
+        statement = statement.where(Shipment.id.in_(requested_ids))
+    shipments = db.exec(statement).all()
+    if requested_ids:
+        order = {sid: idx for idx, sid in enumerate(requested_ids)}
+        shipments.sort(key=lambda s: order.get(s.id or 0, len(order)))
     
     # Create Workbook
     from openpyxl import Workbook
@@ -448,11 +532,38 @@ def export_shipments(
         )
         return f"{child.status}{eta_str}", child.last_scan_date or ""
 
+    def _parse_show_date(raw_value) -> Optional[date]:
+        if raw_value is None:
+            return None
+        if isinstance(raw_value, datetime):
+            return raw_value.date()
+        if isinstance(raw_value, date):
+            return raw_value
+
+        token = str(raw_value).strip()
+        if not token or token.lower() in EMPTY_TRACKING_TOKENS:
+            return None
+
+        parsed = pd.to_datetime(token, errors="coerce")
+        if pd.isna(parsed):
+            parsed = pd.to_datetime(token, errors="coerce", dayfirst=True)
+        if pd.isna(parsed):
+            return None
+        return parsed.date()
+
+    def _should_highlight_show_date(raw_value) -> bool:
+        parsed = _parse_show_date(raw_value)
+        if not parsed:
+            return False
+        today = date.today()
+        window_end = today + timedelta(days=20)
+        return today <= parsed <= window_end
+
     def _write_row(row_idx: int, values: list, bold_master_awb: bool = False):
         for col, val in enumerate(values, 1):
             cell = ws.cell(row=row_idx, column=col, value=val)
             cell.border = border
-            if headers[col - 1] == "Show date":
+            if headers[col - 1] == "Show date" and _should_highlight_show_date(val):
                 cell.fill = yellow_fill
             if col in [3, 8]:
                 cell.alignment = alignment_center

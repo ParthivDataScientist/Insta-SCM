@@ -56,12 +56,20 @@ class Settings(BaseSettings):
     FEDEX_CLIENT_ID: str = ""
     FEDEX_CLIENT_SECRET: str = ""
     FEDEX_URL: str = "https://apis.fedex.com"
+    FEDEX_ENABLE_MOCK_DATA: bool = False
 
     UPS_CLIENT_ID: str = ""
     UPS_CLIENT_SECRET: str = ""
 
     DHL_API_KEY: str = ""
     DHL_API_SECRET: str = ""
+    DHL_WCF_WSDL_URL: str = "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc?wsdl"
+    DHL_WCF_ENDPOINT: str = "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc"
+    DHL_WCF_USERNAME: str = ""
+    DHL_WCF_PASSWORD: str = ""
+    DHL_WCF_SOAP_ACTION: str = "http://tempuri.org/IDHLService/PostTracking"
+    DHL_WCF_SOAP_VERSION: Literal["1.1", "1.2"] = "1.1"
+    DHL_WCF_TIMEOUT_SECONDS: int = 20
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

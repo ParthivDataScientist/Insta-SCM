@@ -189,11 +189,12 @@ export function useShipments() {
         });
     }, [filter, carrierFilter, dateFilter, searchQuery, shipments]);
 
-    const exportExcel = useCallback(async () => {
+    const exportExcel = useCallback(async (shipmentIds = null) => {
         setLoading(true);
         setError(null);
         try {
-            const blob = await shipmentsService.exportExcel();
+            const ids = Array.isArray(shipmentIds) ? shipmentIds : [];
+            const blob = await shipmentsService.exportExcel(ids);
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

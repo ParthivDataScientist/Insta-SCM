@@ -24,6 +24,13 @@ def fedex_service():
 
 
 class TestFedExParser:
+    def test_missing_credentials_without_mock_returns_error(self, fedex_service):
+        fedex_service.enable_mock_data = False
+        fedex_service.client_id = ""
+        fedex_service.client_secret = ""
+        with pytest.raises(RuntimeError):
+            fedex_service._get_token()
+
     def test_status_mapped_correctly(self, fedex_service, fedex_response):
         result = fedex_service._standardize_response(fedex_response, "123456789012")
         assert result["status"] == "Out for Delivery"

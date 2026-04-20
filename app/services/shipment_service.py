@@ -4,6 +4,7 @@ Encapsulates all business logic for tracking and managing shipments.
 Endpoints should call these functions instead of containing business logic directly.
 """
 import logging
+from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 from sqlmodel import Session, select
@@ -15,6 +16,152 @@ from app.services.dhl import DHLService
 from app.services.carrier_detection import detect_carrier
 
 logger = logging.getLogger(__name__)
+STUCK_THRESHOLD_DAYS = 2
+STUCK_THRESHOLD_SECONDS = STUCK_THRESHOLD_DAYS * 24 * 60 * 60
+
+
+def _parse_event_datetime(raw_value: str) -> Optional[datetime]:
+    token = str(raw_value or "").strip()
+    if not token:
+        return None
+
+    normalized = token.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        pass
+
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%d-%m-%Y %H:%M:%S",
+        "%d-%m-%Y",
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y",
+        "%m/%d/%Y %H:%M:%S",
+        "%m/%d/%Y",
+    ):
+        try:
+            dt = datetime.strptime(token, fmt).replace(tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+def _normalize_location(value: Optional[str]) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _is_delivered_status(status: str) -> bool:
+    return str(status or "").strip().lower() == "delivered"
+
+
+def _is_stuck_keyword_present(result: dict) -> bool:
+    blob = " ".join(
+        str(result.get(key, "") or "")
+        for key in ("status", "raw_status", "current_status")
+    ).lower()
+    keywords = (
+        "delay",
+        "delayed",
+        "hold",
+        "held",
+        "stuck",
+        "shipment exception",
+        "clearance delay",
+        "exception",
+    )
+    return any(keyword in blob for keyword in keywords)
+
+
+def _apply_stuck_policy_to_child_parcels(result: dict, now_utc: datetime) -> None:
+    child_parcels = result.get("child_parcels")
+    if not isinstance(child_parcels, list):
+        return
+
+    for parcel in child_parcels:
+        if not isinstance(parcel, dict):
+            continue
+        if _is_delivered_status(parcel.get("status", "")):
+            continue
+
+        last_date = _parse_event_datetime(parcel.get("last_date", ""))
+        if last_date is None:
+            continue
+        if (now_utc - last_date).total_seconds() > STUCK_THRESHOLD_SECONDS:
+            parcel["status"] = "Exception"
+
+
+def _apply_stuck_exception_policy(result: dict) -> dict:
+    """
+    Carrier-agnostic stuck detection:
+    1) If latest checkpoint is older than 2 days (and not delivered) => Exception.
+    2) If same location has persisted for over 2 days => Exception.
+    3) If carrier text already signals delay/hold/stuck => Exception.
+    """
+    if not isinstance(result, dict) or "error" in result:
+        return result
+
+    current_status = str(result.get("status", "") or "")
+    if _is_delivered_status(current_status):
+        return result
+
+    history = result.get("history")
+    events = history if isinstance(history, list) else []
+
+    now_utc = datetime.now(timezone.utc)
+    reasons: list[str] = []
+    latest_dt: Optional[datetime] = None
+    latest_loc = ""
+
+    parsed_events = []
+    for idx, event in enumerate(events):
+        if not isinstance(event, dict):
+            continue
+        dt = _parse_event_datetime(event.get("date", ""))
+        loc = _normalize_location(event.get("location"))
+        parsed_events.append((idx, dt, loc, event))
+
+    if parsed_events:
+        parsed_events.sort(
+            key=lambda item: (
+                item[1] is not None,
+                item[1].timestamp() if item[1] else float("-inf"),
+                -item[0],
+            ),
+            reverse=True,
+        )
+        _, latest_dt, latest_loc, _ = parsed_events[0]
+
+    if latest_dt and (now_utc - latest_dt).total_seconds() > STUCK_THRESHOLD_SECONDS:
+        reasons.append("no_movement_over_2_days")
+
+    if latest_dt and latest_loc:
+        oldest_same_loc_dt = latest_dt
+        for _, dt, loc, _ in parsed_events[1:]:
+            if loc != latest_loc:
+                break
+            if dt:
+                oldest_same_loc_dt = dt
+        if (latest_dt - oldest_same_loc_dt).total_seconds() > STUCK_THRESHOLD_SECONDS:
+            reasons.append("same_location_over_2_days")
+
+    if _is_stuck_keyword_present(result):
+        reasons.append("carrier_marked_delay_or_hold")
+
+    if reasons:
+        result["status"] = "Exception"
+        result["progress"] = 10
+        result["stuck_detected"] = True
+        result["stuck_reasons"] = list(dict.fromkeys(reasons))
+
+    _apply_stuck_policy_to_child_parcels(result, now_utc)
+    return result
 
 
 def track_and_save(
@@ -34,6 +181,7 @@ def track_and_save(
     last_scan_date: Optional[str] = None,
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
+    destination: Optional[str] = None,
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -63,6 +211,16 @@ def track_and_save(
         logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
         return {"tracking_number": tracking_number, "error": result["error"]}
 
+    result = _apply_stuck_exception_policy(result)
+
+    destination_input = (destination or "").strip()
+    api_destination = result.get("destination")
+    resolved_destination = (
+        api_destination
+        if api_destination and api_destination != "Unknown"
+        else (destination_input or "Unknown")
+    )
+
     # Upsert: find existing record or create new one
     statement = select(Shipment).where(Shipment.tracking_number == tracking_number)
     shipment = db.exec(statement).first()
@@ -77,7 +235,7 @@ def track_and_save(
             show_date=show_date,
             project_id=project_id,
             origin=result.get("origin", "Unknown"),
-            destination=result.get("destination", "Unknown"),
+            destination=resolved_destination,
             eta=result.get("eta", "TBD"),
             progress=result.get("progress", 0),
             items=items or "Package",
@@ -126,8 +284,10 @@ def track_and_save(
         # Only update fields if the API returned meaningful data
         if result.get("origin") and result.get("origin") != "Unknown":
             shipment.origin = result["origin"]
-        if result.get("destination") and result.get("destination") != "Unknown":
-            shipment.destination = result["destination"]
+        if api_destination and api_destination != "Unknown":
+            shipment.destination = api_destination
+        elif destination_input:
+            shipment.destination = destination_input
         if result.get("eta") and result.get("eta") not in ("Unknown", "TBD"):
             shipment.eta = result["eta"]
         if result.get("progress") is not None:
@@ -231,6 +391,8 @@ def preview_track(tracking_number: str) -> dict:
     result = service.track(tracking_number)
     if "error" in result:
         return result
+
+    result = _apply_stuck_exception_policy(result)
 
     # Attach metadata the frontend needs
     result["tracking_number"] = tracking_number

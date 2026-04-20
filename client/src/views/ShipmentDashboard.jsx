@@ -55,6 +55,19 @@ export default function ShipmentDashboard() {
 
     const hasActiveFilters = filter !== 'All' || searchQuery !== '';
 
+    const handleExport = async () => {
+        const selected = selectedIds.filter((id) => Number.isInteger(id));
+        const filteredIds = filteredShipments
+            .map((shipment) => shipment?.id)
+            .filter((id) => Number.isInteger(id));
+        const idsToExport = selected.length > 0 ? selected : filteredIds;
+        if (idsToExport.length === 0) {
+            window.alert('No shipments available to export for the current selection/filter.');
+            return;
+        }
+        await exportExcel(idsToExport);
+    };
+
     const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
         <>
             {sidebarOverlay ? (
@@ -125,7 +138,7 @@ export default function ShipmentDashboard() {
                         <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--text" onClick={importExcelPrompt} title="Import Excel">
                             <FileSpreadsheet size={16} className="design-dashboard__button-icon" /> Import
                         </button>
-                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--text" onClick={exportExcel} disabled={loading} title="Export Excel">
+                        <button className="design-dashboard__icon-button design-dashboard__icon-button--grouped design-dashboard__icon-button--text" onClick={handleExport} disabled={loading} title="Export Excel">
                             <Download size={16} className="design-dashboard__button-icon" /> Export
                         </button>
                         <button

@@ -96,7 +96,22 @@ const formatCurrentStatus = (shipment) => {
         } catch (_) {
             historyDate = (latest.date || '').slice(0, 10);
         }
-        return `${historyDate} : ${latest.location || latest.description || shipment.status}`;
+
+        const eventStatus = String(latest.status || '').trim();
+        const eventDescription = String(latest.description || '').trim();
+        const eventLocation = String(latest.location || '').trim();
+
+        let statusSegment = shipment.status || '-';
+        if (eventStatus && eventDescription) {
+            statusSegment = eventStatus.toLowerCase() === eventDescription.toLowerCase()
+                ? eventStatus
+                : `${eventStatus}, ${eventDescription}`;
+        } else if (eventStatus || eventDescription) {
+            statusSegment = eventStatus || eventDescription;
+        }
+
+        const locationSegment = eventLocation ? ` @ ${eventLocation}` : '';
+        return `${historyDate} : ${statusSegment}${locationSegment}`;
     }
 
     if (shipment.last_scan_date) {

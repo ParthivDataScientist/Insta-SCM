@@ -6,6 +6,7 @@ import projectsService from '../api/projects';
 const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
     const [trackingNum, setTrackingNum] = useState('');
     const [shipmentName, setShipmentName] = useState('');
+    const [destination, setDestination] = useState('');
     const [exhibitionName, setExhibitionName] = useState('');
     const [showDate, setShowDate] = useState('');
     const [cs, setCs] = useState('');
@@ -44,6 +45,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
     const handleTrack = async () => {
         const trackingNumber = trackingNum.trim().toUpperCase();
         const shipmentLabel = shipmentName.trim();
+        const destinationValue = destination.trim();
         const exhibition = exhibitionName.trim();
         const eventDate = showDate.trim();
         const incoterm = cs.trim();
@@ -63,6 +65,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
             await shipmentsService.trackShipment(trackingNumber, {
                 recipient: shipmentLabel || null,
                 shipment_name: shipmentLabel || null,
+                destination: destinationValue || null,
                 show_date: eventDate || null,
                 exhibition_name: exhibition,
                 cs: incoterm || null,
@@ -113,6 +116,17 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                         placeholder="e.g. Tech Expo"
                         value={exhibitionName}
                         onChange={e => setExhibitionName(e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="dmc-label">Destination (Fallback)</label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
+                        placeholder="e.g. Irving, TX, US"
+                        value={destination}
+                        onChange={e => setDestination(e.target.value)}
                     />
                 </div>
                 <div className="form-group">

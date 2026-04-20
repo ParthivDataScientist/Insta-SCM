@@ -1527,6 +1527,72 @@
     flex-direction: column;
 }
 
+.history-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.history-tree__node {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    column-gap: 14px;
+    align-items: flex-start;
+}
+
+.history-tree__branch {
+    position: relative;
+    min-height: 74px;
+    display: flex;
+    justify-content: center;
+}
+
+.history-tree__dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    margin-top: 6px;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
+}
+
+.history-tree__line {
+    position: absolute;
+    top: 20px;
+    bottom: -8px;
+    width: 2px;
+    background: linear-gradient(180deg, #e2e8f0 0%, #f1f5f9 100%);
+}
+
+.history-tree__card {
+    position: relative;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px 11px;
+    margin-bottom: 12px;
+}
+
+.history-tree__card::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 15px;
+    width: 10px;
+    height: 2px;
+    background: #cbd5e1;
+}
+
+.history-tree__node.is-current .history-tree__dot {
+    background: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+}
+
+.history-tree__node.is-current .history-tree__card {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
 .timeline-item {
     display: flex;
     gap: 16px;

@@ -1,32 +1,69 @@
+"""
+Idempotent SQLite shipment schema sync.
+
+Usage:
+    .\\venv\\Scripts\\python.exe scripts\\migrate_shipments.py
+"""
+
+from __future__ import annotations
+
 import sqlite3
+from pathlib import Path
 import os
+import sys
 
-db_path = os.path.join("d:\\Desktop\\Insta-Track", "sql_app.db")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from app.core.config import settings
 
-try:
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    
-    # Check existing columns
-    cur.execute("PRAGMA table_info(shipment)")
-    columns = [col[1] for col in cur.fetchall()]
-    
-    if "master_tracking_number" not in columns:
-        print("Adding master_tracking_number...")
-        cur.execute("ALTER TABLE shipment ADD COLUMN master_tracking_number VARCHAR")
-        
-    if "is_master" not in columns:
-        print("Adding is_master...")
-        cur.execute("ALTER TABLE shipment ADD COLUMN is_master BOOLEAN DEFAULT 0")
-        
-    if "child_tracking_numbers" not in columns:
-        print("Adding child_tracking_numbers...")
-        cur.execute("ALTER TABLE shipment ADD COLUMN child_tracking_numbers JSON")
-        
-    conn.commit()
-    print("Database altered successfully!")
-except Exception as e:
-    print(f"Error: {e}")
-finally:
-    if 'conn' in locals():
-        conn.close()
+
+def _sqlite_db_path() -> Path:
+    url = settings.DATABASE_URL
+    if not url.startswith("sqlite:///"):
+        raise RuntimeError(f"This migration only supports SQLite. DATABASE_URL={url}")
+    return Path(url.replace("sqlite:///", "", 1))
+
+
+def run() -> None:
+    db_path = _sqlite_db_path()
+    print(f"Using SQLite DB: {db_path}")
+
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(shipment)")
+        existing_columns = {row[1] for row in cur.fetchall()}
+
+        required_columns: list[tuple[str, str]] = [
+            ("master_tracking_number", "VARCHAR"),
+            ("is_master", "BOOLEAN DEFAULT 0"),
+            ("child_tracking_numbers", "JSON"),
+            ("child_parcels", "JSON"),
+            ("is_archived", "BOOLEAN DEFAULT 0"),
+            ("cs", "VARCHAR"),
+            ("no_of_box", "VARCHAR"),
+            ("project_id", "INTEGER"),
+            ("booking_date", "VARCHAR"),
+            ("show_city", "VARCHAR"),
+            ("cs_type", "VARCHAR"),
+            ("remarks", "VARCHAR"),
+            ("last_scan_date", "VARCHAR"),
+        ]
+
+        added = 0
+        for column_name, column_type in required_columns:
+            if column_name in existing_columns:
+                continue
+            statement = f"ALTER TABLE shipment ADD COLUMN {column_name} {column_type}"
+            print(f"Adding column: {column_name}")
+            cur.execute(statement)
+            added += 1
+
+        conn.commit()
+
+    if added:
+        print(f"Shipment migration complete. Added {added} column(s).")
+    else:
+        print("Shipment migration complete. No changes needed.")
+
+
+if __name__ == "__main__":
+    run()

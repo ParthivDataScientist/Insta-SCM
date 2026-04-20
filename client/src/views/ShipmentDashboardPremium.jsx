@@ -57,6 +57,19 @@ export default function ShipmentDashboardPremium() {
 
     const hasActiveFilters = filter !== 'All' || searchQuery !== '';
 
+    const handleExport = async () => {
+        const selected = selectedIds.filter((id) => Number.isInteger(id));
+        const filteredIds = filteredShipments
+            .map((shipment) => shipment?.id)
+            .filter((id) => Number.isInteger(id));
+        const idsToExport = selected.length > 0 ? selected : filteredIds;
+        if (idsToExport.length === 0) {
+            window.alert('No shipments available to export for the current selection/filter.');
+            return;
+        }
+        await exportExcel(idsToExport);
+    };
+
     const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
         <>
             {sidebarOverlay ? (
@@ -110,7 +123,7 @@ export default function ShipmentDashboardPremium() {
                             <FileSpreadsheet size={15} className="design-premium-btn__icon" /> Import
                         </button>
 
-                        <button className="design-premium-btn" onClick={exportExcel} disabled={loading} title="Export Excel">
+                        <button className="design-premium-btn" onClick={handleExport} disabled={loading} title="Export Excel">
                             <Download size={15} className="design-premium-btn__icon" /> Export
                         </button>
 

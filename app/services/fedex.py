@@ -2,6 +2,7 @@ import requests
 import json
 import time
 import logging
+from datetime import datetime
 from .carrier_base import CarrierService, HISTORY_STATUS_MAP
 from app.core.config import settings
 from typing import Dict, Any, List, Optional
@@ -87,14 +88,33 @@ class FedExService(CarrierService):
         self.base_url = settings.FEDEX_URL
         self.client_id = settings.FEDEX_CLIENT_ID
         self.client_secret = settings.FEDEX_CLIENT_SECRET
+        self.enable_mock_data = settings.FEDEX_ENABLE_MOCK_DATA
+
+    def _credentials_configured(self) -> bool:
+        """
+        FedEx credentials are considered configured only when both values
+        are present and not left at placeholder literals.
+        """
+        placeholders = {"", "your_fedex_client_id_here", "your_fedex_client_secret_here"}
+        client_id = getattr(self, "client_id", "")
+        client_secret = getattr(self, "client_secret", "")
+        return (
+            client_id not in placeholders
+            and client_secret not in placeholders
+        )
 
     def _get_token(self) -> str:
         """Fetch a new OAuth token. Caches at module level for ~1 hour."""
         global _fedex_token, _fedex_token_expiry
 
-        if not self.client_id or self.client_id == 'your_fedex_client_id_here':
-            logger.info('Using mock FedEx token for development.')
-            return 'mock_token'
+        if not self._credentials_configured():
+            if getattr(self, "enable_mock_data", False):
+                logger.warning("Using mock FedEx token because FEDEX_ENABLE_MOCK_DATA=true.")
+                return "mock_token"
+            raise RuntimeError(
+                "FedEx credentials are missing. Set FEDEX_CLIENT_ID and FEDEX_CLIENT_SECRET "
+                "or enable FEDEX_ENABLE_MOCK_DATA=true for local mock testing."
+            )
 
         # Return cached token if still valid (with 60s buffer)
         if self.client_id and self.client_secret and _fedex_token and time.time() < _fedex_token_expiry - 60:
@@ -173,7 +193,7 @@ class FedExService(CarrierService):
         }
 
     def _request_track(self, url: str, headers: Dict[str, str], body: Dict[str, Any], timeout: int = 15) -> Optional[Dict[str, Any]]:
-        if headers.get('Authorization') == 'Bearer mock_token':
+        if getattr(self, "enable_mock_data", False) and headers.get('Authorization') == 'Bearer mock_token':
             try:
                 tracking_number = body['trackingInfo'][0]['trackingNumberInfo']['trackingNumber']
             except (KeyError, IndexError):
@@ -334,18 +354,31 @@ class FedExService(CarrierService):
     def _extract_piece_data(self, piece_output: Dict[str, Any]) -> Dict[str, Any]:
         """Helper to extract common fields from a single piece output (master or child)."""
         scan_events = piece_output.get("scanEvents", [])
-        raw_status = piece_output.get("latestStatusDetail", {}).get("statusByLocale", "Unknown")
+        latest_status_detail = piece_output.get("latestStatusDetail", {}) or {}
+        raw_status = (
+            latest_status_detail.get("statusByLocale")
+            or latest_status_detail.get("description")
+            or latest_status_detail.get("code")
+            or "Unknown"
+        )
+        if raw_status == "Unknown" and scan_events:
+            raw_status = scan_events[0].get("eventDescription") or scan_events[0].get("eventType") or "Unknown"
         mapped_status = map_fedex_status(raw_status)
 
         # Extract History
         history = []
         for event in scan_events:
-            desc = event.get("eventDescription", "")
+            desc = event.get("eventDescription") or event.get("derivedStatus") or event.get("eventType", "")
             city = event.get("scanLocation", {}).get("city", "")
             state = event.get("scanLocation", {}).get("stateOrProvinceCode", "")
             country = event.get("scanLocation", {}).get("countryCode", "")
             location = f"{city}, {state}, {country}".strip(", ")
-            timestamp = event.get("date", "")
+            timestamp = (
+                event.get("date")
+                or event.get("dateTime")
+                or event.get("localTime")
+                or ""
+            )
 
             raw_event_type = event.get("eventType", "")
             event_label = HISTORY_STATUS_MAP.get(raw_event_type, raw_event_type)
@@ -356,7 +389,10 @@ class FedExService(CarrierService):
                 "status": event_label,
                 "date": timestamp,
             })
-        history.sort(key=lambda x: x["date"], reverse=True)
+        history.sort(
+            key=lambda item: self._history_sort_key(item.get("date", "")),
+            reverse=True,
+        )
 
         # Use history description for display if raw status is generic
         if history and (raw_status.lower() in ["unknown", "delivery updated", "shipment exception", "clearance delay"]):
@@ -367,6 +403,18 @@ class FedExService(CarrierService):
         origin_loc = piece_output.get("originLocation", {}).get("locationContactAndAddress", {}).get("address", {})
         if not origin_loc:
             origin_loc = piece_output.get("shipperInformation", {}).get("address", {})
+        if not origin_loc:
+            origin_loc = (
+                piece_output.get("shipperInformation", {})
+                .get("locationContactAndAddress", {})
+                .get("address", {})
+            )
+        if not origin_loc:
+            origin_loc = (
+                piece_output.get("shipperInformation", {})
+                .get("contact", {})
+                .get("address", {})
+            )
         if origin_loc and origin_loc.get("city"):
             origin = f"{origin_loc.get('city')}, {origin_loc.get('stateOrProvinceCode', '')}, {origin_loc.get('countryCode', '')}".strip(", ")
         elif history:
@@ -377,6 +425,12 @@ class FedExService(CarrierService):
 
         destination = "Unknown"
         dest_loc = piece_output.get("recipientInformation", {}).get("address", {})
+        if not dest_loc:
+            dest_loc = (
+                piece_output.get("destinationLocation", {})
+                .get("locationContactAndAddress", {})
+                .get("address", {})
+            )
         dest_country = dest_loc.get("countryCode", "")
         if dest_loc and dest_loc.get("city"):
             destination = f"{dest_loc.get('city')}, {dest_loc.get('stateOrProvinceCode', '')}, {dest_country}".strip(", ")
@@ -451,6 +505,31 @@ class FedExService(CarrierService):
             "last_date": last_date,
             "last_location": last_location,
         }
+
+    def _history_sort_key(self, value: str) -> tuple[int, str]:
+        token = (value or "").strip()
+        if not token:
+            return (0, "")
+        normalized = token.replace("Z", "+00:00")
+        try:
+            return (2, datetime.fromisoformat(normalized).isoformat())
+        except ValueError:
+            pass
+
+        for fmt in (
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d",
+            "%m/%d/%Y %H:%M:%S",
+            "%m/%d/%Y",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y",
+        ):
+            try:
+                return (1, datetime.strptime(token, fmt).isoformat())
+            except ValueError:
+                continue
+        return (0, token)
 
     def _standardize_response(self, raw_data: Dict, tracking_number: str, associated_results: list = None, master_tn: str = None, is_master: bool = False) -> Dict[str, Any]:
         if associated_results is None:

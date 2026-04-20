@@ -84,8 +84,12 @@ const shipmentsService = {
         return response.data;
     },
 
-    exportExcel: async () => {
+    exportExcel: async (shipmentIds = []) => {
+        const params = Array.isArray(shipmentIds) && shipmentIds.length > 0
+            ? { shipment_ids: shipmentIds.join(',') }
+            : {};
         const response = await apiClient.get('/api/v1/shipments/export-excel', {
+            params,
             responseType: 'blob'
         });
         return response.data;
