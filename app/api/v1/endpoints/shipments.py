@@ -153,10 +153,19 @@ def preview_shipment(
         max_length=50,
         description="Carrier tracking number to preview (no DB save)",
     ),
+    master_tracking_number: Optional[str] = Query(
+        default=None,
+        description="Optional master tracking number hint for child-piece lookups.",
+    ),
+    db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """Fetch live tracking data for a tracking number WITHOUT saving to the database."""
-    result = preview_track(tracking_number.upper())
+    result = preview_track(
+        tracking_number.upper(),
+        db=db,
+        master_tracking_number=(master_tracking_number or "").upper() or None,
+    )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -478,59 +487,59 @@ def export_shipments(
         except (ValueError, TypeError):
             return str(raw_value)[:10]
 
+    def _safe_time(raw_value):
+        if not raw_value:
+            return ""
+        token = str(raw_value).strip()
+        if ":" not in token and "T" not in token:
+            return ""
+        try:
+            dt = datetime.fromisoformat(token.replace("Z", "+00:00"))
+            return dt.strftime("%I:%M %p")
+        except (ValueError, TypeError):
+            try:
+                parsed = pd.to_datetime(token, errors="coerce", dayfirst=True)
+                if pd.isna(parsed):
+                    return ""
+                return parsed.strftime("%I:%M %p")
+            except Exception:
+                return ""
+
+    def _format_booking_date(raw_value):
+        formatted = _safe_date(raw_value)
+        return formatted if formatted else ""
+
+    def _status_date_time_location(raw_dt, raw_location):
+        date_part = _safe_date(raw_dt)
+        time_part = _safe_time(raw_dt)
+        location = str(raw_location or "").strip()
+
+        datetime_label = " ".join(token for token in [date_part, time_part] if token).strip()
+        parts = [token for token in [datetime_label, location] if token]
+        return " | ".join(parts) if parts else dash
+
     def _build_master_latest(shipment: Shipment):
         if shipment.history:
             latest = shipment.history[0]
-            loc = f" {latest.get('location', '')}" if latest.get("location") else ""
-            eta_str = (
-                f" ETA : {shipment.eta}"
-                if shipment.eta and shipment.eta not in ("Unknown", "TBD", "Pending")
-                else ""
-            )
-            latest_status = f"{latest.get('description', '')}{loc}{eta_str}"
-            return latest_status, _safe_date(latest.get("date"))
-        eta_str = (
-            f" ETA : {shipment.eta}"
-            if shipment.eta and shipment.eta not in ("Unknown", "TBD", "Pending")
-            else ""
-        )
-        return f"{shipment.status}{eta_str}", shipment.last_scan_date or ""
+            return _status_date_time_location(latest.get("date"), latest.get("location")), _safe_date(latest.get("date"))
+        return _status_date_time_location(shipment.last_scan_date, shipment.destination or shipment.origin), _safe_date(shipment.last_scan_date)
 
     def _build_child_latest(parent: Shipment, child: dict):
-        c_date = _safe_date(child.get("last_date"))
-        if not c_date:
-            c_date = parent.created_at.strftime("%d.%m.%Y") if parent.created_at else ""
-
-        c_status = child.get("raw_status") or child.get("status") or "Unknown"
+        c_date_raw = child.get("last_date")
         c_loc = child.get("last_location") or ""
-        if (not c_loc or c_status.lower() in ("unknown", "delivery updated", "in transit")) and parent.history:
+        if (not c_loc) and parent.history:
             master_latest = parent.history[0]
-            c_status = master_latest.get("description", c_status)
             c_loc = master_latest.get("location", c_loc)
-        c_loc_str = f" {c_loc}" if c_loc else ""
+            if not c_date_raw:
+                c_date_raw = master_latest.get("date")
 
-        c_eta = child.get("eta")
-        if not c_eta or c_eta in ("Unknown", "TBD", "Pending"):
-            c_eta = parent.eta
-        eta_str = f" ETA : {c_eta}" if c_eta and c_eta not in ("Unknown", "TBD", "Pending") else ""
-        return f"{c_status}{c_loc_str}{eta_str}", c_date
+        return _status_date_time_location(c_date_raw, c_loc), _safe_date(c_date_raw)
 
     def _build_child_latest_from_shipment(child: Shipment):
         if child.history:
             latest = child.history[0]
-            loc = f" {latest.get('location', '')}" if latest.get("location") else ""
-            eta_str = (
-                f" ETA : {child.eta}"
-                if child.eta and child.eta not in ("Unknown", "TBD", "Pending")
-                else ""
-            )
-            return f"{latest.get('description', child.status)}{loc}{eta_str}", _safe_date(latest.get("date"))
-        eta_str = (
-            f" ETA : {child.eta}"
-            if child.eta and child.eta not in ("Unknown", "TBD", "Pending")
-            else ""
-        )
-        return f"{child.status}{eta_str}", child.last_scan_date or ""
+            return _status_date_time_location(latest.get("date"), latest.get("location")), _safe_date(latest.get("date"))
+        return _status_date_time_location(child.last_scan_date, child.destination or child.origin), _safe_date(child.last_scan_date)
 
     def _parse_show_date(raw_value) -> Optional[date]:
         if raw_value is None:
@@ -594,7 +603,7 @@ def export_shipments(
         row_data = [
             s.destination or dash,
             s.recipient or dash,
-            s.booking_date or (s.created_at.strftime("%d.%m.%Y") if s.created_at else dash),
+            _format_booking_date(s.booking_date) or dash,
             s.show_date or dash,
             s.show_city or s.exhibition_name or dash,
             s.cs_type or s.cs or dash,
@@ -621,7 +630,7 @@ def export_shipments(
             child_data = [
                 child.destination or s.destination or dash,
                 child.recipient or s.recipient or dash,
-                child.booking_date or s.booking_date or (child.created_at.strftime("%d.%m.%Y") if child.created_at else dash),
+                _format_booking_date(child.booking_date) or _format_booking_date(s.booking_date) or dash,
                 child.show_date or s.show_date or dash,
                 child.show_city or child.exhibition_name or s.show_city or s.exhibition_name or dash,
                 child.cs_type or child.cs or s.cs_type or s.cs or dash,
@@ -645,7 +654,7 @@ def export_shipments(
             child_data = [
                 s.destination or dash,
                 s.recipient or dash,
-                s.booking_date or (s.created_at.strftime("%d.%m.%Y") if s.created_at else dash),
+                _format_booking_date(s.booking_date) or dash,
                 s.show_date or dash,
                 s.show_city or s.exhibition_name or dash,
                 s.cs_type or s.cs or dash,
@@ -669,7 +678,7 @@ def export_shipments(
             orphan_row = [
                 child.destination or dash,
                 child.recipient or dash,
-                child.booking_date or (child.created_at.strftime("%d.%m.%Y") if child.created_at else dash),
+                _format_booking_date(child.booking_date) or dash,
                 child.show_date or dash,
                 child.show_city or child.exhibition_name or dash,
                 child.cs_type or child.cs or dash,

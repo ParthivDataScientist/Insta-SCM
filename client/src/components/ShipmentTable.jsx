@@ -57,14 +57,22 @@ const parseTrackingTokens = (value) => {
     )];
 };
 
-const readChildPackages = (shipment) => (
-    parseTrackingTokens(
+const readChildPackages = (shipment) => {
+    const directTokens = parseTrackingTokens(
         shipment?.child_package
         ?? shipment?.child_awb
         ?? shipment?.child_tracking_number
         ?? shipment?.child_tracking_numbers,
-    )
-);
+    );
+
+    const parcelTokens = Array.isArray(shipment?.child_parcels)
+        ? shipment.child_parcels
+            .map((parcel) => normalizeToken(parcel?.tracking_number || parcel?.trackingNo || parcel?.tracking))
+            .filter(Boolean)
+        : [];
+
+    return [...new Set([...directTokens, ...parcelTokens])];
+};
 
 const formatDateTime = (dateStr) => {
     if (!dateStr || ['TBD', '-', 'Unknown', 'Pending'].includes(dateStr)) return '-';
@@ -197,31 +205,45 @@ const isUpcomingShowDate = (showDateValue, windowDays = 20) => {
 
 const buildPositionalGroups = (rows = []) => {
     const groups = [];
-    let currentGroup = null;
+    const groupsByMasterTracking = new Map();
+    const pendingChildren = [];
 
-    rows.forEach((row) => {
+    const registerMaster = (row, index) => {
+        const trackingNumber = normalizeToken(row?.tracking_number);
+        const key = trackingNumber || `row-${index}`;
+        const existing = groupsByMasterTracking.get(key);
+        if (existing) return existing;
+
+        const group = { master: row, children: [] };
+        groupsByMasterTracking.set(key, group);
+        groups.push(group);
+        return group;
+    };
+
+    rows.forEach((row, index) => {
         if (!row) return;
 
         const trackingNumber = normalizeToken(row.tracking_number);
         const explicitParent = normalizeToken(row.master_tracking_number);
-        const childPackages = readChildPackages(row);
+        const isChildRow = Boolean(explicitParent && explicitParent !== trackingNumber);
 
-        const rowDeclaresMaster = row.is_master === true;
-        const rowDeclaresChild = Boolean(explicitParent || childPackages.length);
-        const currentMasterTracking = normalizeToken(currentGroup?.master?.tracking_number);
-
-        const startsNewMaster =
-            rowDeclaresMaster
-            || !currentGroup
-            || (!rowDeclaresChild && trackingNumber && trackingNumber !== currentMasterTracking);
-
-        if (startsNewMaster) {
-            currentGroup = { master: row, children: [] };
-            groups.push(currentGroup);
+        if (isChildRow) {
+            pendingChildren.push({ row, explicitParent, index });
             return;
         }
 
-        currentGroup.children.push(row);
+        registerMaster(row, index);
+    });
+
+    pendingChildren.forEach(({ row, explicitParent, index }) => {
+        const parentGroup = groupsByMasterTracking.get(explicitParent);
+        if (parentGroup) {
+            parentGroup.children.push(row);
+            return;
+        }
+
+        // Keep child rows visible even when parent row is not present in payload.
+        registerMaster(row, index);
     });
 
     return groups;
@@ -252,6 +274,40 @@ const expandChildRows = (children, master) => children.flatMap((child, childInde
 });
 
 const buildInlineChildrenFromMaster = (master, masterKey) => {
+    const parcels = Array.isArray(master?.child_parcels) ? master.child_parcels : [];
+    if (parcels.length) {
+        return parcels
+            .map((parcel, index) => {
+                const tracking = normalizeToken(parcel?.tracking_number || parcel?.trackingNo || parcel?.tracking);
+                if (!tracking) return null;
+
+                const parcelHistory = (parcel?.last_date || parcel?.last_location || parcel?.raw_status || parcel?.status)
+                    ? [{
+                        description: parcel?.raw_status || parcel?.status || master.status || 'Update',
+                        location: parcel?.last_location || parcel?.destination || '',
+                        status: parcel?.status || parcel?.raw_status || master.status || 'In Transit',
+                        date: parcel?.last_date || '',
+                    }]
+                    : (Array.isArray(master?.history) ? master.history : []);
+
+                return {
+                    ...master,
+                    ...parcel,
+                    history: parcelHistory,
+                    status: parcel?.status || master.status,
+                    raw_status: parcel?.raw_status || master.raw_status,
+                    origin: parcel?.origin || master.origin,
+                    destination: parcel?.destination || master.destination,
+                    eta: parcel?.eta || master.eta,
+                    tracking_number: tracking,
+                    __displayTracking: tracking,
+                    __sourceChild: parcel,
+                    __rowKey: `inline-${masterKey}-${index}`,
+                };
+            })
+            .filter(Boolean);
+    }
+
     const packages = readChildPackages(master);
     if (!packages.length) return [];
 
@@ -354,7 +410,8 @@ const ShipmentTable = ({
     const matchesTrackingSearch = (row) => {
         const query = idSearch.trim().toLowerCase();
         if (!query) return true;
-        const target = `${row.tracking_number || ''} ${row.child_package || ''} ${row.items || ''} ${row.recipient || ''}`.toLowerCase();
+        const childTokens = readChildPackages(row).join(' ');
+        const target = `${row.tracking_number || ''} ${childTokens} ${row.items || ''} ${row.recipient || ''}`.toLowerCase();
         return target.includes(query);
     };
 

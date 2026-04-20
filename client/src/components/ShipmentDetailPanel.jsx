@@ -174,7 +174,9 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                 const trackingNumber = (shipment?.tracking_number || '').trim();
                 const hasHistory = Array.isArray(nextShipment?.history) && nextShipment.history.length > 0;
                 if (trackingNumber && !hasHistory) {
-                    const preview = await shipmentsService.previewTrackShipment(trackingNumber);
+                    const preview = await shipmentsService.previewTrackShipment(trackingNumber, {
+                        masterTrackingNumber: shipment?.master_tracking_number || undefined,
+                    });
                     if (active && preview) {
                         nextShipment = mergeLiveTracking(nextShipment, preview);
                     }

@@ -45,4 +45,8 @@ def detect_carrier(tracking_number: str) -> ProviderName:
     if re.fullmatch(r"[A-Z]{2}\d{9,}[A-Z]{2}", tn):
         return "DHL"
 
+    # DHL child-piece tokens can appear as "JD..." in import feeds.
+    if re.fullmatch(r"JD\d{10,}", tn):
+        return "DHL"
+
     return "Unknown"

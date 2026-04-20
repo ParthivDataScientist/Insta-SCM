@@ -29,8 +29,12 @@ const shipmentsService = {
         return response.data;
     },
 
-    previewTrackShipment: async (trackingNumber) => {
-        const response = await apiClient.get(`/api/v1/shipments/track/${trackingNumber}/preview`);
+    previewTrackShipment: async (trackingNumber, options = {}) => {
+        const params = {};
+        if (options.masterTrackingNumber) {
+            params.master_tracking_number = options.masterTrackingNumber;
+        }
+        const response = await apiClient.get(`/api/v1/shipments/track/${trackingNumber}/preview`, { params });
         return response.data;
     },
 

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 from sqlmodel import Session, select
-from sqlalchemy import func, case
+from sqlalchemy import func, case, delete as sa_delete
 
 from app.models.shipment import Shipment
 from app.services.fedex import FedExService
@@ -285,29 +285,66 @@ def track_and_save(
     Detect carrier, call tracking API, then upsert the shipment record in DB.
     Returns a result dict. On error, the dict will contain an 'error' key.
     """
+    tracking_number = (tracking_number or "").strip().upper()
     carrier_name = detect_carrier(tracking_number)
+    result: dict
+    service = None
 
     if carrier_name == "DHL":
         service = DHLService()
     elif carrier_name == "FedEx":
         service = FedExService()
-    elif carrier_name == "UPS":
-        return {
-            "tracking_number": tracking_number,
-            "error": "UPS tracking is not yet supported. Supported carriers: FedEx, DHL.",
-        }
+    elif carrier_name in ("UPS", "Unknown"):
+        fallback = _resolve_child_fallback_result(
+            db=db,
+            tracking_number=tracking_number,
+            master_tracking_number=master_tracking_number,
+        )
+        if fallback:
+            result = fallback
+            carrier_name = str(result.get("carrier") or carrier_name)
+            logger.info(
+                "Resolved %s from stored master/child data (carrier=%s) without live API call.",
+                tracking_number,
+                carrier_name,
+            )
+        elif carrier_name == "UPS":
+            return {
+                "tracking_number": tracking_number,
+                "error": "UPS tracking is not yet supported. Supported carriers: FedEx, DHL.",
+            }
+        else:
+            return {
+                "tracking_number": tracking_number,
+                "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
+                         "Supported formats: FedEx (12/15/20/22 digits), DHL (10 digits), UPS (1Z...).",
+            }
     else:
         return {
             "tracking_number": tracking_number,
-            "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
-                     "Supported formats: FedEx (12/15/20/22 digits), DHL (10 digits), UPS (1Z...).",
+            "error": f"Could not detect carrier for tracking number '{tracking_number}'.",
         }
 
-    result = service.track(tracking_number)
+    if service is not None:
+        result = service.track(tracking_number)
 
-    if "error" in result:
-        logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
-        return {"tracking_number": tracking_number, "error": result["error"]}
+        if "error" in result:
+            fallback = _resolve_child_fallback_result(
+                db=db,
+                tracking_number=tracking_number,
+                master_tracking_number=master_tracking_number,
+            )
+            if fallback:
+                result = fallback
+                carrier_name = str(result.get("carrier") or carrier_name)
+                logger.info(
+                    "Carrier lookup failed for %s (%s) but resolved from stored master/child data.",
+                    tracking_number,
+                    carrier_name,
+                )
+            else:
+                logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
+                return {"tracking_number": tracking_number, "error": result["error"]}
 
     result = _apply_stuck_exception_policy(result)
 
@@ -469,26 +506,55 @@ def get_stats(db: Session) -> dict:
     }
 
 
-def preview_track(tracking_number: str) -> dict:
+def preview_track(
+    tracking_number: str,
+    db: Optional[Session] = None,
+    master_tracking_number: Optional[str] = None,
+) -> dict:
     """
     Fetch live tracking data from the carrier API WITHOUT saving to the DB.
     Returns the full result dict (including history, origin, destination, eta).
     On error, the dict will contain an 'error' key.
     """
+    tracking_number = (tracking_number or "").strip().upper()
     carrier_name = detect_carrier(tracking_number)
+    service = None
 
     if carrier_name == "DHL":
         service = DHLService()
     elif carrier_name == "FedEx":
         service = FedExService()
-    elif carrier_name == "UPS":
-        return {"error": "UPS tracking is not yet supported."}
-    else:
+    elif carrier_name in ("UPS", "Unknown"):
+        if db is not None:
+            fallback = _resolve_child_fallback_result(
+                db=db,
+                tracking_number=tracking_number,
+                master_tracking_number=master_tracking_number,
+            )
+            if fallback:
+                result = _apply_stuck_exception_policy(fallback)
+                result["tracking_number"] = tracking_number
+                result["carrier"] = str(result.get("carrier") or carrier_name)
+                return result
+        if carrier_name == "UPS":
+            return {"error": "UPS tracking is not yet supported."}
         return {"error": f"Could not detect carrier for '{tracking_number}'."}
 
     result = service.track(tracking_number)
     if "error" in result:
-        return result
+        if db is not None:
+            fallback = _resolve_child_fallback_result(
+                db=db,
+                tracking_number=tracking_number,
+                master_tracking_number=master_tracking_number,
+            )
+            if fallback:
+                result = fallback
+                carrier_name = str(result.get("carrier") or carrier_name)
+            else:
+                return result
+        else:
+            return result
 
     result = _apply_stuck_exception_policy(result)
 
@@ -596,32 +662,41 @@ def batch_delete(shipment_ids: list[int], db: Session) -> dict:
         return {"status": "success", "count": 0, "deleted_ids": []}
 
     ids_to_delete: set[int] = {s.id for s in requested if s.id is not None}
-
-    # Only selected top-level records should cascade downward to children.
-    top_level_master_tns = {
+    pending_master_tns = {
         (s.tracking_number or "").strip().upper()
         for s in requested
-        if not (s.master_tracking_number or "").strip()
+        if (s.tracking_number or "").strip()
     }
+    seen_master_tns: set[str] = set()
 
-    if top_level_master_tns:
+    # Cascade through all linked descendants in one pass (supports nested linkage).
+    while pending_master_tns:
+        lookup_tns = pending_master_tns - seen_master_tns
+        if not lookup_tns:
+            break
+        seen_master_tns.update(lookup_tns)
+
         child_rows = db.exec(
-            select(Shipment).where(
+            select(Shipment.id, Shipment.tracking_number).where(
                 func.upper(func.trim(func.coalesce(Shipment.master_tracking_number, ""))).in_(
-                    list(top_level_master_tns)
+                    list(lookup_tns)
                 )
             )
         ).all()
-        for child in child_rows:
-            if child.id is not None:
-                ids_to_delete.add(child.id)
 
-    shipments = db.exec(select(Shipment).where(Shipment.id.in_(list(ids_to_delete)))).all()
-    deleted_ids: list[int] = []
-    for shipment in shipments:
-        if shipment.id is not None:
-            deleted_ids.append(shipment.id)
-        db.delete(shipment)
+        pending_master_tns = set()
+        for row in child_rows:
+            child_id = row[0]
+            child_tn = (row[1] or "").strip().upper() if len(row) > 1 else ""
+            if child_id is not None:
+                ids_to_delete.add(child_id)
+            if child_tn:
+                pending_master_tns.add(child_tn)
 
+    if not ids_to_delete:
+        return {"status": "success", "count": 0, "deleted_ids": []}
+
+    deleted_ids = sorted(ids_to_delete)
+    db.exec(sa_delete(Shipment).where(Shipment.id.in_(deleted_ids)))
     db.commit()
     return {"status": "success", "count": len(deleted_ids), "deleted_ids": deleted_ids}
