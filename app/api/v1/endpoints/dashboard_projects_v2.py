@@ -1159,8 +1159,9 @@ def get_timeline_data(session: Session = Depends(get_session)):
         unassigned_stmt = (
             select(DashboardProject)
             .where(DashboardProject.manager_id == None)
+            .where(func.lower(func.trim(func.coalesce(DashboardProject.stage, "Open"))).in_(WIN_STAGE_ALIASES))
         )
-        unassigned_projects = [project for project in session.exec(unassigned_stmt).all() if _is_won_project(project.stage)]
+        unassigned_projects = session.exec(unassigned_stmt).all()
         if unassigned_projects:
             manager_groups["unassigned"] = {"manager": "Unassigned", "allocations": []}
             for project in unassigned_projects:
