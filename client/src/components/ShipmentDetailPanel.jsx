@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package, MapPin, Info, Phone, ExternalLink, Copy } from 'lucide-react';
-import StatusBadge from './StatusBadge';
-import ProgressBar from './ProgressBar';
+import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package, MapPin, Phone, Mail } from 'lucide-react';
 import shipmentsService from '../api/shipments';
 
 const formatHistoryDate = (dateStr) => {
@@ -51,6 +49,97 @@ const mergeLiveTracking = (baseShipment, liveShipment) => {
         eta: liveShipment.eta || liveShipment.estimated_delivery || baseShipment.eta,
         origin: liveShipment.origin || baseShipment.origin,
         destination: liveShipment.destination || baseShipment.destination,
+    };
+};
+
+const CARRIER_SUPPORT_CONTACTS = {
+    FedEx: {
+        email: import.meta.env.VITE_FEDEX_SUPPORT_EMAIL || 'india@fedex.com',
+        phone: '18004633339',
+    },
+    DHL: {
+        email: import.meta.env.VITE_DHL_SUPPORT_EMAIL || 'indiaexpress@dhl.com',
+        phone: '',
+    },
+    UPS: {
+        email: import.meta.env.VITE_UPS_SUPPORT_EMAIL || 'customer.service@ups.com',
+        phone: '',
+    },
+    BlueDart: {
+        email: import.meta.env.VITE_BLUEDART_SUPPORT_EMAIL || 'customerservice@bluedart.com',
+        phone: '',
+    },
+};
+
+const parseDateSafe = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const ts = Date.parse(raw);
+    if (Number.isNaN(ts)) return null;
+    return new Date(ts);
+};
+
+const inferIssueSummary = (shipment, latestEvent) => {
+    const status = String(shipment?.status || '').toLowerCase();
+    const currentStatus = String(shipment?.current_status || '').toLowerCase();
+    const latestDesc = String(latestEvent?.description || '').toLowerCase();
+    const issueTokens = ['exception', 'delay', 'hold', 'stuck', 'customs', 'return', 'failed'];
+    const combined = `${status} ${currentStatus} ${latestDesc}`;
+
+    if (issueTokens.some((token) => combined.includes(token))) {
+        return `The shipment appears to be facing an operational issue (${shipment?.status || 'Status Alert'}).`;
+    }
+
+    const latestDate = parseDateSafe(latestEvent?.date);
+    if (latestDate) {
+        const ageMs = Date.now() - latestDate.getTime();
+        if (ageMs > 2 * 24 * 60 * 60 * 1000) {
+            return 'The shipment has not shown movement for over 2 days. Please confirm next action and ETA.';
+        }
+    }
+
+    return 'Please provide an updated delivery timeline and confirm if any action is required from our side.';
+};
+
+const buildCarrierEmailDraft = (shipment) => {
+    const carrier = shipment?.carrier || 'Carrier';
+    const contact = CARRIER_SUPPORT_CONTACTS[carrier] || { email: '', phone: '' };
+    const history = Array.isArray(shipment?.history) ? shipment.history : [];
+    const latestEvent = history.length > 0 ? history[0] : {};
+    const issueSummary = inferIssueSummary(shipment, latestEvent);
+    const subject = `[HIGH PRIORITY] Shipment Support Request - ${shipment?.tracking_number || 'N/A'} (${carrier})`;
+
+    const body = [
+        'Dear Concerned Team,',
+        '',
+        'We need urgent assistance with the following shipment:',
+        '',
+        `Carrier: ${carrier}`,
+        `Tracking Number: ${shipment?.tracking_number || 'N/A'}`,
+        `Current Dashboard Status: ${shipment?.status || 'N/A'}`,
+        `Latest Tracking Update: ${latestEvent?.description || shipment?.current_status || shipment?.status || 'N/A'}`,
+        `Latest Location: ${latestEvent?.location || shipment?.last_location || 'N/A'}`,
+        `Latest Event Time: ${latestEvent?.date || 'N/A'}`,
+        `Origin: ${shipment?.origin || 'N/A'}`,
+        `Destination: ${shipment?.destination || 'N/A'}`,
+        `Expected Delivery (ETA): ${shipment?.eta || shipment?.estimated_delivery || 'N/A'}`,
+        '',
+        `Issue Summary: ${issueSummary}`,
+        '',
+        'Please investigate this on priority and share:',
+        '1. Root cause of the current issue/status',
+        '2. Updated delivery timeline',
+        '3. Any action needed from our side',
+        '',
+        'Thanks & regards,',
+        'Insta-SCM Team',
+    ].join('\n');
+
+    return {
+        to: contact.email || '',
+        phone: contact.phone || '',
+        subject,
+        body,
     };
 };
 
@@ -122,10 +211,16 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
     };
 
     const s = useMemo(() => mergeLiveTracking(shipment, resolvedShipment), [shipment, resolvedShipment]);
+    const emailDraft = useMemo(() => buildCarrierEmailDraft(s), [s]);
     const originCity = (s.origin || 'N/A').split(',')[0];
     const originState = (s.origin || '').split(',')[1] || '';
     const destCity = (s.destination || 'N/A').split(',')[0];
     const destState = (s.destination || '').split(',')[1] || '';
+
+    const handleEmailCarrier = () => {
+        const mailtoUrl = `mailto:${emailDraft.to}?subject=${encodeURIComponent(emailDraft.subject)}&body=${encodeURIComponent(emailDraft.body)}`;
+        window.location.href = mailtoUrl;
+    };
 
     // If not in panel mode, wrap with legacy overlay (though we prefer panel mode now)
     const content = (
@@ -213,11 +308,14 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                     Contact the carrier directly for real-time adjustments or claims.
                 </p>
                 <div className="support-buttons">
-                    {s.carrier === 'FedEx' && (
-                        <a href="tel:18004633339" className="support-btn">
-                            <Phone size={14} /> Call FedEx
+                    {emailDraft.phone ? (
+                        <a href={`tel:${emailDraft.phone}`} className="support-btn">
+                            <Phone size={14} /> Call {s.carrier || 'Carrier'}
                         </a>
-                    )}
+                    ) : null}
+                    <button className="support-btn tertiary" onClick={handleEmailCarrier}>
+                        <Mail size={14} /> Email {s.carrier || 'Carrier'}
+                    </button>
                     <button className="support-btn secondary" onClick={() => setConfirmOpen(true)}>
                         <Trash2 size={14} /> Delete Entry
                     </button>

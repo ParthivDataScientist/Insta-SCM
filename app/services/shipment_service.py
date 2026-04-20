@@ -164,6 +164,104 @@ def _apply_stuck_exception_policy(result: dict) -> dict:
     return result
 
 
+def _progress_from_status(status: str) -> int:
+    return {
+        "Delivered": 100,
+        "Out for Delivery": 80,
+        "In Transit": 40,
+        "Exception": 10,
+    }.get(str(status or "").strip(), 40)
+
+
+def _build_result_from_existing_shipment_row(shipment: Shipment) -> dict:
+    return {
+        "carrier": shipment.carrier or "Unknown",
+        "status": shipment.status or "Unknown",
+        "origin": shipment.origin or "Unknown",
+        "destination": shipment.destination or "Unknown",
+        "eta": shipment.eta or "Unknown",
+        "progress": shipment.progress if shipment.progress is not None else _progress_from_status(shipment.status),
+        "history": list(shipment.history or []),
+        "master_tracking_number": shipment.master_tracking_number,
+        "is_master": bool(shipment.is_master),
+        "child_parcels": list(shipment.child_parcels or []),
+    }
+
+
+def _resolve_child_fallback_result(
+    db: Session,
+    tracking_number: str,
+    master_tracking_number: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Resolve a child package from already saved master shipment data when the
+    carrier API cannot track the child token directly (e.g., DHL piece codes).
+    """
+    tn = (tracking_number or "").strip().upper()
+    if not tn:
+        return None
+
+    existing = db.exec(select(Shipment).where(Shipment.tracking_number == tn)).first()
+    if existing:
+        return _build_result_from_existing_shipment_row(existing)
+
+    masters_to_check: list[Shipment] = []
+    master_hint = (master_tracking_number or "").strip().upper()
+    if master_hint:
+        hinted_master = db.exec(select(Shipment).where(Shipment.tracking_number == master_hint)).first()
+        if hinted_master:
+            masters_to_check.append(hinted_master)
+
+    if not masters_to_check:
+        masters_to_check = db.exec(select(Shipment).where(Shipment.is_archived == False)).all()
+
+    for master in masters_to_check:
+        parcels = master.child_parcels or []
+        if not isinstance(parcels, list):
+            continue
+        for parcel in parcels:
+            if not isinstance(parcel, dict):
+                continue
+            child_tn = str(parcel.get("tracking_number") or "").strip().upper()
+            if child_tn != tn:
+                continue
+
+            child_status = parcel.get("status") or master.status or "In Transit"
+            child_raw_status = parcel.get("raw_status") or child_status
+            child_last_date = parcel.get("last_date") or ""
+            child_last_location = parcel.get("last_location") or ""
+
+            child_history = []
+            if child_last_date or child_last_location or child_raw_status:
+                child_history.append(
+                    {
+                        "description": child_raw_status,
+                        "location": child_last_location,
+                        "status": child_status,
+                        "date": child_last_date,
+                    }
+                )
+            elif master.history:
+                child_history = list(master.history[:1])
+
+            return {
+                "carrier": master.carrier or "DHL",
+                "status": child_status,
+                "origin": parcel.get("origin") or master.origin or "Unknown",
+                "destination": parcel.get("destination") or master.destination or "Unknown",
+                "eta": parcel.get("eta") or master.eta or "Unknown",
+                "progress": _progress_from_status(child_status),
+                "history": child_history,
+                "master_tracking_number": master.tracking_number,
+                "is_master": False,
+                "child_parcels": [],
+                "raw_status": child_raw_status,
+                "last_scan_date": child_last_date or master.last_scan_date or "",
+            }
+
+    return None
+
+
 def track_and_save(
     tracking_number: str,
     recipient: Optional[str],

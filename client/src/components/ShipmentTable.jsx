@@ -80,6 +80,79 @@ const formatDateTime = (dateStr) => {
     }
 };
 
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const formatStatusDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        if (Number.isNaN(date.getTime())) return String(dateStr).slice(0, 10);
+        return date
+            .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            .replace(/\//g, '.');
+    } catch (_) {
+        return String(dateStr).slice(0, 10);
+    }
+};
+
+const stripLocationFromDescription = (description, location) => {
+    const desc = String(description || '').trim();
+    const loc = String(location || '').trim();
+    if (!desc || !loc) return desc;
+
+    const escaped = escapeRegExp(loc);
+    const patterns = [
+        new RegExp(`\\s*@\\s*${escaped}$`, 'i'),
+        new RegExp(`\\s+at\\s+${escaped}$`, 'i'),
+        new RegExp(`\\s+in\\s+${escaped}$`, 'i'),
+        new RegExp(`\\s+${escaped}$`, 'i'),
+    ];
+
+    let cleaned = desc;
+    patterns.forEach((pattern) => {
+        cleaned = cleaned.replace(pattern, '');
+    });
+    return cleaned.trim().replace(/[,:;.\-]+$/, '').trim();
+};
+
+const getCurrentStatusMeta = (shipment) => {
+    const history = Array.isArray(shipment?.history) ? shipment.history : [];
+    if (history.length > 0) {
+        const latest = history[0];
+        const eventStatus = String(latest?.status || '').trim();
+        const eventDescriptionRaw = String(latest?.description || '').trim();
+        const eventLocation = String(latest?.location || '').trim();
+        const eventDescription = stripLocationFromDescription(eventDescriptionRaw, eventLocation);
+        const dateLabel = formatStatusDate(latest?.date);
+
+        let headline = shipment?.status || '-';
+        if (eventStatus && eventDescription) {
+            if (eventStatus.toLowerCase() === eventDescription.toLowerCase()) {
+                headline = eventStatus;
+            } else if (eventDescription.toLowerCase().startsWith(eventStatus.toLowerCase())) {
+                headline = eventDescription;
+            } else {
+                headline = `${eventStatus}: ${eventDescription}`;
+            }
+        } else if (eventDescription || eventStatus) {
+            headline = eventDescription || eventStatus;
+        }
+
+        return {
+            date: dateLabel,
+            headline,
+            location: eventLocation,
+        };
+    }
+
+    const fallbackDate = String(shipment?.last_scan_date || '').trim();
+    return {
+        date: fallbackDate,
+        headline: shipment?.status || '-',
+        location: '',
+    };
+};
+
 const parseShowDate = (showDateValue) => {
     const raw = String(showDateValue ?? '').trim();
     if (!raw) return null;
@@ -120,47 +193,6 @@ const isUpcomingShowDate = (showDateValue, windowDays = 20) => {
     const end = new Date(start);
     end.setDate(end.getDate() + windowDays);
     return showDate >= start && showDate <= end;
-};
-
-const formatCurrentStatus = (shipment) => {
-    if (shipment.history && shipment.history.length > 0) {
-        const latest = shipment.history[0];
-        let historyDate = '';
-        try {
-            const date = new Date(latest.date);
-            if (!Number.isNaN(date.getTime())) {
-                historyDate = date
-                    .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                    .replace(/\//g, '.');
-            } else {
-                historyDate = (latest.date || '').slice(0, 10);
-            }
-        } catch (_) {
-            historyDate = (latest.date || '').slice(0, 10);
-        }
-
-        const eventStatus = String(latest.status || '').trim();
-        const eventDescription = String(latest.description || '').trim();
-        const eventLocation = String(latest.location || '').trim();
-
-        let statusSegment = shipment.status || '-';
-        if (eventStatus && eventDescription) {
-            statusSegment = eventStatus.toLowerCase() === eventDescription.toLowerCase()
-                ? eventStatus
-                : `${eventStatus}, ${eventDescription}`;
-        } else if (eventStatus || eventDescription) {
-            statusSegment = eventStatus || eventDescription;
-        }
-
-        const locationSegment = eventLocation ? ` @ ${eventLocation}` : '';
-        return `${historyDate} : ${statusSegment}${locationSegment}`;
-    }
-
-    if (shipment.last_scan_date) {
-        return `${shipment.last_scan_date} : ${shipment.status}`;
-    }
-
-    return shipment.status || '-';
 };
 
 const buildPositionalGroups = (rows = []) => {
@@ -498,6 +530,10 @@ const ShipmentTable = ({
                             const isExpanded = expandedRows.has(masterKey);
                             const isSelected = master.id != null && selectedIds.includes(master.id);
                             const masterHasUpcomingShow = isUpcomingShowDate(master.show_date);
+                            const masterStatusMeta = getCurrentStatusMeta(master);
+                            const masterStatusTitle = [masterStatusMeta.date, masterStatusMeta.headline, masterStatusMeta.location]
+                                .filter(Boolean)
+                                .join(' | ');
 
                             return (
                                 <Fragment key={masterKey}>
@@ -548,8 +584,14 @@ const ShipmentTable = ({
                                         </td>
 
                                         <td className="design-table__td shipping-col-current">
-                                            <div className="shipment-current-status" title={formatCurrentStatus(master)}>
-                                                {formatCurrentStatus(master)}
+                                            <div className="shipment-current-status" title={masterStatusTitle}>
+                                                {masterStatusMeta.date ? (
+                                                    <span className="shipment-current-status__date">{masterStatusMeta.date}</span>
+                                                ) : null}
+                                                <span className="shipment-current-status__headline">{masterStatusMeta.headline}</span>
+                                                {masterStatusMeta.location ? (
+                                                    <span className="shipment-current-status__location">{masterStatusMeta.location}</span>
+                                                ) : null}
                                             </div>
                                         </td>
 
@@ -618,6 +660,10 @@ const ShipmentTable = ({
 
                                     {isExpanded ? childRows.map((child) => {
                                         const childHasUpcomingShow = isUpcomingShowDate(child.show_date || master.show_date);
+                                        const childStatusMeta = getCurrentStatusMeta(child);
+                                        const childStatusTitle = [childStatusMeta.date, childStatusMeta.headline, childStatusMeta.location]
+                                            .filter(Boolean)
+                                            .join(' | ');
                                         return (
                                         <tr
                                             key={child.__rowKey}
@@ -644,8 +690,14 @@ const ShipmentTable = ({
                                             </td>
 
                                             <td className="design-table__td shipping-col-current">
-                                                <div className="shipment-current-status shipment-current-status--child">
-                                                    {formatCurrentStatus(child)}
+                                                <div className="shipment-current-status shipment-current-status--child" title={childStatusTitle}>
+                                                    {childStatusMeta.date ? (
+                                                        <span className="shipment-current-status__date">{childStatusMeta.date}</span>
+                                                    ) : null}
+                                                    <span className="shipment-current-status__headline">{childStatusMeta.headline}</span>
+                                                    {childStatusMeta.location ? (
+                                                        <span className="shipment-current-status__location">{childStatusMeta.location}</span>
+                                                    ) : null}
                                                 </div>
                                             </td>
 
