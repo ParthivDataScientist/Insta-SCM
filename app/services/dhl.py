@@ -50,8 +50,18 @@ def map_dhl_status(status_str: str) -> str:
         if key in lower:
             return DHL_STATUS_MAP[key]
 
-    if "deliver" in lower and "out" not in lower:
-        return "Delivered"
+    if any(token in lower for token in ("out for delivery", "with delivery courier", "with courier")):
+        return "Out for Delivery"
+
+    delivered_markers = (
+        "shipment delivered",
+        "delivery successful",
+        "proof of delivery",
+        "delivered",
+    )
+    if any(marker in lower for marker in delivered_markers):
+        if not any(token in lower for token in ("delivery facility", "out for delivery", "scheduled for delivery", "attempted")):
+            return "Delivered"
 
     return "In Transit"
 

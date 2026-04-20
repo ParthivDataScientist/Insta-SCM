@@ -72,6 +72,7 @@ def test_dhl_provider_maps_tracking_payload(monkeypatch):
     assert result["current_status"] == "Arrived at delivery facility"
     assert result["estimated_delivery"] == "2026-04-22"
     assert result["last_location"] == "Mumbai Hub"
+    assert result["status"] == "In Transit"
     assert result["carrier"] == "DHL"
 
 
@@ -125,4 +126,29 @@ def test_dhl_provider_prefers_all_checkpoint_history(monkeypatch):
     assert result["current_status"] == "Out for delivery"
     assert result["last_location"] == "IRVING, TX, US"
     assert result["origin"] == "MUMBAI (BOMBAY)-IND"
+    assert result["status"] == "Out for Delivery"
     assert len(result["history"]) == 2
+
+
+def test_dhl_provider_marks_explicit_delivered_as_delivered(monkeypatch):
+    provider = DHLProvider()
+    payload = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        "<AWBInfo>"
+        "<ShipmentEvent>"
+        "<Date>2026-04-20</Date><Time>18:30:00</Time><EventCode>OK</EventCode>"
+        "<Description>Shipment delivered</Description>"
+        "<ServiceAreaDescription>IRVING, TX, US</ServiceAreaDescription>"
+        "</ShipmentEvent>"
+        "</AWBInfo>"
+    )
+
+    soap = _wrap_in_soap(payload, "PostTracking_AllCheckpointResult")
+    monkeypatch.setattr(
+        "app.services.dhl_provider.requests.post",
+        lambda *args, **kwargs: _MockResponse(status_code=200, text=soap),
+    )
+
+    # summary call will fail with "missing result node", but detailed succeeds and is enough
+    result = provider.track("1234567890")
+    assert result["status"] == "Delivered"

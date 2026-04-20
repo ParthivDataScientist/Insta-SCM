@@ -304,7 +304,8 @@ class DHLProvider:
         if history:
             history.sort(key=lambda item: item.get("date", ""), reverse=True)
 
-        status_bucket = self._to_status_bucket(current_status)
+        event_code = self._first_non_empty(latest_event, ["EventCode", "StatusCode", "Code"])
+        status_bucket = self._to_status_bucket(current_status, event_code=event_code)
         progress = {
             "Delivered": 100,
             "Out for Delivery": 80,
@@ -363,14 +364,25 @@ class DHLProvider:
                 key=lambda item: self._history_sort_key(item.get("date", "")),
                 reverse=True,
             )
+            sorted_events = sorted(
+                events,
+                key=lambda ev: self._history_sort_key(
+                    self._normalize_datetime_string(
+                        f"{ev.get('date', '')} {ev.get('time', '')}".strip()
+                    )
+                    or ev.get("date", "")
+                ),
+                reverse=True,
+            )
             latest = history[0]
             oldest = history[-1]
+            latest_event_code = sorted_events[0].get("event_code", "") if sorted_events else ""
             current_status = latest.get("description") or "Unknown"
             estimated_delivery = _text_or_empty(payload_root.findtext("EstimatedDeliveryDate")) or None
             if estimated_delivery:
                 estimated_delivery = self._normalize_datetime_string(estimated_delivery)[:10]
 
-            status_bucket = self._to_status_bucket(current_status)
+            status_bucket = self._to_status_bucket(current_status, event_code=latest_event_code)
             return {
                 "current_status": current_status,
                 "estimated_delivery": estimated_delivery,
@@ -393,7 +405,7 @@ class DHLProvider:
         summary_code = _text_or_empty(payload_root.findtext("EventCode"))
         if summary_description or summary_code:
             location = self._extract_location_from_description(summary_description)
-            status_bucket = self._to_status_bucket(summary_description or summary_code)
+            status_bucket = self._to_status_bucket(summary_description or summary_code, event_code=summary_code)
             return {
                 "current_status": summary_description or summary_code,
                 "estimated_delivery": None,
@@ -671,12 +683,32 @@ class DHLProvider:
                 return match.group(1).strip()
         return None
 
-    def _to_status_bucket(self, raw_status: str) -> str:
+    def _to_status_bucket(self, raw_status: str, event_code: str = "") -> str:
         status = _text_or_empty(raw_status).lower()
-        if "deliver" in status and "out for" not in status:
-            return "Delivered"
-        if "out for delivery" in status or "with courier" in status:
+        code = _text_or_empty(event_code).upper()
+
+        # Event-code hints for DHL India WCF payloads.
+        if code == "WC":
             return "Out for Delivery"
-        if any(token in status for token in ("exception", "hold", "custom", "delay", "return")):
+
+        # Exception first to avoid false "delivered" positives like "undelivered".
+        if any(token in status for token in ("exception", "hold", "custom", "delay", "return", "undeliver", "attempted")):
             return "Exception"
+
+        if any(token in status for token in ("out for delivery", "with delivery courier", "with courier")):
+            return "Out for Delivery"
+
+        # Delivered should be explicit, not inferred from words like
+        # "delivery facility" or "scheduled for delivery".
+        delivered_markers = (
+            "shipment delivered",
+            "delivery successful",
+            "delivered - signed for",
+            "proof of delivery",
+            "delivered",
+        )
+        if any(marker in status for marker in delivered_markers):
+            if not any(token in status for token in ("delivery facility", "out for delivery", "scheduled for delivery", "attempted")):
+                return "Delivered"
+
         return "In Transit"

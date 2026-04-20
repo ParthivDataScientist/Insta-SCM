@@ -80,6 +80,48 @@ const formatDateTime = (dateStr) => {
     }
 };
 
+const parseShowDate = (showDateValue) => {
+    const raw = String(showDateValue ?? '').trim();
+    if (!raw) return null;
+
+    const direct = Date.parse(raw);
+    if (!Number.isNaN(direct)) {
+        const date = new Date(direct);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    const normalized = raw.replace(/\./g, '/').replace(/-/g, '/');
+    const ddmmyyyy = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+        const day = Number(ddmmyyyy[1]);
+        const month = Number(ddmmyyyy[2]) - 1;
+        const year = Number(ddmmyyyy[3]);
+        const date = new Date(year, month, day);
+        if (!Number.isNaN(date.getTime())) return date;
+    }
+
+    const yyyymmdd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (yyyymmdd) {
+        const year = Number(yyyymmdd[1]);
+        const month = Number(yyyymmdd[2]) - 1;
+        const day = Number(yyyymmdd[3]);
+        const date = new Date(year, month, day);
+        if (!Number.isNaN(date.getTime())) return date;
+    }
+
+    return null;
+};
+
+const isUpcomingShowDate = (showDateValue, windowDays = 20) => {
+    const showDate = parseShowDate(showDateValue);
+    if (!showDate) return false;
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const end = new Date(start);
+    end.setDate(end.getDate() + windowDays);
+    return showDate >= start && showDate <= end;
+};
+
 const formatCurrentStatus = (shipment) => {
     if (shipment.history && shipment.history.length > 0) {
         const latest = shipment.history[0];
@@ -455,10 +497,11 @@ const ShipmentTable = ({
                             const hasChildren = childRows.length > 0;
                             const isExpanded = expandedRows.has(masterKey);
                             const isSelected = master.id != null && selectedIds.includes(master.id);
+                            const masterHasUpcomingShow = isUpcomingShowDate(master.show_date);
 
                             return (
                                 <Fragment key={masterKey}>
-                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''}`} onClick={() => onSelectShipment(master)}>
+                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''}`} onClick={() => onSelectShipment(master)}>
                                         <td className="design-table__td shipping-col-check" onClick={(event) => handleSelectMaster(event, master.id)}>
                                             <span className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                                                 {isSelected ? <Check size={10} /> : null}
@@ -505,7 +548,7 @@ const ShipmentTable = ({
                                         </td>
 
                                         <td className="design-table__td shipping-col-current">
-                                            <div className="shipment-current-status truncate-cell" title={formatCurrentStatus(master)}>
+                                            <div className="shipment-current-status" title={formatCurrentStatus(master)}>
                                                 {formatCurrentStatus(master)}
                                             </div>
                                         </td>
@@ -573,10 +616,12 @@ const ShipmentTable = ({
                                         </td>
                                     </tr>
 
-                                    {isExpanded ? childRows.map((child) => (
+                                    {isExpanded ? childRows.map((child) => {
+                                        const childHasUpcomingShow = isUpcomingShowDate(child.show_date || master.show_date);
+                                        return (
                                         <tr
                                             key={child.__rowKey}
-                                            className="design-table__row shipping-row shipping-row--child"
+                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''}`}
                                             onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
                                         >
                                             <td className="design-table__td shipping-col-check" />
@@ -599,7 +644,7 @@ const ShipmentTable = ({
                                             </td>
 
                                             <td className="design-table__td shipping-col-current">
-                                                <div className="shipment-current-status shipment-current-status--child truncate-cell">
+                                                <div className="shipment-current-status shipment-current-status--child">
                                                     {formatCurrentStatus(child)}
                                                 </div>
                                             </td>
@@ -635,7 +680,8 @@ const ShipmentTable = ({
                                                 </button>
                                             </td>
                                         </tr>
-                                    )) : null}
+                                        );
+                                    }) : null}
                                 </Fragment>
                             );
                         })}
