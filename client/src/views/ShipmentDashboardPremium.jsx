@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
 import { useShipments } from '../hooks/useShipments';
 import ShipmentTable from '../components/ShipmentTable';
 import TrackModal from '../components/TrackModal';
@@ -21,6 +21,19 @@ export default function ShipmentDashboardPremium() {
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
     const [showTrack, setShowTrack] = useState(false);
+    const [showMobileHeaderActions, setShowMobileHeaderActions] = useState(false);
+    const [isMobileViewport, setIsMobileViewport] = useState(() => (
+        typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
+    ));
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+        const media = window.matchMedia('(max-width: 767px)');
+        const sync = () => setIsMobileViewport(media.matches);
+        sync();
+        media.addEventListener('change', sync);
+        return () => media.removeEventListener('change', sync);
+    }, []);
 
     const importExcelPrompt = () => {
         const el = document.getElementById('excel-file-input');
@@ -82,77 +95,194 @@ export default function ShipmentDashboardPremium() {
                 </button>
             ) : null}
 
-            <header className="design-premium-header">
-                <div className="design-premium-header__inner">
-                    <div className="design-premium-header__brand design-premium-header__brand--offset">
-                        <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
-                    </div>
-
-                    <div className="design-premium-header__search-container">
-                        <label className="design-premium-search">
-                            <Search size={16} className="design-premium-search__icon" aria-hidden />
-                            <input
-                                type="search"
-                                placeholder="Search ID, Exhibition..."
-                                value={searchQuery || ''}
-                                onChange={(event) => setSearchQuery(event.target.value)}
-                            />
-                        </label>
-                    </div>
-
-                    <div className="design-premium-header__filters">
-                        <div className="design-premium-filter">
-                            <div className="design-premium-filter__label">Date range</div>
-                            <PremiumDateRangePicker />
-                        </div>
-                    </div>
-
-                    <div className="design-premium-header__actions">
-                        {hasActiveFilters && (
+            {isMobileViewport ? (
+                <header className="design-premium-header shipping-dashboard-header shipping-dashboard-header--mobile">
+                    <div className="design-premium-header__inner shipping-dashboard-header__inner shipping-mobile-header-shell">
+                        <div className="shipping-mobile-topbar">
                             <button
                                 type="button"
-                                className="design-premium-btn design-premium-btn--danger-ghost"
-                                onClick={resetFilters}
-                                title="Clear all filters"
+                                className="shipping-mobile-topbar__icon"
+                                onClick={toggleSidebar}
+                                title="Open navigation"
+                                aria-label="Open navigation"
                             >
-                                <X size={14} /> Clear
+                                <Menu size={18} />
                             </button>
-                        )}
+                            <div className="shipping-mobile-topbar__title">Shipments</div>
+                            <button type="button" className="shipping-mobile-topbar__icon" title="Notifications" aria-label="Notifications">
+                                <Bell size={18} />
+                            </button>
+                        </div>
 
-                        <button className="design-premium-btn" onClick={importExcelPrompt} title="Import Excel">
-                            <FileSpreadsheet size={15} className="design-premium-btn__icon" /> Import
-                        </button>
-
-                        <button className="design-premium-btn" onClick={handleExport} disabled={loading} title="Export Excel">
-                            <Download size={15} className="design-premium-btn__icon" /> Export
-                        </button>
-
-                        <button
-                            className="design-premium-icon-btn"
-                            onClick={() => { void refreshTracking(); }}
-                            disabled={loading || refreshing}
-                            title="Refresh Tracking"
-                        >
-                            <RefreshCw size={16} className={refreshing ? 'design-premium-icon-btn__spin' : ''} />
-                        </button>
-
-                        <button className="design-premium-btn design-premium-btn--primary" onClick={() => setShowTrack(true)}>
-                            <Plus size={15} /> Add Shipment
-                        </button>
-
-                        <button
-                            type="button"
-                            className="design-premium-icon-btn"
-                            title="Notifications"
-                        >
-                            <Bell size={18} />
-                            <span className="design-premium-icon-btn__badge"></span>
-                        </button>
+                        <div className="shipping-mobile-search-row">
+                            <label className="design-premium-search shipping-dashboard-search shipping-dashboard-search--mobile">
+                                <Search size={16} className="design-premium-search__icon" aria-hidden />
+                                <input
+                                    type="search"
+                                    placeholder="Search ID, Exhibition..."
+                                    value={searchQuery || ''}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                className="shipping-mobile-topbar__icon shipping-mobile-topbar__icon--actions"
+                                onClick={() => setShowMobileHeaderActions(true)}
+                                title="More actions"
+                                aria-label="More actions"
+                            >
+                                <MoreHorizontal size={18} />
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            ) : (
+                <header className="design-premium-header shipping-dashboard-header">
+                    <div className="design-premium-header__inner shipping-dashboard-header__inner">
+                        <div className="design-premium-header__brand design-premium-header__brand--offset">
+                            <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                        </div>
+
+                        <div className="design-premium-header__search-container">
+                            <label className="design-premium-search shipping-dashboard-search">
+                                <Search size={16} className="design-premium-search__icon" aria-hidden />
+                                <input
+                                    type="search"
+                                    placeholder="Search ID, Exhibition..."
+                                    value={searchQuery || ''}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                />
+                            </label>
+                        </div>
+
+                        <div className="design-premium-header__filters">
+                            <div className="design-premium-filter">
+                                <div className="design-premium-filter__label">Date range</div>
+                                <PremiumDateRangePicker />
+                            </div>
+                        </div>
+
+                        <div className="design-premium-header__actions">
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    className="design-premium-btn design-premium-btn--danger-ghost"
+                                    onClick={resetFilters}
+                                    title="Clear all filters"
+                                >
+                                    <X size={14} /> Clear
+                                </button>
+                            )}
+
+                            <button className="design-premium-btn" onClick={importExcelPrompt} title="Import Excel">
+                                <FileSpreadsheet size={15} className="design-premium-btn__icon" /> Import
+                            </button>
+
+                            <button className="design-premium-btn" onClick={handleExport} disabled={loading} title="Export Excel">
+                                <Download size={15} className="design-premium-btn__icon" /> Export
+                            </button>
+
+                            <button
+                                className="design-premium-icon-btn"
+                                onClick={() => { void refreshTracking(); }}
+                                disabled={loading || refreshing}
+                                title="Refresh Tracking"
+                            >
+                                <RefreshCw size={16} className={refreshing ? 'design-premium-icon-btn__spin' : ''} />
+                            </button>
+
+                            <button className="design-premium-btn design-premium-btn--primary" onClick={() => setShowTrack(true)}>
+                                <Plus size={15} /> Add Shipment
+                            </button>
+
+                            <button
+                                type="button"
+                                className="design-premium-icon-btn"
+                                title="Notifications"
+                            >
+                                <Bell size={18} />
+                                <span className="design-premium-icon-btn__badge"></span>
+                            </button>
+                        </div>
+                    </div>
+                </header>
+            )}
         </>
     );
+
+    const mobileHeaderActionSheet = showMobileHeaderActions ? (
+        <>
+            <button
+                type="button"
+                className="shipping-mobile-sheet-backdrop"
+                aria-label="Close quick actions"
+                onClick={() => setShowMobileHeaderActions(false)}
+            />
+            <section className="shipping-mobile-sheet shipping-mobile-sheet--actions" role="dialog" aria-modal="true" aria-label="Quick actions">
+                <div className="shipping-mobile-sheet__header">
+                    <h3>Quick Actions</h3>
+                    <button type="button" className="shipping-mobile-sheet__close" onClick={() => setShowMobileHeaderActions(false)}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="shipping-mobile-sheet__body">
+                    <button
+                        type="button"
+                        className="shipping-mobile-action shipping-mobile-action--primary"
+                        onClick={() => {
+                            setShowTrack(true);
+                            setShowMobileHeaderActions(false);
+                        }}
+                    >
+                        <Plus size={16} /> Add Shipment
+                    </button>
+                    <button
+                        type="button"
+                        className="shipping-mobile-action"
+                        onClick={() => {
+                            importExcelPrompt();
+                            setShowMobileHeaderActions(false);
+                        }}
+                    >
+                        <FileSpreadsheet size={16} /> Import Excel
+                    </button>
+                    <button
+                        type="button"
+                        className="shipping-mobile-action"
+                        onClick={async () => {
+                            await handleExport();
+                            setShowMobileHeaderActions(false);
+                        }}
+                    >
+                        <Download size={16} /> Export Excel
+                    </button>
+                    <button
+                        type="button"
+                        className="shipping-mobile-action"
+                        disabled={loading || refreshing}
+                        onClick={async () => {
+                            await refreshTracking();
+                            setShowMobileHeaderActions(false);
+                        }}
+                    >
+                        <RefreshCw size={16} className={refreshing ? 'design-premium-icon-btn__spin' : ''} /> Refresh Tracking
+                    </button>
+                    {hasActiveFilters ? (
+                        <button
+                            type="button"
+                            className="shipping-mobile-action shipping-mobile-action--danger"
+                            onClick={() => {
+                                resetFilters();
+                                setShowMobileHeaderActions(false);
+                            }}
+                        >
+                            <X size={16} /> Clear Filters
+                        </button>
+                    ) : null}
+                </div>
+            </section>
+        </>
+    ) : null;
 
     return (
         <>
@@ -281,6 +411,7 @@ export default function ShipmentDashboardPremium() {
                     )}
 
             </AppShell>
+            {mobileHeaderActionSheet}
         </>
     );
 }

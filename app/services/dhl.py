@@ -186,6 +186,7 @@ class DHLService(CarrierService):
                         "origin": p_data["origin"],
                         "destination": p_data["destination"],
                         "eta": p_data["eta"],
+                        "history": p_data.get("history", []),
                         "carrier": "DHL",
                     })
             
@@ -211,6 +212,9 @@ class DHLService(CarrierService):
                             "origin": data["origin"],
                             "destination": data["destination"],
                             "eta": data["eta"],
+                            # Piece-level history is not always exposed by this response;
+                            # fall back to the master timeline so the UI can show full flow.
+                            "history": list(data.get("history", [])),
                             "carrier": "DHL",
                         })
 

@@ -232,9 +232,10 @@ def _resolve_child_fallback_result(
             child_raw_status = parcel.get("raw_status") or child_status
             child_last_date = parcel.get("last_date") or ""
             child_last_location = parcel.get("last_location") or ""
+            stored_child_history = parcel.get("history")
 
-            child_history = []
-            if child_last_date or child_last_location or child_raw_status:
+            child_history = list(stored_child_history) if isinstance(stored_child_history, list) else []
+            if not child_history and (child_last_date or child_last_location or child_raw_status):
                 child_history.append(
                     {
                         "description": child_raw_status,
@@ -243,8 +244,9 @@ def _resolve_child_fallback_result(
                         "date": child_last_date,
                     }
                 )
-            elif master.history:
-                child_history = list(master.history[:1])
+            elif not child_history and master.history:
+                # Use full parent history when child-specific checkpoints are unavailable.
+                child_history = list(master.history)
 
             return {
                 "carrier": master.carrier or "DHL",
@@ -269,7 +271,7 @@ def _resolve_child_fallback_result(
                 "destination": master.destination or "Unknown",
                 "eta": master.eta or "Unknown",
                 "progress": master.progress if master.progress is not None else _progress_from_status(master.status),
-                "history": list(master.history[:1] if master.history else []),
+                "history": list(master.history or []),
                 "master_tracking_number": master.tracking_number,
                 "is_master": False,
                 "child_parcels": [],

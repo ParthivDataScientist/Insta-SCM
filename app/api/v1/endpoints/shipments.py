@@ -10,7 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 from sqlmodel import Session, select
 
 from app.api.middleware.dhl_validation import validate_dhl_awb_or_400
@@ -52,10 +52,18 @@ class RefreshRequest(BaseModel):
     include_children: bool = False
 
 class SheetRow(BaseModel):
+    model_config = {"populate_by_name": True}
+
     ship_to_location: Optional[str] = None
     client_name: Optional[str] = None
-    booking_date: Optional[str] = None
-    show_date: Optional[str] = None
+    booking_date: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("booking_date", "bookingDate", "booking_dt", "Booking Date", "Booking dt."),
+    )
+    show_date: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("show_date", "showDate", "Show Date", "Show date", "show date"),
+    )
     show_city: Optional[str] = None
     cs_type: Optional[str] = None
     no_of_box: Optional[str] = None

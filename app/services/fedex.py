@@ -189,6 +189,7 @@ class FedExService(CarrierService):
             "eta": child_data["eta"],
             "last_date": child_data["last_date"],
             "last_location": child_data["last_location"],
+            "history": child_data.get("history", []),
             "carrier": "FedEx",
         }
 

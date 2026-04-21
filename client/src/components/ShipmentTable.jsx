@@ -5,9 +5,12 @@ import {
     ChevronRight,
     Filter,
     Loader,
+    MoreHorizontal,
     Package,
     Search,
+    SlidersHorizontal,
     Trash2,
+    X,
 } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
@@ -208,9 +211,10 @@ const getCurrentStatusMeta = (shipment) => {
     };
 };
 
-const parseShowDate = (showDateValue) => {
-    const raw = String(showDateValue ?? '').trim();
+const parseComparableDate = (dateValue) => {
+    const raw = String(dateValue ?? '').trim();
     if (!raw) return null;
+    if (['TBD', '-', 'Unknown', 'Pending', 'NA', 'N/A', 'null', 'undefined'].includes(raw)) return null;
 
     const direct = Date.parse(raw);
     if (!Number.isNaN(direct)) {
@@ -240,14 +244,52 @@ const parseShowDate = (showDateValue) => {
     return null;
 };
 
+const parseShowDate = (showDateValue) => parseComparableDate(showDateValue);
+
 const isUpcomingShowDate = (showDateValue, windowDays = 20) => {
-    const showDate = parseShowDate(showDateValue);
+    const showDate = parseComparableDate(showDateValue);
     if (!showDate) return false;
     const today = new Date();
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const end = new Date(start);
     end.setDate(end.getDate() + windowDays);
     return showDate >= start && showDate <= end;
+};
+
+const isUpcomingBookingDate = (bookingDateValue, windowDays = 20) => {
+    const bookingDate = parseComparableDate(bookingDateValue);
+    if (!bookingDate) return false;
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const end = new Date(start);
+    end.setDate(end.getDate() + windowDays);
+    return bookingDate >= start && bookingDate <= end;
+};
+
+const formatShowDateDisplay = (showDateValue) => {
+    const raw = String(showDateValue ?? '').trim();
+    if (!raw || ['TBD', '-', 'Unknown', 'Pending'].includes(raw)) return '-';
+
+    const parsed = parseComparableDate(raw);
+    if (!parsed) return raw;
+
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}.${month}.${year}`;
+};
+
+const formatLastUpdateLine = (shipment) => {
+    const meta = getCurrentStatusMeta(shipment);
+    if (meta.date && meta.headline) return `${meta.date} • ${meta.headline}`;
+    return meta.headline || meta.date || 'No recent updates';
+};
+
+const shortRouteLabel = (shipment) => {
+    const from = shortLocation(shipment?.origin);
+    const to = shortLocation(shipment?.destination);
+    if (from === '-' && to === '-') return '-';
+    return `${from} → ${to}`;
 };
 
 const buildPositionalGroups = (rows = []) => {
@@ -328,14 +370,19 @@ const buildInlineChildrenFromMaster = (master, masterKey) => {
                 const tracking = readParcelTrackingNumber(parcel);
                 if (!tracking) return null;
 
-                const parcelHistory = (parcel?.last_date || parcel?.last_location || parcel?.raw_status || parcel?.status)
-                    ? [{
-                        description: parcel?.raw_status || parcel?.status || master.status || 'Update',
-                        location: parcel?.last_location || parcel?.destination || '',
-                        status: parcel?.status || parcel?.raw_status || master.status || 'In Transit',
-                        date: parcel?.last_date || '',
-                    }]
-                    : (Array.isArray(master?.history) ? master.history : []);
+                const explicitParcelHistory = Array.isArray(parcel?.history)
+                    ? parcel.history.filter(Boolean)
+                    : [];
+                const parcelHistory = explicitParcelHistory.length > 0
+                    ? explicitParcelHistory
+                    : ((parcel?.last_date || parcel?.last_location || parcel?.raw_status || parcel?.status)
+                        ? [{
+                            description: parcel?.raw_status || parcel?.status || master.status || 'Update',
+                            location: parcel?.last_location || parcel?.destination || '',
+                            status: parcel?.status || parcel?.raw_status || master.status || 'In Transit',
+                            date: parcel?.last_date || '',
+                        }]
+                        : (Array.isArray(master?.history) ? master.history : []));
 
                 return {
                     ...master,
@@ -370,6 +417,10 @@ const buildInlineChildrenFromMaster = (master, masterKey) => {
 const toChildSelectionPayload = (child, master) => ({
     ...(child.__sourceChild || child),
     ...child,
+    id: child?.__sourceChild?.id ?? (child?.id === master?.id ? null : (child?.id ?? null)),
+    history: Array.isArray(child?.history) && child.history.length > 0
+        ? child.history
+        : (Array.isArray(master?.history) ? master.history : []),
     tracking_number: child.__displayTracking || child.tracking_number,
     master_tracking_number: master?.tracking_number || readParentTrackingNumber(child) || null,
     is_master: false,
@@ -428,6 +479,8 @@ const ShipmentTable = ({
     const [statusFilter, setStatusFilter] = useState([]);
     const [carrierFilter, setCarrierFilter] = useState([]);
     const [expandedRows, setExpandedRows] = useState(() => new Set());
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
+    const [mobileActionTarget, setMobileActionTarget] = useState(null);
 
     const groupedShipments = useMemo(() => (
         buildPositionalGroups(shipments).map((group, index) => {
@@ -451,6 +504,10 @@ const ShipmentTable = ({
     );
     const allCarriers = useMemo(
         () => [...new Set(groupedShipments.map((group) => group.master.carrier).filter(Boolean))],
+        [groupedShipments],
+    );
+    const allExhibitions = useMemo(
+        () => [...new Set(groupedShipments.map((group) => group.master.exhibition_name || 'N/A').filter(Boolean))],
         [groupedShipments],
     );
 
@@ -536,6 +593,14 @@ const ShipmentTable = ({
         });
     };
 
+    const clearAllFilters = () => {
+        setIdSearch('');
+        setExhibitionFilter([]);
+        setStatusFilter([]);
+        setCarrierFilter([]);
+        onClearFilters();
+    };
+
     return (
         <div className="shipment-table-shell">
             {hasFilters ? (
@@ -543,13 +608,7 @@ const ShipmentTable = ({
                     <button
                         type="button"
                         className="btn-outline-sm shipment-table-toolbar__clear"
-                        onClick={() => {
-                            setIdSearch('');
-                            setExhibitionFilter([]);
-                            setStatusFilter([]);
-                            setCarrierFilter([]);
-                            onClearFilters();
-                        }}
+                        onClick={clearAllFilters}
                     >
                         Clear All Filters
                     </button>
@@ -562,7 +621,92 @@ const ShipmentTable = ({
                     Loading shipments...
                 </div>
             ) : (
-                <table className="design-table shipping-table">
+                <>
+                    <div className="shipment-table-mobile">
+                        <div className="shipment-mobile-toolbar">
+                            <button
+                                type="button"
+                                className="shipment-mobile-toolbar__button"
+                                onClick={() => setShowMobileFilters(true)}
+                            >
+                                <SlidersHorizontal size={16} />
+                                Filters
+                                {hasFilters ? <span className="shipment-mobile-toolbar__badge">On</span> : null}
+                            </button>
+                            {hasFilters ? (
+                                <button
+                                    type="button"
+                                    className="shipment-mobile-toolbar__button shipment-mobile-toolbar__button--ghost"
+                                    onClick={clearAllFilters}
+                                >
+                                    Clear
+                                </button>
+                            ) : null}
+                        </div>
+
+                        <div className="shipment-mobile-list">
+                            {filteredGroups.map(({ master, childRows, masterKey }) => (
+                                <article
+                                    key={`mobile-${masterKey}`}
+                                    className={`shipment-mobile-card ${isUpcomingBookingDate(master.booking_date) ? 'shipment-mobile-card--upcoming' : ''}`}
+                                >
+                                    <div className="shipment-mobile-card__top">
+                                        <div className="shipment-mobile-card__title-wrap">
+                                            <h3 className="shipment-mobile-card__client">
+                                                {master.recipient || master.project_client_name || 'Unknown Client'}
+                                            </h3>
+                                            <div className="shipment-mobile-card__status">
+                                                <StatusBadge status={master.status} />
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="shipment-mobile-card__menu"
+                                            aria-label="Shipment actions"
+                                            onClick={() => setMobileActionTarget(master)}
+                                        >
+                                            <MoreHorizontal size={18} />
+                                        </button>
+                                    </div>
+
+                                    <div className="shipment-mobile-card__meta-grid">
+                                        <div className="shipment-mobile-card__meta">
+                                            <span className="shipment-mobile-card__label">Courier</span>
+                                            <span className="shipment-mobile-card__value">{displayValue(master.carrier)}</span>
+                                        </div>
+                                        <div className="shipment-mobile-card__meta">
+                                            <span className="shipment-mobile-card__label">Route</span>
+                                            <span className="shipment-mobile-card__value">{shortRouteLabel(master)}</span>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className="shipment-mobile-card__update"
+                                        title={formatLastUpdateLine(master)}
+                                    >
+                                        {formatLastUpdateLine(master)}
+                                    </div>
+
+                                    <div className="shipment-mobile-card__footer">
+                                        <button
+                                            type="button"
+                                            className="shipment-mobile-card__track"
+                                            onClick={() => onSelectShipment(master)}
+                                        >
+                                            Track
+                                        </button>
+                                        <span className="shipment-mobile-card__tracking">{displayValue(master.tracking_number)}</span>
+                                        {childRows.length > 0 ? (
+                                            <span className="shipment-mobile-card__children">+{childRows.length} parcels</span>
+                                        ) : null}
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="shipment-table-desktop">
+                        <table className="design-table shipping-table">
                     <thead className="design-table__thead">
                         <tr>
                             <th className="design-table__th design-table__th--left shipping-col-check">
@@ -603,6 +747,7 @@ const ShipmentTable = ({
 
                             <th className="design-table__th design-table__th--left shipping-col-current">Current Status</th>
                             <th className="design-table__th design-table__th--left shipping-col-eta">Date</th>
+                            <th className="design-table__th design-table__th--left shipping-col-show-date">Show Date</th>
 
                             <FilterPopover title="Carrier" className="shipping-col-carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
                                 <div className="fp-check-list">
@@ -634,6 +779,7 @@ const ShipmentTable = ({
                             const isExpanded = expandedRows.has(masterKey);
                             const isSelected = master.id != null && selectedIds.includes(master.id);
                             const masterHasUpcomingShow = isUpcomingShowDate(master.show_date);
+                            const masterHasUpcomingBooking = isUpcomingBookingDate(master.booking_date);
                             const masterStatusMeta = getCurrentStatusMeta(master);
                             const masterStatusTitle = [masterStatusMeta.date, masterStatusMeta.headline, masterStatusMeta.location]
                                 .filter(Boolean)
@@ -641,7 +787,7 @@ const ShipmentTable = ({
 
                             return (
                                 <Fragment key={masterKey}>
-                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''}`} onClick={() => onSelectShipment(master)}>
+                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${masterHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''}`} onClick={() => onSelectShipment(master)}>
                                         <td className="design-table__td shipping-col-check" onClick={(event) => handleSelectMaster(event, master.id)}>
                                             <span className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                                                 {isSelected ? <Check size={10} /> : null}
@@ -716,6 +862,12 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
+                                        <td className="design-table__td shipping-col-show-date">
+                                            <div className="shipment-date-cell">
+                                                <span className="shipment-date-cell__date">{formatShowDateDisplay(master.show_date)}</span>
+                                            </div>
+                                        </td>
+
                                         <td className="design-table__td shipping-col-carrier">
                                             <span className="carrier-cell">{displayValue(master.carrier)}</span>
                                         </td>
@@ -766,6 +918,7 @@ const ShipmentTable = ({
 
                                     {isExpanded ? childRows.map((child) => {
                                         const childHasUpcomingShow = isUpcomingShowDate(child.show_date || master.show_date);
+                                        const childHasUpcomingBooking = isUpcomingBookingDate(child.booking_date || master.booking_date);
                                         const childStatusMeta = getCurrentStatusMeta(child);
                                         const childStatusTitle = [childStatusMeta.date, childStatusMeta.headline, childStatusMeta.location]
                                             .filter(Boolean)
@@ -773,7 +926,7 @@ const ShipmentTable = ({
                                         return (
                                         <tr
                                             key={child.__rowKey}
-                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''}`}
+                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${childHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''}`}
                                             onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
                                         >
                                             <td className="design-table__td shipping-col-check" />
@@ -817,6 +970,12 @@ const ShipmentTable = ({
                                                 </div>
                                             </td>
 
+                                            <td className="design-table__td shipping-col-show-date">
+                                                <div className="shipment-date-cell shipment-date-cell--child">
+                                                    <span className="shipment-date-cell__date">{formatShowDateDisplay(child.show_date || master.show_date)}</span>
+                                                </div>
+                                            </td>
+
                                             <td className="design-table__td shipping-col-carrier">
                                                 <span className="carrier-cell carrier-cell--child">{displayValue(child.carrier || master.carrier)}</span>
                                             </td>
@@ -846,8 +1005,149 @@ const ShipmentTable = ({
                             );
                         })}
                     </tbody>
-                </table>
+                        </table>
+                    </div>
+                </>
             )}
+
+            {showMobileFilters ? (
+                <>
+                    <button
+                        type="button"
+                        className="shipping-mobile-sheet-backdrop"
+                        aria-label="Close filters"
+                        onClick={() => setShowMobileFilters(false)}
+                    />
+                    <section className="shipping-mobile-sheet" role="dialog" aria-modal="true" aria-label="Shipment filters">
+                        <div className="shipping-mobile-sheet__header">
+                            <h3>Filters</h3>
+                            <button type="button" className="shipping-mobile-sheet__close" onClick={() => setShowMobileFilters(false)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="shipping-mobile-sheet__body">
+                            <label className="shipping-mobile-sheet__field">
+                                <span className="shipping-mobile-sheet__label">Search tracking</span>
+                                <input
+                                    type="text"
+                                    value={idSearch}
+                                    onChange={(event) => setIdSearch(event.target.value)}
+                                    placeholder="Tracking, items, recipient..."
+                                />
+                            </label>
+
+                            <div className="shipping-mobile-sheet__group">
+                                <div className="shipping-mobile-sheet__label">Status</div>
+                                <div className="shipping-mobile-sheet__chips">
+                                    {allStatuses.map((status) => (
+                                        <button
+                                            key={status}
+                                            type="button"
+                                            className={`shipping-mobile-chip ${statusFilter.includes(status) ? 'is-active' : ''}`}
+                                            onClick={() => toggleArrayItem(statusFilter, setStatusFilter, status)}
+                                        >
+                                            {status}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="shipping-mobile-sheet__group">
+                                <div className="shipping-mobile-sheet__label">Carrier</div>
+                                <div className="shipping-mobile-sheet__chips">
+                                    {allCarriers.map((carrier) => (
+                                        <button
+                                            key={carrier}
+                                            type="button"
+                                            className={`shipping-mobile-chip ${carrierFilter.includes(carrier) ? 'is-active' : ''}`}
+                                            onClick={() => toggleArrayItem(carrierFilter, setCarrierFilter, carrier)}
+                                        >
+                                            {carrier}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="shipping-mobile-sheet__group">
+                                <div className="shipping-mobile-sheet__label">Exhibition</div>
+                                <div className="shipping-mobile-sheet__chips">
+                                    {allExhibitions.map((exhibition) => (
+                                        <button
+                                            key={exhibition}
+                                            type="button"
+                                            className={`shipping-mobile-chip ${exhibitionFilter.includes(exhibition) ? 'is-active' : ''}`}
+                                            onClick={() => toggleArrayItem(exhibitionFilter, setExhibitionFilter, exhibition)}
+                                        >
+                                            {exhibition}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="shipping-mobile-sheet__footer">
+                            <button type="button" className="shipping-mobile-sheet__ghost" onClick={clearAllFilters}>
+                                Clear all
+                            </button>
+                            <button type="button" className="shipping-mobile-sheet__primary" onClick={() => setShowMobileFilters(false)}>
+                                Apply
+                            </button>
+                        </div>
+                    </section>
+                </>
+            ) : null}
+
+            {mobileActionTarget ? (
+                <>
+                    <button
+                        type="button"
+                        className="shipping-mobile-sheet-backdrop"
+                        aria-label="Close shipment actions"
+                        onClick={() => setMobileActionTarget(null)}
+                    />
+                    <section className="shipping-mobile-sheet shipping-mobile-sheet--actions" role="dialog" aria-modal="true" aria-label="Shipment actions">
+                        <div className="shipping-mobile-sheet__header">
+                            <h3>Actions</h3>
+                            <button type="button" className="shipping-mobile-sheet__close" onClick={() => setMobileActionTarget(null)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="shipping-mobile-sheet__body">
+                            <button
+                                type="button"
+                                className="shipping-mobile-action"
+                                onClick={() => {
+                                    onSelectShipment(mobileActionTarget);
+                                    setMobileActionTarget(null);
+                                }}
+                            >
+                                View details
+                            </button>
+                            {onArchiveShipment ? (
+                                <button
+                                    type="button"
+                                    className="shipping-mobile-action"
+                                    onClick={() => {
+                                        onArchiveShipment(mobileActionTarget.id);
+                                        setMobileActionTarget(null);
+                                    }}
+                                >
+                                    {mobileActionTarget.is_archived ? 'Restore to Dashboard' : 'Move to Storage'}
+                                </button>
+                            ) : null}
+                            <button
+                                type="button"
+                                className="shipping-mobile-action shipping-mobile-action--danger"
+                                onClick={() => {
+                                    onDeleteShipment(mobileActionTarget.id);
+                                    setMobileActionTarget(null);
+                                }}
+                            >
+                                Delete shipment
+                            </button>
+                        </div>
+                    </section>
+                </>
+            ) : null}
 
             {filteredGroups.length === 0 && !loading ? (
                 <div className="shipment-table-empty">

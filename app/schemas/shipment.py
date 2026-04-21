@@ -24,6 +24,7 @@ class ChildParcel(BaseModel):
     origin: Optional[str] = None
     destination: Optional[str] = None
     eta: Optional[str] = None
+    booking_date: Optional[str] = None
     last_date: Optional[str] = None
     last_location: Optional[str] = None
     carrier: Optional[str] = None
@@ -51,6 +52,7 @@ class ShipmentResponse(BaseModel):
     project_name: Optional[str] = None
     project_client_name: Optional[str] = None
     eta: Optional[str] = None
+    booking_date: Optional[str] = None
     progress: Optional[int] = 0
     show_date: Optional[str] = None
     cs: Optional[str] = None
