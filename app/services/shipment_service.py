@@ -202,12 +202,22 @@ def _resolve_child_fallback_result(
     if not tn:
         return None
 
+    master_hint = (master_tracking_number or "").strip().upper()
     existing = db.exec(select(Shipment).where(Shipment.tracking_number == tn)).first()
     if existing:
-        return _build_result_from_existing_shipment_row(existing)
+        existing_has_history = bool(existing.history)
+        existing_master = (existing.master_tracking_number or "").strip().upper()
+        should_try_master_context = (
+            allow_master_context
+            and master_tracking_number
+            and existing_master
+            and existing_master == master_hint
+            and not existing_has_history
+        )
+        if not should_try_master_context:
+            return _build_result_from_existing_shipment_row(existing)
 
     masters_to_check: list[Shipment] = []
-    master_hint = (master_tracking_number or "").strip().upper()
     if master_hint:
         hinted_master = db.exec(select(Shipment).where(Shipment.tracking_number == master_hint)).first()
         if hinted_master:

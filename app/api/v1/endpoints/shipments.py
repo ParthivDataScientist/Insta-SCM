@@ -4,6 +4,7 @@ All business logic lives in app.services.shipment_service.
 """
 import io
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import pandas as pd
@@ -19,6 +20,8 @@ from app.db.session import get_session
 from app.models.dashboard_project import DashboardProject
 from app.models.shipment import Shipment
 from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
+from app.services.carrier_detection import detect_carrier
+from app.services.dhl_validation import DHL_AWB_FORMAT_ERROR
 from app.services.shipment_service import get_stats, track_and_save, preview_track, refresh_tracked_shipments
 from app.services.dhl import DHLService
 
@@ -52,6 +55,7 @@ class RefreshRequest(BaseModel):
     include_children: bool = False
 
 class SheetRow(BaseModel):
+    row_number: Optional[int] = None
     ship_to_location: Optional[str] = None
     client_name: Optional[str] = None
     booking_date: Optional[str] = None
@@ -66,6 +70,7 @@ class SheetRow(BaseModel):
 
 class WebhookPayload(BaseModel):
     rows: List[SheetRow]
+    track_live: bool = False
 
 
 EMPTY_TRACKING_TOKENS = {"", "nan", "none", "null", "-", "n/a", "na"}
@@ -346,52 +351,255 @@ async def import_excel(
     }
 
 
+def _clean_sheet_value(value: Optional[str]) -> Optional[str]:
+    token = str(value or "").strip()
+    return None if token.lower() in EMPTY_TRACKING_TOKENS else token
+
+
+def _sheet_row_has_data(row: SheetRow) -> bool:
+    return any(
+        _clean_sheet_value(getattr(row, field))
+        for field in (
+            "ship_to_location",
+            "client_name",
+            "booking_date",
+            "show_date",
+            "show_city",
+            "cs_type",
+            "no_of_box",
+            "courier",
+            "master_awb",
+            "child_awb",
+            "remarks",
+        )
+    )
+
+
+def _looks_like_dhl(courier: Optional[str]) -> bool:
+    return "dhl" in str(courier or "").strip().lower()
+
+
+def _resolve_sheet_carrier(tracking_number: str, courier: Optional[str]) -> str:
+    detected = detect_carrier(tracking_number)
+    if detected != "Unknown":
+        return detected
+
+    courier_label = str(courier or "").strip().lower()
+    if "fedex" in courier_label or "fed ex" in courier_label:
+        return "FedEx" if detected == "FedEx" else "Unknown"
+    if "dhl" in courier_label:
+        return "DHL" if detected == "DHL" else "Unknown"
+    if "ups" in courier_label:
+        return "UPS" if detected == "UPS" else "Unknown"
+    return "Unknown"
+
+
+def _sheet_failure(
+    row: SheetRow,
+    row_number: int,
+    tracking_number: Optional[str],
+    reason: str,
+    *,
+    carrier: Optional[str] = None,
+) -> dict:
+    return {
+        "row_number": row_number,
+        "tracking_number": tracking_number,
+        "master_awb": _normalize_tracking_cell(row.master_awb),
+        "child_awb": _normalize_tracking_cell(row.child_awb),
+        "carrier": carrier or _resolve_sheet_carrier(tracking_number or "", row.courier),
+        "reason": reason,
+    }
+
+
+def _upsert_sheet_shipment_metadata(
+    *,
+    db: Session,
+    row: SheetRow,
+    tracking_number: str,
+    master_tracking_number: Optional[str],
+    is_master: bool,
+    carrier: str,
+) -> dict:
+    existing = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    sync_event = {
+        "description": "Shipment synced from Google Sheet",
+        "location": _clean_sheet_value(row.ship_to_location) or "",
+        "status": "Pending carrier refresh",
+        "date": now_iso,
+    }
+
+    if existing:
+        existing.carrier = carrier or existing.carrier
+        existing.recipient = _clean_sheet_value(row.client_name) or existing.recipient
+        existing.show_date = _clean_sheet_value(row.show_date) or existing.show_date
+        existing.exhibition_name = _clean_sheet_value(row.show_city) or existing.exhibition_name
+        existing.destination = _clean_sheet_value(row.ship_to_location) or existing.destination
+        existing.booking_date = _clean_sheet_value(row.booking_date) or existing.booking_date
+        existing.cs = _clean_sheet_value(row.cs_type) or existing.cs
+        existing.cs_type = _clean_sheet_value(row.cs_type) or existing.cs_type
+        existing.no_of_box = _clean_sheet_value(row.no_of_box) or existing.no_of_box
+        existing.remarks = _clean_sheet_value(row.remarks) or existing.remarks
+        existing.master_tracking_number = master_tracking_number
+        existing.is_master = is_master
+        if not existing.history:
+            existing.history = [sync_event]
+        db.add(existing)
+        return {"tracking_number": tracking_number, "status": "success", "carrier": carrier, "outcome": "updated"}
+
+    shipment = Shipment(
+        tracking_number=tracking_number,
+        carrier=carrier,
+        status="Pending",
+        recipient=_clean_sheet_value(row.client_name) or "",
+        exhibition_name=_clean_sheet_value(row.show_city) or "Unknown Exhibition",
+        show_date=_clean_sheet_value(row.show_date),
+        origin="Unknown",
+        destination=_clean_sheet_value(row.ship_to_location) or "Unknown",
+        eta="TBD",
+        progress=0,
+        items="Child Package" if master_tracking_number else "Package",
+        history=[sync_event],
+        cs=_clean_sheet_value(row.cs_type),
+        no_of_box=_clean_sheet_value(row.no_of_box),
+        booking_date=_clean_sheet_value(row.booking_date),
+        show_city=_clean_sheet_value(row.show_city),
+        cs_type=_clean_sheet_value(row.cs_type),
+        remarks=_clean_sheet_value(row.remarks),
+        master_tracking_number=master_tracking_number,
+        is_master=is_master,
+        child_parcels=[],
+    )
+    db.add(shipment)
+    return {"tracking_number": tracking_number, "status": "success", "carrier": carrier, "outcome": "created"}
+
+
 def _process_webhook_payload(payload: WebhookPayload, db: Session):
-    success = 0
+    imported = 0
     failed = 0
-    errors = []
-    
+    skipped = 0
+    failures = []
+    skipped_rows = []
+    imported_rows = []
+    seen_tracking_numbers: set[str] = set()
     last_master_awb = None
-    
-    for row in payload.rows:
+
+    for index, row in enumerate(payload.rows):
+        row_number = row.row_number or index + 2
         tracking_number, master_to_use, is_master, last_master_awb = _resolve_tracking_row(
             master_awb=row.master_awb,
             child_awb=row.child_awb,
             last_master_awb=last_master_awb,
         )
         if not tracking_number:
+            if _sheet_row_has_data(row):
+                failed += 1
+                failures.append(_sheet_failure(row, row_number, None, "Missing master_awb and child_awb"))
+            else:
+                skipped += 1
+                skipped_rows.append({"row_number": row_number, "reason": "Blank row"})
+            continue
+
+        if tracking_number in seen_tracking_numbers:
+            skipped += 1
+            skipped_rows.append({
+                "row_number": row_number,
+                "tracking_number": tracking_number,
+                "master_awb": _normalize_tracking_cell(row.master_awb),
+                "child_awb": _normalize_tracking_cell(row.child_awb),
+                "reason": "Duplicate tracking number in this sync payload",
+            })
+            continue
+        seen_tracking_numbers.add(tracking_number)
+
+        if not is_master and not master_to_use:
+            failed += 1
+            failures.append(_sheet_failure(
+                row,
+                row_number,
+                tracking_number,
+                "Child shipment is missing a master_awb relationship",
+            ))
+            continue
+
+        carrier = _resolve_sheet_carrier(tracking_number, row.courier)
+        if carrier == "Unknown":
+            failed += 1
+            reason = DHL_AWB_FORMAT_ERROR if _looks_like_dhl(row.courier) else "Unsupported carrier or tracking number format"
+            failures.append(_sheet_failure(row, row_number, tracking_number, reason, carrier=carrier))
             continue
 
         try:
-            res = track_and_save(
-                tracking_number=tracking_number,
-                recipient=row.client_name,
-                items=None, # Not explicitly in sheet as an item field
-                show_date=row.show_date,
-                exhibition_name="Unknown Exhibition", # We can update if sheet adds it
-                db=db,
-                cs=row.cs_type,
-                no_of_box=row.no_of_box,
-                project_id=None,
-                destination=row.ship_to_location,
-                booking_date=row.booking_date,
-                show_city=row.show_city,
-                cs_type=row.cs_type,
-                remarks=row.remarks,
-                master_tracking_number=master_to_use,
-                is_master=is_master
-            )
+            if payload.track_live:
+                res = track_and_save(
+                    tracking_number=tracking_number,
+                    recipient=row.client_name,
+                    items=None,
+                    show_date=row.show_date,
+                    exhibition_name=row.show_city or "Unknown Exhibition",
+                    db=db,
+                    cs=row.cs_type,
+                    no_of_box=row.no_of_box,
+                    project_id=None,
+                    destination=row.ship_to_location,
+                    booking_date=row.booking_date,
+                    show_city=row.show_city,
+                    cs_type=row.cs_type,
+                    remarks=row.remarks,
+                    master_tracking_number=master_to_use,
+                    is_master=is_master,
+                )
+                outcome = "tracked"
+            else:
+                res = _upsert_sheet_shipment_metadata(
+                    db=db,
+                    row=row,
+                    tracking_number=tracking_number,
+                    master_tracking_number=master_to_use,
+                    is_master=is_master,
+                    carrier=carrier,
+                )
+                outcome = res.get("outcome", "imported")
+
             if "error" in res:
                 failed += 1
-                errors.append(f"{tracking_number}: {res['error']}")
+                failures.append(_sheet_failure(row, row_number, tracking_number, res["error"], carrier=carrier))
             else:
-                success += 1
-        except Exception as e:
-            logger.error(f"Error processing webhook row {tracking_number}: {str(e)}")
+                imported += 1
+                imported_rows.append({
+                    "row_number": row_number,
+                    "tracking_number": tracking_number,
+                    "master_tracking_number": master_to_use,
+                    "carrier": carrier,
+                    "outcome": outcome,
+                })
+        except Exception as exc:
+            logger.exception("Error processing Google Sheet row %s (%s)", row_number, tracking_number)
             failed += 1
-            errors.append(f"{tracking_number}: {str(e)}")
-            
-    return {"success": success, "failed": failed, "errors": errors}
+            failures.append(_sheet_failure(row, row_number, tracking_number, str(exc), carrier=carrier))
+
+    if not payload.track_live:
+        db.commit()
+
+    errors = [
+        f"Row {failure['row_number']} ({failure.get('tracking_number') or 'no tracking'}): {failure['reason']}"
+        for failure in failures
+    ]
+
+    return {
+        "received": len(payload.rows),
+        "processed": imported + failed + skipped,
+        "imported": imported,
+        "success": imported,
+        "failed": failed,
+        "skipped": skipped,
+        "tracking_mode": "live" if payload.track_live else "metadata_only",
+        "errors": errors,
+        "failures": failures,
+        "skipped_rows": skipped_rows,
+        "imported_rows": imported_rows,
+    }
 
 
 @router.post("/webhook/google-sheet", status_code=200)
@@ -408,10 +616,11 @@ async def google_sheet_webhook(
     result = await run_in_threadpool(_process_webhook_payload, payload, db)
     return {
         "status": "completed",
-        "success": result["success"],
-        "failed": result["failed"],
-        "errors": result["errors"],
-        "message": f"Processed {result['success']} shipments. {result['failed']} failed.",
+        **result,
+        "message": (
+            f"Received {result['received']} row(s). Imported {result['imported']}, "
+            f"failed {result['failed']}, skipped {result['skipped']}."
+        ),
     }
 
 
