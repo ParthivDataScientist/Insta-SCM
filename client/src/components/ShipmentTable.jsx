@@ -28,6 +28,7 @@ function useOnClickOutside(ref, handler) {
 }
 
 const normalizeToken = (value) => String(value ?? '').trim();
+const normalizeTrackingKey = (value) => normalizeToken(value).toUpperCase();
 
 const displayValue = (value) => {
     const token = normalizeToken(value);
@@ -57,19 +58,65 @@ const parseTrackingTokens = (value) => {
     )];
 };
 
+const readFirstToken = (...values) => {
+    for (const value of values) {
+        const [token] = parseTrackingTokens(value);
+        if (token) return token;
+    }
+    return '';
+};
+
+const readParentTrackingNumber = (shipment) => readFirstToken(
+    shipment?.master_tracking_number,
+    shipment?.masterTrackingNumber,
+    shipment?.parent_tracking_number,
+    shipment?.parentTrackingNumber,
+    shipment?.parent_awb,
+    shipment?.parentAwb,
+    shipment?.master_awb,
+    shipment?.masterAwb,
+    shipment?.relationship?.master_tracking_number,
+    shipment?.relationship?.parent_tracking_number,
+);
+
+const readParcelTrackingNumber = (parcel) => readFirstToken(
+    parcel?.tracking_number,
+    parcel?.trackingNumber,
+    parcel?.trackingNo,
+    parcel?.tracking,
+    parcel?.awb,
+    parcel?.child_awb,
+    parcel?.childAwb,
+);
+
+const readInlineParcels = (shipment) => {
+    const candidates = [
+        shipment?.child_parcels,
+        shipment?.childPackages,
+        shipment?.child_packages,
+        shipment?.child_shipments,
+        shipment?.childShipments,
+        shipment?.children,
+        shipment?.pieces,
+        shipment?.packages,
+    ];
+
+    return candidates.find((value) => Array.isArray(value) && value.length > 0) || [];
+};
+
 const readChildPackages = (shipment) => {
     const directTokens = parseTrackingTokens(
         shipment?.child_package
         ?? shipment?.child_awb
         ?? shipment?.child_tracking_number
-        ?? shipment?.child_tracking_numbers,
+        ?? shipment?.child_tracking_numbers
+        ?? shipment?.childTrackingNumbers
+        ?? shipment?.child_awbs,
     );
 
-    const parcelTokens = Array.isArray(shipment?.child_parcels)
-        ? shipment.child_parcels
-            .map((parcel) => normalizeToken(parcel?.tracking_number || parcel?.trackingNo || parcel?.tracking))
-            .filter(Boolean)
-        : [];
+    const parcelTokens = readInlineParcels(shipment)
+        .map((parcel) => readParcelTrackingNumber(parcel))
+        .filter(Boolean);
 
     return [...new Set([...directTokens, ...parcelTokens])];
 };
@@ -209,7 +256,7 @@ const buildPositionalGroups = (rows = []) => {
     const pendingChildren = [];
 
     const registerMaster = (row, index) => {
-        const trackingNumber = normalizeToken(row?.tracking_number);
+        const trackingNumber = normalizeTrackingKey(row?.tracking_number);
         const key = trackingNumber || `row-${index}`;
         const existing = groupsByMasterTracking.get(key);
         if (existing) return existing;
@@ -223,8 +270,8 @@ const buildPositionalGroups = (rows = []) => {
     rows.forEach((row, index) => {
         if (!row) return;
 
-        const trackingNumber = normalizeToken(row.tracking_number);
-        const explicitParent = normalizeToken(row.master_tracking_number);
+        const trackingNumber = normalizeTrackingKey(row.tracking_number);
+        const explicitParent = normalizeTrackingKey(readParentTrackingNumber(row));
         const isChildRow = Boolean(explicitParent && explicitParent !== trackingNumber);
 
         if (isChildRow) {
@@ -274,11 +321,11 @@ const expandChildRows = (children, master) => children.flatMap((child, childInde
 });
 
 const buildInlineChildrenFromMaster = (master, masterKey) => {
-    const parcels = Array.isArray(master?.child_parcels) ? master.child_parcels : [];
+    const parcels = readInlineParcels(master);
     if (parcels.length) {
         return parcels
             .map((parcel, index) => {
-                const tracking = normalizeToken(parcel?.tracking_number || parcel?.trackingNo || parcel?.tracking);
+                const tracking = readParcelTrackingNumber(parcel);
                 if (!tracking) return null;
 
                 const parcelHistory = (parcel?.last_date || parcel?.last_location || parcel?.raw_status || parcel?.status)
@@ -324,7 +371,7 @@ const toChildSelectionPayload = (child, master) => ({
     ...(child.__sourceChild || child),
     ...child,
     tracking_number: child.__displayTracking || child.tracking_number,
-    master_tracking_number: master?.tracking_number || child.master_tracking_number || null,
+    master_tracking_number: master?.tracking_number || readParentTrackingNumber(child) || null,
     is_master: false,
 });
 
@@ -687,31 +734,33 @@ const ShipmentTable = ({
                                         </td>
 
                                         <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
-                                            <button type="button" className="track-btn" onClick={() => onSelectShipment(master)}>Track</button>
-                                            {onArchiveShipment ? (
+                                            <div className="action-cell__inner">
+                                                <button type="button" className="track-btn" onClick={() => onSelectShipment(master)}>Track</button>
+                                                {onArchiveShipment ? (
+                                                    <button
+                                                        type="button"
+                                                        className="archive-btn"
+                                                        title={master.is_archived ? 'Restore to Dashboard' : 'Move to Storage'}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            onArchiveShipment(master.id);
+                                                        }}
+                                                    >
+                                                        {master.is_archived ? 'Restore' : 'Move'}
+                                                    </button>
+                                                ) : null}
                                                 <button
                                                     type="button"
-                                                    className="archive-btn"
-                                                    title={master.is_archived ? 'Restore to Dashboard' : 'Move to Storage'}
+                                                    className="delete-btn"
+                                                    title="Delete shipment"
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        onArchiveShipment(master.id);
+                                                        onDeleteShipment(master.id);
                                                     }}
                                                 >
-                                                    {master.is_archived ? 'Restore' : 'Move'}
+                                                    <Trash2 size={14} />
                                                 </button>
-                                            ) : null}
-                                            <button
-                                                type="button"
-                                                className="delete-btn"
-                                                title="Delete shipment"
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    onDeleteShipment(master.id);
-                                                }}
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                            </div>
                                         </td>
                                     </tr>
 
@@ -780,13 +829,15 @@ const ShipmentTable = ({
                                             </td>
 
                                             <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
-                                                <button
-                                                    type="button"
-                                                    className="track-btn mini-btn"
-                                                    onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
-                                                >
-                                                    Details
-                                                </button>
+                                                <div className="action-cell__inner">
+                                                    <button
+                                                        type="button"
+                                                        className="track-btn mini-btn"
+                                                        onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
+                                                    >
+                                                        Details
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                         );

@@ -125,7 +125,7 @@ export function useShipments() {
         setError(null);
         try {
             const result = await shipmentsService.refreshShipments(shipmentIds, {
-                includeChildren: false,
+                includeChildren: true,
                 timeoutMs: 120000,
             });
             await loadData(null, { silent: true });

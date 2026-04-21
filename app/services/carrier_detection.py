@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from app.services.dhl_validation import is_valid_dhl_tracking_number
+
 # Public label returned to API consumers (stable contract).
 ProviderName = str
 
@@ -39,14 +41,7 @@ def detect_carrier(tracking_number: str) -> ProviderName:
     if re.fullmatch(r"\d{22}", tn):
         return "FedEx"
 
-    if re.fullmatch(r"\d{10}", tn):
-        return "DHL"
-
-    if re.fullmatch(r"[A-Z]{2}\d{9,}[A-Z]{2}", tn):
-        return "DHL"
-
-    # DHL child-piece tokens can appear as "JD..." in import feeds.
-    if re.fullmatch(r"JD\d{10,}", tn):
+    if is_valid_dhl_tracking_number(tn):
         return "DHL"
 
     return "Unknown"

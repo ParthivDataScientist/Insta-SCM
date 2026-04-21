@@ -1,6 +1,6 @@
 import html
 
-from app.services.dhl_provider import DHLProvider
+from app.services.dhl_provider import DHL_CHILD_PIECE_CONTEXT_ERROR, DHL_SOAP_INTERNAL_ERROR, DHLProvider
 from app.services.dhl_validation import DHL_AWB_FORMAT_ERROR
 
 
@@ -23,10 +23,59 @@ def _wrap_in_soap(payload: str, result_node: str = "PostTrackingResult") -> str:
     )
 
 
+def _wrap_fault(message: str) -> str:
+    return (
+        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">'
+        "<s:Body>"
+        "<s:Fault>"
+        "<faultcode>s:Server</faultcode>"
+        f"<faultstring>{html.escape(message)}</faultstring>"
+        "</s:Fault>"
+        "</s:Body>"
+        "</s:Envelope>"
+    )
+
+
 def test_dhl_provider_rejects_invalid_awb():
     provider = DHLProvider()
     result = provider.track("1Z12345E0291980793")
     assert result["error"] == DHL_AWB_FORMAT_ERROR
+
+
+def test_dhl_provider_accepts_child_piece_identifier():
+    provider = DHLProvider()
+    child_piece = "JD014600012565061255"
+    assert provider._validate_input(child_piece, raw_input=child_piece) is None
+
+
+def test_dhl_provider_translates_child_piece_null_reference_fault(monkeypatch):
+    provider = DHLProvider()
+    fault = _wrap_fault("Object reference not set to an instance of an object.")
+
+    monkeypatch.setattr(
+        "app.services.dhl_provider.requests.post",
+        lambda *args, **kwargs: _MockResponse(status_code=500, text=fault),
+    )
+
+    result = provider.track("JD014600012565061255")
+
+    assert result["error"] == DHL_CHILD_PIECE_CONTEXT_ERROR
+    assert "Object reference" not in result["error"]
+
+
+def test_dhl_provider_translates_awb_null_reference_fault(monkeypatch):
+    provider = DHLProvider()
+    fault = _wrap_fault("Object reference not set to an instance of an object.")
+
+    monkeypatch.setattr(
+        "app.services.dhl_provider.requests.post",
+        lambda *args, **kwargs: _MockResponse(status_code=500, text=fault),
+    )
+
+    result = provider.track("1234567890")
+
+    assert result["error"] == DHL_SOAP_INTERNAL_ERROR
+    assert "Object reference" not in result["error"]
 
 
 def test_dhl_provider_uses_awbnumber_tag():

@@ -37,6 +37,9 @@ class TestDHLDetection:
     def test_dhl_ecommerce_format(self):
         assert detect_carrier("GM123456789DE") == "DHL"
 
+    def test_dhl_child_piece_jd_format(self):
+        assert detect_carrier("JD014600012565061255") == "DHL"
+
 
 class TestUnknownDetection:
     def test_unknown_gibberish(self):

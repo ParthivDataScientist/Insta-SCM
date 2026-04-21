@@ -12,9 +12,22 @@ import requests
 
 from app.core.config import settings
 from app.services.carrier_base import HISTORY_STATUS_MAP
-from app.services.dhl_validation import DHL_AWB_FORMAT_ERROR, sanitize_dhl_awb
+from app.services.dhl_validation import (
+    DHL_AWB_FORMAT_ERROR,
+    is_dhl_child_piece_id,
+    is_valid_dhl_tracking_number,
+    sanitize_dhl_awb,
+)
 
 logger = logging.getLogger(__name__)
+
+DHL_CHILD_PIECE_CONTEXT_ERROR = (
+    "DHL child piece IDs require the related master AWB for tracking. "
+    "Track or import the master shipment first so the child package can be resolved from the DHL shipment hierarchy."
+)
+DHL_SOAP_INTERNAL_ERROR = (
+    "DHL tracking service returned an internal error. Please verify the AWB and try again."
+)
 
 DHL_EVENT_CODE_MAP = {
     **HISTORY_STATUS_MAP,
@@ -105,7 +118,7 @@ class DHLProvider:
         if any(marker in upper_input for marker in self.NON_DHL_MARKERS):
             return DHL_AWB_FORMAT_ERROR
 
-        if not re.fullmatch(r"\d{10}", awb):
+        if not is_valid_dhl_tracking_number(awb):
             return DHL_AWB_FORMAT_ERROR
 
         return None
@@ -135,9 +148,13 @@ class DHLProvider:
         if response.status_code >= 400:
             fault = self._extract_fault_message(response.text)
             detail = fault or f"HTTP {response.status_code}"
-            return {"error": f"DHL SOAP Error: {detail}"}
+            return {"error": self._format_soap_error(normalized_awb=awb, detail=detail)}
 
-        extraction = self._extract_post_tracking_result(response.text, result_node=result_node)
+        extraction = self._extract_post_tracking_result(
+            response.text,
+            result_node=result_node,
+            normalized_awb=awb,
+        )
         if extraction.get("error"):
             return {"error": extraction["error"]}
 
@@ -214,7 +231,22 @@ class DHLProvider:
         fault_text = fault_node.findtext(".//{*}faultstring") or fault_node.findtext(".//{*}Text") or ""
         return _text_or_empty(fault_text)
 
-    def _extract_post_tracking_result(self, soap_xml: str, *, result_node: str) -> dict[str, str]:
+    def _format_soap_error(self, *, normalized_awb: str, detail: str) -> str:
+        message = _text_or_empty(detail)
+        lower_message = message.lower()
+        if "object reference not set to an instance of an object" in lower_message:
+            if is_dhl_child_piece_id(normalized_awb):
+                return DHL_CHILD_PIECE_CONTEXT_ERROR
+            return DHL_SOAP_INTERNAL_ERROR
+        return f"DHL SOAP Error: {message or 'Unknown carrier error'}"
+
+    def _extract_post_tracking_result(
+        self,
+        soap_xml: str,
+        *,
+        result_node: str,
+        normalized_awb: str,
+    ) -> dict[str, str]:
         try:
             root = ET.fromstring(soap_xml)
         except ET.ParseError as exc:
@@ -222,7 +254,7 @@ class DHLProvider:
 
         fault_message = self._extract_fault_message(soap_xml)
         if fault_message:
-            return {"error": fault_message}
+            return {"error": self._format_soap_error(normalized_awb=normalized_awb, detail=fault_message)}
 
         result = root.find(f".//{{*}}{result_node}")
         if result is None:

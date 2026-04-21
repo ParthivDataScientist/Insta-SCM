@@ -60,6 +60,11 @@ class TestTrackShipment:
         assert data["carrier"] == "FedEx"
         assert data["tracking_number"] == "888598190302"
 
+    def test_dhl_preview_accepts_child_piece_number(self, client):
+        resp = client.get("/api/v1/shipments/dhl/track/JD014600012565061255/preview")
+        assert resp.status_code == 200
+        assert resp.json()["carrier"] == "DHL"
+
     def test_track_creates_db_record(self, client):
         """After tracking, shipment should appear in list."""
         project = create_project(client, "List Shipment Project")

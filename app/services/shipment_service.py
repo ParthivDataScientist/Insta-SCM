@@ -192,6 +192,7 @@ def _resolve_child_fallback_result(
     db: Session,
     tracking_number: str,
     master_tracking_number: Optional[str] = None,
+    allow_master_context: bool = False,
 ) -> Optional[dict]:
     """
     Resolve a child package from already saved master shipment data when the
@@ -216,9 +217,10 @@ def _resolve_child_fallback_result(
         masters_to_check = db.exec(select(Shipment).where(Shipment.is_archived == False)).all()
 
     for master in masters_to_check:
+        master_tn = (master.tracking_number or "").strip().upper()
         parcels = master.child_parcels or []
         if not isinstance(parcels, list):
-            continue
+            parcels = []
         for parcel in parcels:
             if not isinstance(parcel, dict):
                 continue
@@ -257,6 +259,22 @@ def _resolve_child_fallback_result(
                 "child_parcels": [],
                 "raw_status": child_raw_status,
                 "last_scan_date": child_last_date or master.last_scan_date or "",
+            }
+
+        if allow_master_context and master_hint and master_tn == master_hint and tn != master_tn:
+            return {
+                "carrier": master.carrier or "DHL",
+                "status": master.status or "In Transit",
+                "origin": master.origin or "Unknown",
+                "destination": master.destination or "Unknown",
+                "eta": master.eta or "Unknown",
+                "progress": master.progress if master.progress is not None else _progress_from_status(master.status),
+                "history": list(master.history[:1] if master.history else []),
+                "master_tracking_number": master.tracking_number,
+                "is_master": False,
+                "child_parcels": [],
+                "raw_status": master.status or "In Transit",
+                "last_scan_date": master.last_scan_date or "",
             }
 
     return None
@@ -314,16 +332,37 @@ def track_and_save(
                 "error": "UPS tracking is not yet supported. Supported carriers: FedEx, DHL.",
             }
         else:
+            supported_formats = (
+                "Supported formats: FedEx (12/15/20/22 digits), DHL "
+                "(10-digit AWB, eCommerce ID, or JD child piece ID), UPS (1Z...)."
+            )
             return {
                 "tracking_number": tracking_number,
                 "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
-                         "Supported formats: FedEx (12/15/20/22 digits), DHL (10 digits), UPS (1Z...).",
+                f"{supported_formats}",
             }
     else:
         return {
             "tracking_number": tracking_number,
             "error": f"Could not detect carrier for tracking number '{tracking_number}'.",
         }
+
+    if service is not None and master_tracking_number:
+        contextual_fallback = _resolve_child_fallback_result(
+            db=db,
+            tracking_number=tracking_number,
+            master_tracking_number=master_tracking_number,
+            allow_master_context=(carrier_name == "DHL"),
+        )
+        if contextual_fallback:
+            result = contextual_fallback
+            carrier_name = str(result.get("carrier") or carrier_name)
+            service = None
+            logger.info(
+                "Resolved child shipment %s from %s master context before live carrier lookup.",
+                tracking_number,
+                carrier_name,
+            )
 
     if service is not None:
         result = service.track(tracking_number)
@@ -333,6 +372,7 @@ def track_and_save(
                 db=db,
                 tracking_number=tracking_number,
                 master_tracking_number=master_tracking_number,
+                allow_master_context=(carrier_name == "DHL"),
             )
             if fallback:
                 result = fallback
@@ -540,6 +580,19 @@ def preview_track(
             return {"error": "UPS tracking is not yet supported."}
         return {"error": f"Could not detect carrier for '{tracking_number}'."}
 
+    if service is not None and db is not None and master_tracking_number:
+        contextual_fallback = _resolve_child_fallback_result(
+            db=db,
+            tracking_number=tracking_number,
+            master_tracking_number=master_tracking_number,
+            allow_master_context=(carrier_name == "DHL"),
+        )
+        if contextual_fallback:
+            result = _apply_stuck_exception_policy(contextual_fallback)
+            result["tracking_number"] = tracking_number
+            result["carrier"] = str(result.get("carrier") or carrier_name)
+            return result
+
     result = service.track(tracking_number)
     if "error" in result:
         if db is not None:
@@ -547,6 +600,7 @@ def preview_track(
                 db=db,
                 tracking_number=tracking_number,
                 master_tracking_number=master_tracking_number,
+                allow_master_context=(carrier_name == "DHL"),
             )
             if fallback:
                 result = fallback
