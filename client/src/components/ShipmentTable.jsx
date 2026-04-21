@@ -121,14 +121,18 @@ const readChildPackages = (shipment) => {
     return [...new Set([...directTokens, ...parcelTokens])];
 };
 
-const formatShowDate = (dateStr) => {
-    const raw = normalizeToken(dateStr);
-    if (!raw || ['TBD', '-', 'Unknown', 'Pending'].includes(raw)) return '-';
-
-    const parsed = parseShowDate(raw);
-    if (!parsed) return raw;
-
-    return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const formatDateTime = (dateStr) => {
+    if (!dateStr || ['TBD', '-', 'Unknown', 'Pending'].includes(dateStr)) return '-';
+    try {
+        const date = new Date(dateStr);
+        if (Number.isNaN(date.getTime())) return dateStr;
+        return {
+            datePart: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            timePart: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        };
+    } catch (_) {
+        return dateStr;
+    }
 };
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -345,7 +349,6 @@ const buildInlineChildrenFromMaster = (master, masterKey) => {
                     tracking_number: tracking,
                     __displayTracking: tracking,
                     __sourceChild: parcel,
-                    __isInlineChild: true,
                     __rowKey: `inline-${masterKey}-${index}`,
                 };
             })
@@ -360,48 +363,16 @@ const buildInlineChildrenFromMaster = (master, masterKey) => {
         tracking_number: pkg,
         __displayTracking: pkg,
         __sourceChild: master,
-        __isInlineChild: true,
         __rowKey: `inline-${masterKey}-${index}`,
     }));
-};
-
-const normalizeHistoryForChild = (child, master) => {
-    if (Array.isArray(child?.history) && child.history.length > 0) {
-        return child.history;
-    }
-
-    const source = child?.__sourceChild || child;
-    const childDate = source?.last_date || source?.date || source?.timestamp || '';
-    const childLocation = source?.last_location || source?.location || '';
-    const childStatus = source?.status || source?.raw_status || child?.status || '';
-
-    if (childDate || childLocation || childStatus) {
-        return [{
-            description: source?.raw_status || source?.description || childStatus || 'Child package update',
-            location: childLocation,
-            status: childStatus || master?.status || 'In Transit',
-            date: childDate,
-        }];
-    }
-
-    return Array.isArray(master?.history) ? master.history.slice(0, 1) : [];
 };
 
 const toChildSelectionPayload = (child, master) => ({
     ...(child.__sourceChild || child),
     ...child,
-    id: child.__isInlineChild ? null : child.id,
     tracking_number: child.__displayTracking || child.tracking_number,
     master_tracking_number: master?.tracking_number || readParentTrackingNumber(child) || null,
     is_master: false,
-    carrier: child.carrier || master?.carrier || 'Unknown',
-    show_date: child.show_date || master?.show_date || null,
-    exhibition_name: child.exhibition_name || master?.exhibition_name || null,
-    recipient: child.recipient || master?.recipient || null,
-    items: child.items || 'Child Package',
-    origin: child.origin || master?.origin || null,
-    destination: child.destination || master?.destination || null,
-    history: normalizeHistoryForChild(child, master),
 });
 
 const FilterPopover = ({ title, className = '', isActive, onClear, children }) => {
@@ -631,7 +602,7 @@ const ShipmentTable = ({
                             </FilterPopover>
 
                             <th className="design-table__th design-table__th--left shipping-col-current">Current Status</th>
-                            <th className="design-table__th design-table__th--left shipping-col-eta">Show Date</th>
+                            <th className="design-table__th design-table__th--left shipping-col-eta">Date</th>
 
                             <FilterPopover title="Carrier" className="shipping-col-carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
                                 <div className="fp-check-list">
@@ -730,7 +701,18 @@ const ShipmentTable = ({
 
                                         <td className="design-table__td shipping-col-eta">
                                             <div className="shipment-date-cell">
-                                                <span className="shipment-date-cell__date">{formatShowDate(master.show_date)}</span>
+                                                {(() => {
+                                                    const formatted = formatDateTime(master.eta);
+                                                    if (typeof formatted === 'object') {
+                                                        return (
+                                                            <>
+                                                                <span className="shipment-date-cell__date">{formatted.datePart}</span>
+                                                                <span className="shipment-date-cell__time">{formatted.timePart}</span>
+                                                            </>
+                                                        );
+                                                    }
+                                                    return <span className="shipment-date-cell__date">{formatted || '-'}</span>;
+                                                })()}
                                             </div>
                                         </td>
 
@@ -827,7 +809,11 @@ const ShipmentTable = ({
 
                                             <td className="design-table__td shipping-col-eta">
                                                 <div className="shipment-date-cell shipment-date-cell--child">
-                                                    <span className="shipment-date-cell__date">{formatShowDate(child.show_date || master.show_date)}</span>
+                                                    {(() => {
+                                                        const formatted = formatDateTime(child.eta);
+                                                        if (typeof formatted === 'object') return <span className="shipment-date-cell__date">{formatted.datePart}</span>;
+                                                        return <span className="shipment-date-cell__date">{formatted || '-'}</span>;
+                                                    })()}
                                                 </div>
                                             </td>
 

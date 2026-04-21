@@ -198,10 +198,6 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
     }, [shipment]);
 
     const handleDelete = async () => {
-        if (!shipment?.id) {
-            setDeleteError('This child package is part of a master shipment and cannot be deleted separately.');
-            return;
-        }
         setDeleting(true);
         setDeleteError('');
         try {
@@ -322,13 +318,10 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                     <button className="support-btn tertiary" onClick={handleEmailCarrier}>
                         <Mail size={14} /> Email {s.carrier || 'Carrier'}
                     </button>
-                    {s.id ? (
-                        <button className="support-btn secondary" onClick={() => setConfirmOpen(true)}>
-                            <Trash2 size={14} /> Delete Entry
-                        </button>
-                    ) : null}
+                    <button className="support-btn secondary" onClick={() => setConfirmOpen(true)}>
+                        <Trash2 size={14} /> Delete Entry
+                    </button>
                 </div>
-                {deleteError ? <p className="form-error">{deleteError}</p> : null}
             </div>
 
             {confirmOpen && (
