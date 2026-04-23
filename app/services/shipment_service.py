@@ -644,7 +644,17 @@ def refresh_tracked_shipments(
     if not include_archived:
         statement = statement.where(Shipment.is_archived == False)
 
-    shipments = db.exec(statement).all()
+    # Fetch all matching shipments
+    shipments_unsorted = db.exec(statement).all()
+    
+    # Sort so that masters (where master_tracking_number is None or equals tracking_number)
+    # are processed BEFORE children. This ensures that when children fall back to local DB
+    # context, they pull the freshly updated master data.
+    shipments = sorted(
+        shipments_unsorted,
+        key=lambda s: (bool(s.master_tracking_number and s.master_tracking_number != s.tracking_number))
+    )
+    
     refreshed = 0
     errors: list[str] = []
 
@@ -659,6 +669,14 @@ def refresh_tracked_shipments(
             cs=shipment.cs,
             no_of_box=shipment.no_of_box,
             project_id=shipment.project_id,
+            booking_date=shipment.booking_date,
+            show_city=shipment.show_city,
+            cs_type=shipment.cs_type,
+            remarks=shipment.remarks,
+            last_scan_date=shipment.last_scan_date,
+            master_tracking_number=shipment.master_tracking_number,
+            is_master=shipment.is_master,
+            destination=shipment.destination,
         )
         if "error" in result:
             errors.append(f"{shipment.tracking_number}: {result['error']}")

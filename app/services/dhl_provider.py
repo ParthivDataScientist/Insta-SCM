@@ -38,6 +38,7 @@ DHL_EVENT_CODE_MAP = {
     "OH": "On Hold",
     "RR": "Customs Update",
     "WC": "With Delivery Courier",
+    "OK": "Delivered",
 }
 
 
@@ -722,6 +723,8 @@ class DHLProvider:
         # Event-code hints for DHL India WCF payloads.
         if code == "WC":
             return "Out for Delivery"
+        if code == "OK":
+            return "Delivered"
 
         # Exception first to avoid false "delivered" positives like "undelivered".
         if any(token in status for token in ("exception", "hold", "custom", "delay", "return", "undeliver", "attempted")):
