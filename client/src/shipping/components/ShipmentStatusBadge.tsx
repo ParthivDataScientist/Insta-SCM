@@ -1,9 +1,8 @@
-import React from 'react';
 import { CheckCircle, Truck, AlertTriangle, Clock } from 'lucide-react';
 import { normalizeShipmentStatus } from '../utils/shipmentStatusMapper';
 import { SHIPMENT_STATUS } from '../constants/shipmentStatus';
 
-const ShipmentStatusBadge = ({ status }: { status: string }) => {
+const ShipmentStatusBadge = ({ status }: { status?: string | null }) => {
     const normalizedStatus = normalizeShipmentStatus(status);
 
     const config = {

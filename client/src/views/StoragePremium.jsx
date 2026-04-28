@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { Archive, RefreshCw, Search, Trash2 } from 'lucide-react';
-import { useShipments } from '../hooks/useShipments';
+import React, { useState } from 'react';
+import { Archive, RefreshCw, Search } from 'lucide-react';
+import { useShipments } from '../shipping/hooks/useShipments';
+import { useShipmentSelection } from '../shipping/hooks/useShipmentSelection';
 import AppShell from '../components/app/AppShell';
-import ShipmentTable from '../components/ShipmentTable';
-import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
+import ShipmentTable from '../shipping/components/ShipmentTable';
+import ShipmentDetailPanel from '../shipping/components/ShipmentDetailPanel';
+import ShipmentBulkActions from '../shipping/components/ShipmentBulkActions';
+import '../design-premium.css';
 
 export default function StoragePremium() {
     const [selected, setSelected] = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
+    const { selectedIds, setSelectedIds, clearSelection } = useShipmentSelection();
     const {
         loading,
         error,
@@ -19,11 +22,7 @@ export default function StoragePremium() {
         archiveShipment,
         batchDelete,
         batchArchive,
-    } = useShipments();
-
-    useEffect(() => {
-        loadData(true);
-    }, [loadData]);
+    } = useShipments({ initialArchivedView: true });
 
     const actions = (
         <button type="button" className="premium-action-button premium-action-button--primary" onClick={() => loadData(true)} disabled={loading}>
@@ -101,34 +100,22 @@ export default function StoragePremium() {
                     )}
                 </div>
 
-                {selectedIds.length > 0 ? (
-                    <div className="premium-panel" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--tx)' }}>
-                            {selectedIds.length} archived shipment{selectedIds.length > 1 ? 's' : ''} selected
-                        </div>
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                            <button type="button" className="premium-action-button" onClick={() => { batchArchive(selectedIds, false); setSelectedIds([]); }}>
-                                Restore to Dashboard
-                            </button>
-                            <button
-                                type="button"
-                                className="premium-action-button"
-                                onClick={() => {
-                                    if (window.confirm(`Permanently delete ${selectedIds.length} archived shipments?`)) {
-                                        batchDelete(selectedIds);
-                                        setSelectedIds([]);
-                                    }
-                                }}
-                            >
-                                <Trash2 size={14} />
-                                Delete Permanently
-                            </button>
-                            <button type="button" className="premium-action-button" onClick={() => setSelectedIds([])}>
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                ) : null}
+                <ShipmentBulkActions
+                    count={selectedIds.length}
+                    archiveLabel="Restore to Dashboard"
+                    deleteLabel="Delete Permanently"
+                    onArchive={() => {
+                        batchArchive(selectedIds, false);
+                        clearSelection();
+                    }}
+                    onDelete={() => {
+                        if (window.confirm(`Permanently delete ${selectedIds.length} archived shipments?`)) {
+                            batchDelete(selectedIds);
+                            clearSelection();
+                        }
+                    }}
+                    onCancel={clearSelection}
+                />
             </AppShell>
         </>
     );

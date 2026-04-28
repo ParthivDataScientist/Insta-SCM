@@ -88,6 +88,16 @@ def _normalize_tracking_cell(value: Optional[str]) -> str:
     return token.upper()
 
 
+def _read_normalized_row_value(row, *keys: str) -> Optional[str]:
+    for key in keys:
+        value = row.get(key)
+        if pd.notna(value):
+            token = str(value).strip()
+            if token:
+                return token
+    return None
+
+
 def _resolve_tracking_row(
     *,
     master_awb: Optional[str],
@@ -246,7 +256,10 @@ def _process_excel_import(contents: bytes, db: Session):
     """Parse Excel rows and track each shipment, supporting Master/Child vertical nesting logic."""
     df = pd.read_excel(io.BytesIO(contents))
     # Normalize column names for easier lookup
-    df.columns = [c.strip().lower().replace(" ", "_").replace("#", "").replace("/", "") for c in df.columns]
+    df.columns = [
+        c.strip().lower().replace(" ", "_").replace("#", "").replace("/", "").replace(".", "")
+        for c in df.columns
+    ]
 
     # Required columns check (allowing for either tracking_number OR master/child structure)
     has_legacy = "tracking_number" in df.columns
@@ -308,7 +321,7 @@ def _process_excel_import(contents: bytes, db: Session):
             master_tracking_number=master_to_use,
             is_master=is_master,
             remarks=str(row.get("remarks")).strip() if pd.notna(row.get("remarks")) else None,
-            booking_date=str(row.get("booking_dt")).strip() if pd.notna(row.get("booking_dt")) else None
+            booking_date=_read_normalized_row_value(row, "booking_date", "booking_dt"),
         )
         
         if "error" in res:

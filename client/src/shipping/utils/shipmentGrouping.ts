@@ -1,8 +1,8 @@
 import { formatStatusDate } from './dateFormatters';
-import type { ShipmentRecord, ShipmentGroup } from '../types/shipment.types';
+import type { ShipmentGroup } from '../types/shipment.types';
 
-export const normalizeToken = (value: any): string => String(value ?? '').trim();
-export const normalizeTrackingKey = (value: any): string => normalizeToken(value).toUpperCase();
+const normalizeToken = (value: any): string => String(value ?? '').trim();
+const normalizeTrackingKey = (value: any): string => normalizeToken(value).toUpperCase();
 
 export const displayValue = (value: any): string => {
     const token = normalizeToken(value);
@@ -15,7 +15,7 @@ export const shortLocation = (value: any): string => {
     return token.split(',')[0].trim();
 };
 
-export const parseTrackingTokens = (value: any): string[] => {
+const parseTrackingTokens = (value: any): string[] => {
     if (Array.isArray(value)) {
         return [...new Set(value.flatMap((entry) => parseTrackingTokens(entry)))];
     }
@@ -32,7 +32,7 @@ export const parseTrackingTokens = (value: any): string[] => {
     )];
 };
 
-export const readFirstToken = (...values: any[]): string => {
+const readFirstToken = (...values: any[]): string => {
     for (const value of values) {
         const [token] = parseTrackingTokens(value);
         if (token) return token;
@@ -53,7 +53,7 @@ export const readParentTrackingNumber = (shipment: any): string => readFirstToke
     shipment?.relationship?.parent_tracking_number,
 );
 
-export const readParcelTrackingNumber = (parcel: any): string => readFirstToken(
+const readParcelTrackingNumber = (parcel: any): string => readFirstToken(
     parcel?.tracking_number,
     parcel?.trackingNumber,
     parcel?.trackingNo,
@@ -63,7 +63,7 @@ export const readParcelTrackingNumber = (parcel: any): string => readFirstToken(
     parcel?.childAwb,
 );
 
-export const readInlineParcels = (shipment: any): any[] => {
+const readInlineParcels = (shipment: any): any[] => {
     const candidates = [
         shipment?.child_parcels,
         shipment?.childPackages,
@@ -97,7 +97,7 @@ export const readChildPackages = (shipment: any): string[] => {
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-export const stripLocationFromDescription = (description: string, location: string): string => {
+const stripLocationFromDescription = (description: string, location: string): string => {
     const desc = String(description || '').trim();
     const loc = String(location || '').trim();
     if (!desc || !loc) return desc;

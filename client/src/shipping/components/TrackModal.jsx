@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useId, useState } from 'react';
 import { X, Truck, Loader, ArrowUpRight } from 'lucide-react';
-import shipmentsService from '../api/shipments';
-import projectsService from '../api/projects';
+import shipmentApi, { getApiErrorMessage } from '../services/shipmentApi';
 
 const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
     const [trackingNum, setTrackingNum] = useState('');
@@ -14,31 +13,34 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
     const [loading, setLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
     const [error, setError] = useState('');
+    const fileInputId = useId();
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
+    const handleFileUpload = async (event) => {
+        const file = event.target.files[0];
         if (!file) return;
         setImportLoading(true);
         setError('');
+
         try {
-            const result = await shipmentsService.importExcel(file);
+            const result = await shipmentApi.importExcel(file);
             onTracked();
             onClose();
+
             if (result?.status === 'completed') {
-                let msg = `Import complete: ${result.success} succeeded, ${result.failed} failed.`;
-                if (result.failed > 0 && result.errors && result.errors.length > 0) {
-                    msg += `\n\nErrors:\n` + result.errors.slice(0, 5).join('\n');
+                let message = `Import complete: ${result.success} succeeded, ${result.failed} failed.`;
+                if (result.failed > 0 && Array.isArray(result.errors) && result.errors.length > 0) {
+                    message += `\n\nErrors:\n${result.errors.slice(0, 5).join('\n')}`;
                     if (result.errors.length > 5) {
-                        msg += `\n...and ${result.errors.length - 5} more.`;
+                        message += `\n...and ${result.errors.length - 5} more.`;
                     }
                 }
-                alert(msg);
+                window.alert(message);
             }
-        } catch (err) {
-            setError(err.message);
+        } catch (requestError) {
+            setError(getApiErrorMessage(requestError, 'Failed to import shipment sheet.'));
         } finally {
             setImportLoading(false);
-            e.target.value = null;
+            event.target.value = null;
         }
     };
 
@@ -55,14 +57,17 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
             setError('Please enter a tracking number');
             return;
         }
+
         if (!exhibition) {
             setError('Please enter an Exhibition Name');
             return;
         }
+
         setLoading(true);
         setError('');
+
         try {
-            await shipmentsService.trackShipment(trackingNumber, {
+            await shipmentApi.trackShipment(trackingNumber, {
                 recipient: shipmentLabel || null,
                 shipment_name: shipmentLabel || null,
                 destination: destinationValue || null,
@@ -74,8 +79,8 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
             });
             onTracked();
             onClose();
-        } catch (err) {
-            setError(err.response?.data?.detail || err.message || 'Failed to track shipment');
+        } catch (requestError) {
+            setError(getApiErrorMessage(requestError, 'Failed to track shipment.'));
         } finally {
             setLoading(false);
         }
@@ -91,10 +96,10 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                     style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                     placeholder="e.g. 888123456789"
                     value={trackingNum}
-                    onChange={e => setTrackingNum(e.target.value)}
+                    onChange={(event) => setTrackingNum(event.target.value)}
                 />
             </div>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                     <label className="dmc-label">Shipment Name</label>
@@ -104,7 +109,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                         style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                         placeholder="e.g. Laptop Stand"
                         value={shipmentName}
-                        onChange={e => setShipmentName(e.target.value)}
+                        onChange={(event) => setShipmentName(event.target.value)}
                     />
                 </div>
                 <div className="form-group">
@@ -115,7 +120,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                         style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                         placeholder="e.g. Tech Expo"
                         value={exhibitionName}
-                        onChange={e => setExhibitionName(e.target.value)}
+                        onChange={(event) => setExhibitionName(event.target.value)}
                     />
                 </div>
                 <div className="form-group">
@@ -126,7 +131,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                         style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                         placeholder="e.g. Irving, TX, US"
                         value={destination}
-                        onChange={e => setDestination(e.target.value)}
+                        onChange={(event) => setDestination(event.target.value)}
                     />
                 </div>
                 <div className="form-group">
@@ -137,7 +142,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                         style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                         placeholder="e.g. C-DDP"
                         value={cs}
-                        onChange={e => setCs(e.target.value)}
+                        onChange={(event) => setCs(event.target.value)}
                     />
                 </div>
                 <div className="form-group">
@@ -148,7 +153,7 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                         style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                         placeholder="e.g. 5"
                         value={noOfBox}
-                        onChange={e => setNoOfBox(e.target.value)}
+                        onChange={(event) => setNoOfBox(event.target.value)}
                     />
                 </div>
             </div>
@@ -161,16 +166,16 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
                     style={{ background: '#f8fafc', border: '1px solid #e2e8f0', width: '100%', padding: '12px 16px', borderRadius: '10px' }}
                     placeholder="e.g. March 15th"
                     value={showDate}
-                    onChange={e => setShowDate(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleTrack()}
+                    onChange={(event) => setShowDate(event.target.value)}
+                    onKeyDown={(event) => event.key === 'Enter' && handleTrack()}
                 />
             </div>
 
-            {error && (
+            {error ? (
                 <div style={{ color: '#ef4444', fontSize: '12px', fontWeight: 600, background: 'rgba(239, 68, 68, 0.05)', padding: '10px', borderRadius: '8px' }}>
                     {error}
                 </div>
-            )}
+            ) : null}
 
             <button
                 className="design-premium-btn design-premium-btn--primary"
@@ -183,12 +188,12 @@ const TrackModal = ({ onClose, onTracked, isPanel = false }) => {
 
             <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
                 <p className="dmc-label" style={{ marginBottom: '12px' }}>Bulk Import from Excel</p>
-                <input type="file" id="panel-excel-upload" style={{ display: 'none' }} accept=".xlsx,.xls" onChange={handleFileUpload} />
+                <input type="file" id={fileInputId} style={{ display: 'none' }} accept=".xlsx,.xls" onChange={handleFileUpload} />
                 <button
                     className="design-premium-btn"
                     style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569' }}
                     disabled={importLoading || loading}
-                    onClick={() => document.getElementById('panel-excel-upload').click()}
+                    onClick={() => document.getElementById(fileInputId)?.click()}
                 >
                     {importLoading ? <Loader size={16} className="animate-spin" /> : <><ArrowUpRight size={16} /> Upload Excel</>}
                 </button>

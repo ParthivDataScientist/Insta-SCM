@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
-import { useShipments } from '../hooks/useShipments';
-import ShipmentTable from '../components/ShipmentTable';
-import TrackModal from '../components/TrackModal';
-import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
-import ShipmentSidePanel from '../components/ShipmentSidePanel';
+import { Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
+import { useShipments } from '../shipping/hooks/useShipments';
+import { useShipmentSelection } from '../shipping/hooks/useShipmentSelection';
+import ShipmentTable from '../shipping/components/ShipmentTable';
+import TrackModal from '../shipping/components/TrackModal';
+import ShipmentDetailPanel from '../shipping/components/ShipmentDetailPanel';
+import ShipmentSidePanel from '../shipping/components/ShipmentSidePanel';
+import ShipmentBulkActions from '../shipping/components/ShipmentBulkActions';
+import ShipmentKpiCards from '../shipping/components/ShipmentKpiCards';
 import AppShell from '../components/app/AppShell';
-import KpiCard from '../components/app/KpiCard';
 import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import AlertBanner from '../components/AlertBanner';
 import '../design-premium.css';
@@ -19,7 +21,7 @@ export default function ShipmentDashboardPremium() {
     } = useShipments();
 
     const [selectedShipment, setSelectedShipment] = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
+    const { selectedIds, setSelectedIds, clearSelection } = useShipmentSelection();
     const [showTrack, setShowTrack] = useState(false);
     const [showMobileHeaderActions, setShowMobileHeaderActions] = useState(false);
     const [isMobileViewport, setIsMobileViewport] = useState(() => (
@@ -51,13 +53,13 @@ export default function ShipmentDashboardPremium() {
     const handleBatchDelete = async () => {
         if (window.confirm(`Delete ${selectedIds.length} shipment(s)? This cannot be undone.`)) {
             await batchDelete(selectedIds);
-            setSelectedIds([]);
+            clearSelection();
         }
     };
 
     const handleBatchArchive = () => {
         batchArchive(selectedIds, true);
-        setSelectedIds([]);
+        clearSelection();
     };
 
     const resetFilters = () => {
@@ -302,43 +304,7 @@ export default function ShipmentDashboardPremium() {
 
                 <div className="premium-sliding-layout premium-sliding-layout--compact">
                     <div className={`premium-sliding-main ${selectedShipment || showTrack ? 'is-shrunk' : ''}`}>
-                        <div className="design-dashboard__kpi-grid">
-                            <KpiCard
-                                icon={Truck}
-                                label="Total Shipments"
-                                value={`${stats.total ?? 0}`}
-                                active={filter === 'All'}
-                                onClick={() => setFilter('All')}
-                                className="design-dashboard__kpi design-dashboard__kpi--all"
-                            />
-                            <KpiCard
-                                icon={Package}
-                                label="In Transit"
-                                value={`${stats.transit ?? 0}`}
-                                tone="blue"
-                                active={filter === 'Active'}
-                                onClick={() => setFilter('Active')}
-                                className="design-dashboard__kpi design-dashboard__kpi--pending"
-                            />
-                            <KpiCard
-                                icon={CheckCircle}
-                                label="Delivered"
-                                value={`${stats.delivered ?? 0}`}
-                                tone="green"
-                                active={filter === 'Delivered'}
-                                onClick={() => setFilter('Delivered')}
-                                className="design-dashboard__kpi design-dashboard__kpi--won"
-                            />
-                            <KpiCard
-                                icon={AlertTriangle}
-                                label="Exceptions"
-                                value={`${stats.exceptions ?? 0}`}
-                                tone="red"
-                                active={filter === 'Exception'}
-                                onClick={() => setFilter('Exception')}
-                                className="design-dashboard__kpi design-dashboard__kpi--lost"
-                            />
-                        </div>
+                        <ShipmentKpiCards filter={filter} onFilterChange={setFilter} stats={stats} />
 
                         <div className="design-dashboard__table-shell shipping-table-panel">
                             {loading && shipments.length === 0 ? (
@@ -393,23 +359,14 @@ export default function ShipmentDashboardPremium() {
                 </div>
 
                     {/* Batch Actions Toolbar */}
-                    {selectedIds.length > 0 && (
-                        <div className="batch-toolbar shipping-batch-toolbar animate-in-up">
-                            <div className="bt-info">
-                                <div className="bt-count">{selectedIds.length}</div>
-                                <span>shipments selected</span>
-                            </div>
-                            <div className="bt-actions">
-                                <button className="bt-btn archive" onClick={handleBatchArchive}>
-                                    <Archive size={14} /> Move to Storage
-                                </button>
-                                <button className="bt-btn delete" onClick={handleBatchDelete}>
-                                    <Trash2 size={14} /> Delete
-                                </button>
-                                <button className="bt-close" onClick={() => setSelectedIds([])}>Cancel</button>
-                            </div>
-                        </div>
-                    )}
+                    <ShipmentBulkActions
+                        count={selectedIds.length}
+                        archiveLabel="Move to Storage"
+                        deleteLabel="Delete"
+                        onArchive={handleBatchArchive}
+                        onDelete={handleBatchDelete}
+                        onCancel={clearSelection}
+                    />
 
             </AppShell>
             {mobileHeaderActionSheet}
