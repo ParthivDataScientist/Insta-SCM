@@ -95,9 +95,17 @@ class TestTrackShipment:
         )
         assert resp.status_code == 400
 
-    def test_track_marks_exception_when_no_movement_over_2_days(self, client, monkeypatch):
+    def test_track_marks_exception_when_stale_transit_status_idle(self, client, monkeypatch):
+        """
+        Exception is raised when the latest event is a stale-transit status
+        (Departed Facility / Processed / Scheduled / SM) and has been idle
+        for more than STUCK_THRESHOLD_DAYS (currently 3 days).
+        'Arrived' events intentionally do NOT trigger stuck detection — only
+        limbo-transit events like Departed / Processed do.
+        """
         project = create_project(client, "Stuck Shipment Project")
-        stale_date = (datetime.now(timezone.utc) - timedelta(days=3, hours=1)).isoformat()
+        # Use 4 days to safely exceed the 3-day threshold
+        stale_date = (datetime.now(timezone.utc) - timedelta(days=4)).isoformat()
 
         def mock_stale_track(self, tn):
             return {
@@ -108,9 +116,9 @@ class TestTrackShipment:
                 "progress": 40,
                 "history": [
                     {
-                        "description": "Arrived at facility",
-                        "location": "Memphis, TN, US",
-                        "status": "Arrived",
+                        "description": "Departed facility",
+                        "location": "Mumbai, IN",
+                        "status": "Departed",
                         "date": stale_date,
                     }
                 ],
