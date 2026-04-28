@@ -1666,6 +1666,17 @@
     max-width: 132px !important;
 }
 
+.shipping-table .shipping-col-show-date .shipment-date-cell {
+    align-items: flex-start;
+}
+
+.shipping-table .shipping-col-show-date .shipment-date-cell__date {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.2;
+}
+
 .shipping-table .shipments-status-pill {
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28), var(--ship-elev-small);
     font-weight: 700;

@@ -16,6 +16,26 @@ import {
 
 const isUpcomingBookingDate = isUpcomingDate;
 
+const GENERIC_SHIPMENT_LABELS = new Set(['', 'package', 'child package', 'shipment']);
+
+const resolveShipmentLabel = (shipment, fallback = 'Shipment') => {
+    const candidates = [
+        shipment?.items,
+        shipment?.recipient,
+        shipment?.project_client_name,
+        shipment?.exhibition_name,
+    ];
+
+    for (const candidate of candidates) {
+        const value = String(candidate || '').trim();
+        if (!GENERIC_SHIPMENT_LABELS.has(value.toLowerCase())) {
+            return value;
+        }
+    }
+
+    return fallback;
+};
+
 const toChildSelectionPayload = (child, master) => ({
     ...(child.__sourceChild || child),
     ...child,
@@ -93,7 +113,7 @@ const ShipmentRow = ({
                             <Package size={14} />
                         </span>
                         <div className="shipment-main-cell__content truncate-cell">
-                            <div className="tid-name">{master.items || master.recipient || 'Shipment'}</div>
+                            <div className="tid-name">{resolveShipmentLabel(master)}</div>
                             <div className="tid-num">{displayValue(master.tracking_number)}</div>
                         </div>
                         {childRows.length > 0 ? <span className="shipment-child-count">+{childRows.length}</span> : null}
@@ -191,7 +211,7 @@ const ShipmentRow = ({
                                     <Package size={12} />
                                 </span>
                                 <div className="shipment-main-cell__content truncate-cell">
-                                    <div className="tid-name child-name">{child.items && child.items !== 'Package' ? child.items : 'Child Package'}</div>
+                                    <div className="tid-name child-name">{resolveShipmentLabel(child, resolveShipmentLabel(master, 'Child Package'))}</div>
                                     <div className="tid-num">{displayValue(child.__displayTracking || child.tracking_number)}</div>
                                 </div>
                             </div>
