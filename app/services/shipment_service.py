@@ -16,8 +16,35 @@ from app.services.dhl import DHLService
 from app.services.carrier_detection import detect_carrier
 
 logger = logging.getLogger(__name__)
-STUCK_THRESHOLD_DAYS = 2
+STUCK_THRESHOLD_DAYS = 3
 STUCK_THRESHOLD_SECONDS = STUCK_THRESHOLD_DAYS * 24 * 60 * 60
+
+# Statuses that represent a 'transit limbo' — sitting in one of these for too long signals stuck.
+# NOTE: Delivery-side and customs statuses are intentionally excluded (they naturally stall).
+_STALE_TRANSIT_KEYWORDS = (
+    "departed",
+    "processed",
+    "scheduled",
+    " sm ",          # DHL 'SM' = Scheduled Movement event code
+    "sorting center",
+    "sorted",
+    "sorting",
+    "picked up",
+    "shipment picked up",
+    "transit",
+    "clearance in progress",
+)
+
+
+def _is_stale_transit_event(description: str, status: str = "") -> bool:
+    """
+    Returns True when an event represents a transit-limbo state such as
+    'Departed Facility', 'Processed', 'SM (Scheduled to depart)', etc.
+    These are the statuses that, if repeated without progress, signal a stuck shipment.
+    Customs holds and delivery events are intentionally NOT stale-transit states.
+    """
+    combined = (" " + str(description or "") + " " + str(status or "") + " ").lower()
+    return any(k in combined for k in _STALE_TRANSIT_KEYWORDS)
 
 
 def _parse_event_datetime(raw_value: str) -> Optional[datetime]:
@@ -93,16 +120,39 @@ def _apply_stuck_policy_to_child_parcels(result: dict, now_utc: datetime) -> Non
         last_date = _parse_event_datetime(parcel.get("last_date", ""))
         if last_date is None:
             continue
+
         if (now_utc - last_date).total_seconds() > STUCK_THRESHOLD_SECONDS:
-            parcel["status"] = "Exception"
+            # Only mark Exception when the latest scan is a stale-transit type.
+            # Check history first, then fall back to raw_status / status fields.
+            history = parcel.get("history") or []
+            latest_desc = ""
+            latest_evt_status = ""
+            if history and isinstance(history[0], dict):
+                latest_desc = history[0].get("description", "")
+                latest_evt_status = history[0].get("status", "")
+            if not latest_desc:
+                latest_desc = parcel.get("raw_status", "") or parcel.get("status", "")
+
+            if _is_stale_transit_event(latest_desc, latest_evt_status):
+                parcel["status"] = "Exception"
 
 
 def _apply_stuck_exception_policy(result: dict) -> dict:
     """
-    Carrier-agnostic stuck detection:
-    1) If latest checkpoint is older than 2 days (and not delivered) => Exception.
-    2) If same location has persisted for over 2 days => Exception.
-    3) If carrier text already signals delay/hold/stuck => Exception.
+    Carrier-agnostic stuck detection (v2):
+
+    Rule 1 — Stale transit status idle for too long:
+        The most recent checkpoint is a transit-limbo event (Departed Facility /
+        Processed / SM / Scheduled to depart / Sorted / Picked Up …) AND it has
+        not been updated for more than STUCK_THRESHOLD_DAYS days.
+        Pure location repetition is intentionally NOT a trigger.
+
+    Rule 2 — Carrier explicitly signals a problem:
+        The carrier's own status/raw_status text contains delay/hold/exception
+        keywords (delay, held, stuck, shipment exception, clearance delay).
+
+    Packages in customs, at delivery facilities, or with recent scans are
+    excluded so we avoid false positives on international shipments.
     """
     if not isinstance(result, dict) or "error" in result:
         return result
@@ -117,9 +167,8 @@ def _apply_stuck_exception_policy(result: dict) -> dict:
     now_utc = datetime.now(timezone.utc)
     reasons: list[str] = []
     latest_dt: Optional[datetime] = None
-    latest_loc = ""
 
-    parsed_events = []
+    parsed_events: list[tuple] = []
     for idx, event in enumerate(events):
         if not isinstance(event, dict):
             continue
@@ -127,6 +176,7 @@ def _apply_stuck_exception_policy(result: dict) -> dict:
         loc = _normalize_location(event.get("location"))
         parsed_events.append((idx, dt, loc, event))
 
+    latest_event_dict: dict = {}
     if parsed_events:
         parsed_events.sort(
             key=lambda item: (
@@ -136,21 +186,19 @@ def _apply_stuck_exception_policy(result: dict) -> dict:
             ),
             reverse=True,
         )
-        _, latest_dt, latest_loc, _ = parsed_events[0]
+        _, latest_dt, _, latest_event_dict = parsed_events[0]
 
+    # --- Rule 1: Stale transit status idle for too long ---
     if latest_dt and (now_utc - latest_dt).total_seconds() > STUCK_THRESHOLD_SECONDS:
-        reasons.append("no_movement_over_2_days")
+        latest_desc = latest_event_dict.get("description", "")
+        latest_evt_status = latest_event_dict.get("status", "")
+        # Fall back to the top-level status fields if no history description
+        if not latest_desc:
+            latest_desc = result.get("raw_status", "") or current_status
+        if _is_stale_transit_event(latest_desc, latest_evt_status):
+            reasons.append("stale_transit_status_idle")
 
-    if latest_dt and latest_loc:
-        oldest_same_loc_dt = latest_dt
-        for _, dt, loc, _ in parsed_events[1:]:
-            if loc != latest_loc:
-                break
-            if dt:
-                oldest_same_loc_dt = dt
-        if (latest_dt - oldest_same_loc_dt).total_seconds() > STUCK_THRESHOLD_SECONDS:
-            reasons.append("same_location_over_2_days")
-
+    # --- Rule 2: Carrier explicitly signals delay / hold / exception ---
     if _is_stuck_keyword_present(result):
         reasons.append("carrier_marked_delay_or_hold")
 
@@ -202,10 +250,6 @@ def _resolve_child_fallback_result(
     if not tn:
         return None
 
-    existing = db.exec(select(Shipment).where(Shipment.tracking_number == tn)).first()
-    if existing:
-        return _build_result_from_existing_shipment_row(existing)
-
     masters_to_check: list[Shipment] = []
     master_hint = (master_tracking_number or "").strip().upper()
     if master_hint:
@@ -213,7 +257,7 @@ def _resolve_child_fallback_result(
         if hinted_master:
             masters_to_check.append(hinted_master)
 
-    if not masters_to_check:
+    if not masters_to_check and allow_master_context:
         masters_to_check = db.exec(select(Shipment).where(Shipment.is_archived == False)).all()
 
     for master in masters_to_check:
@@ -278,6 +322,10 @@ def _resolve_child_fallback_result(
                 "raw_status": master.status or "In Transit",
                 "last_scan_date": master.last_scan_date or "",
             }
+
+    existing = db.exec(select(Shipment).where(Shipment.tracking_number == tn)).first()
+    if existing:
+        return _build_result_from_existing_shipment_row(existing)
 
     return None
 

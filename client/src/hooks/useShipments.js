@@ -11,6 +11,7 @@ export function useShipments() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
 
     // Filter state
     const [filter, setFilter] = useState('All');
@@ -94,15 +95,15 @@ export function useShipments() {
         setError(null);
         try {
             const result = await shipmentsService.batchDeleteShipments(ids);
-            const deletedIds = Array.isArray(result?.deleted_ids) && result.deleted_ids.length > 0
-                ? result.deleted_ids
-                : ids;
-            setShipments((prev) => prev.filter((s) => !deletedIds.includes(s.id)));
-            shipmentsService.fetchStats().then(setStats).catch(console.error);
+            const deletedCount = result?.count ?? ids.length;
+            // Full reload guarantees the table matches DB truth (avoids ghost rows)
+            await loadData(null, { silent: false });
+            setSuccess(`Successfully deleted ${deletedCount} shipment(s).`);
+            setTimeout(() => setSuccess(null), 5000);
         } catch (err) {
             setError(getErrorMessage(err));
             console.error('Failed to batch delete shipments:', err);
-            loadData();
+            loadData(); // Recovery reload
         }
     }, [getErrorMessage, loadData]);
 
@@ -132,6 +133,12 @@ export function useShipments() {
             if (result.failed > 0) {
                 const message = `Refreshed ${result.refreshed} shipment(s), but ${result.failed} could not be re-synced.`;
                 setError(message);
+            } else if (result.refreshed > 0) {
+                setSuccess(`Successfully refreshed ${result.refreshed} shipment(s).`);
+                setTimeout(() => setSuccess(null), 5000);
+            } else {
+                setSuccess(`Tracking is up to date.`);
+                setTimeout(() => setSuccess(null), 3000);
             }
             return result;
         } catch (err) {
@@ -216,6 +223,8 @@ export function useShipments() {
         loading,
         refreshing,
         error,
+        success,
+        setSuccess,
         loadData,
         filteredShipments,
         filter, setFilter,

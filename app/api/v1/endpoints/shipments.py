@@ -759,7 +759,7 @@ def refresh_shipments(
 @router.get("/", response_model=List[ShipmentResponse])
 def list_shipments(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
     db: Session = Depends(get_session),
 ):
     """List active (non-archived) shipments."""

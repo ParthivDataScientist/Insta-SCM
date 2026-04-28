@@ -142,6 +142,13 @@ class DHLService(CarrierService):
         }
         progress = progress_map.get(shipment_status, 0)
 
+        # --- last scan date & location (mirrors FedEx _extract_piece_data) ---
+        last_date = ""
+        last_location = ""
+        if history:
+            last_date = history[0].get("date", "")
+            last_location = history[0].get("location", "")
+
         return {
             "status": shipment_status,
             "raw_status": raw_status,
@@ -150,6 +157,8 @@ class DHLService(CarrierService):
             "eta": eta,
             "progress": progress,
             "history": history,
+            "last_date": last_date,
+            "last_location": last_location,
         }
 
     def _standardize_response(self, raw_data: Dict, tracking_number: str) -> Dict[str, Any]:
@@ -186,6 +195,8 @@ class DHLService(CarrierService):
                         "origin": p_data["origin"],
                         "destination": p_data["destination"],
                         "eta": p_data["eta"],
+                        "last_date": p_data.get("last_date", ""),
+                        "last_location": p_data.get("last_location", ""),
                         "history": p_data.get("history", []),
                         "carrier": "DHL",
                     })
@@ -212,6 +223,8 @@ class DHLService(CarrierService):
                             "origin": data["origin"],
                             "destination": data["destination"],
                             "eta": data["eta"],
+                            "last_date": data.get("last_date", ""),
+                            "last_location": data.get("last_location", ""),
                             # Piece-level history is not always exposed by this response;
                             # fall back to the master timeline so the UI can show full flow.
                             "history": list(data.get("history", [])),

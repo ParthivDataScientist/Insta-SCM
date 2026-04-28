@@ -13,7 +13,7 @@ import '../design-premium.css';
 
 export default function ShipmentDashboardPremium() {
     const {
-        shipments, stats, loading, refreshing, error, loadData, filteredShipments,
+        shipments, stats, loading, refreshing, error, success, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
@@ -48,9 +48,9 @@ export default function ShipmentDashboardPremium() {
         archiveShipment(id);
     };
 
-    const handleBatchDelete = () => {
-        if (window.confirm(`Delete ${selectedIds.length} shipments?`)) {
-            batchDelete(selectedIds);
+    const handleBatchDelete = async () => {
+        if (window.confirm(`Delete ${selectedIds.length} shipment(s)? This cannot be undone.`)) {
+            await batchDelete(selectedIds);
             setSelectedIds([]);
         }
     };
@@ -298,6 +298,7 @@ export default function ShipmentDashboardPremium() {
                 sidebarOverlay
             >
                 <AlertBanner message={error} />
+                <AlertBanner message={success} type="success" />
 
                 <div className="premium-sliding-layout premium-sliding-layout--compact">
                     <div className={`premium-sliding-main ${selectedShipment || showTrack ? 'is-shrunk' : ''}`}>
