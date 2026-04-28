@@ -92,7 +92,7 @@ export function useShipments() {
     }, [getErrorMessage, loadData]);
 
     const batchDelete = useCallback(async (ids) => {
-        setError(null);
+        setError(null); 
         try {
             const result = await shipmentsService.batchDeleteShipments(ids);
             const deletedCount = result?.count ?? ids.length;

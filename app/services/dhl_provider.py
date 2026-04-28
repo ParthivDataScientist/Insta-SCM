@@ -727,7 +727,14 @@ class DHLProvider:
             return "Delivered"
 
         # Exception first to avoid false "delivered" positives like "undelivered".
-        if any(token in status for token in ("exception", "hold", "custom", "delay", "return", "undeliver", "attempted")):
+        # Note: "custom" alone is intentionally NOT here — "Customs Update" and
+        # "Customs clearance status updated" are normal processing scans, not holds.
+        # Only explicit hold/delay phrasing triggers Exception.
+        _exception_tokens = (
+            "exception", "hold", "customs hold", "held at customs",
+            "customs delay", "delay", "return", "undeliver", "attempted",
+        )
+        if any(token in status for token in _exception_tokens):
             return "Exception"
 
         if any(token in status for token in ("out for delivery", "with delivery courier", "with courier")):

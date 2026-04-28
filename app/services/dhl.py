@@ -28,11 +28,15 @@ DHL_STATUS_MAP = {
     "sorted": "In Transit",
     "picked up": "In Transit",
     "shipment picked up": "In Transit",
+    "customs update": "In Transit",          # Neutral DHL scan — paperwork only
+    "customs clearance status updated": "In Transit",  # Exact DHL event text
+    "customs cleared": "In Transit",          # Cleared = still moving, not yet delivered
     "out for delivery": "Out for Delivery",
     "with delivery courier": "Out for Delivery",
     "exception": "Exception",
     "held": "Exception",
-    "customs": "Exception",
+    "customs hold": "Exception",              # Actual hold = Exception
+    "held at customs": "Exception",          # Actual hold = Exception
     "delay": "Exception",
     "returned": "Exception",
 }
