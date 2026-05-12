@@ -2740,3 +2740,233 @@
     box-shadow: 0 20px 50px rgba(0,0,0,0.1);
 }
 
+.shipment-booking-page {
+    padding: 24px;
+}
+
+.shipment-booking-shell {
+    display: grid;
+    gap: 20px;
+}
+
+.shipment-booking-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 24px;
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 36%),
+        linear-gradient(135deg, #f8fafc 0%, #ffffff 55%, #fefce8 100%);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.shipment-booking-hero__eyebrow,
+.shipment-booking-result__eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0f766e;
+    margin-bottom: 8px;
+}
+
+.shipment-booking-hero h1,
+.shipment-booking-result h2 {
+    margin: 0 0 8px;
+    color: #0f172a;
+}
+
+.shipment-booking-hero p,
+.shipment-booking-result p {
+    margin: 0;
+    color: #475569;
+    max-width: 760px;
+}
+
+.shipment-booking-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.shipment-booking-origin {
+    padding: 20px 24px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #ecfeff 0%, #ffffff 100%);
+    border: 1px solid rgba(8, 145, 178, 0.18);
+}
+
+.shipment-booking-origin__eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0f766e;
+    margin-bottom: 8px;
+}
+
+.shipment-booking-origin h2 {
+    margin: 0 0 6px;
+    color: #0f172a;
+}
+
+.shipment-booking-origin p {
+    margin: 0;
+    color: #475569;
+}
+
+.shipment-booking-card,
+.shipment-booking-summary__card,
+.shipment-booking-result {
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.shipment-booking-card {
+    padding: 22px;
+}
+
+.shipment-booking-card__header {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+    color: #0f172a;
+}
+
+.shipment-booking-card__header h2,
+.shipment-booking-summary__title {
+    margin: 0 0 4px;
+}
+
+.shipment-booking-card__header p,
+.shipment-booking-summary__meta {
+    margin: 0;
+    color: #64748b;
+}
+
+.shipment-booking-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.booking-field {
+    display: grid;
+    gap: 8px;
+}
+
+.booking-field__label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.booking-field__hint {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.booking-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #dbe3ee;
+    background: #f8fafc;
+    color: #0f172a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.booking-input:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.12);
+}
+
+.shipment-booking-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.shipment-booking-summary__card {
+    padding: 20px;
+    display: grid;
+    gap: 16px;
+}
+
+.shipment-booking-summary__icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 165, 233, 0.12);
+    color: #0369a1;
+}
+
+.shipment-booking-summary__label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.shipment-booking-summary__value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+
+.shipment-booking-result {
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: center;
+    background:
+        radial-gradient(circle at right top, rgba(34, 197, 94, 0.12), transparent 30%),
+        #ffffff;
+}
+
+.shipment-booking-result__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 1024px) {
+    .shipment-booking-grid,
+    .shipment-booking-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .shipment-booking-page {
+        padding: 12px;
+    }
+
+    .shipment-booking-hero,
+    .shipment-booking-result {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .shipment-booking-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

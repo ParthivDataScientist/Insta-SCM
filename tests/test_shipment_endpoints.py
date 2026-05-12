@@ -1,4 +1,5 @@
 """Integration tests for shipment API endpoints."""
+import base64
 from datetime import datetime, timedelta, timezone
 import io
 
@@ -16,6 +17,47 @@ def create_project(client, name="Shipment Project"):
     )
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def booking_payload(project_id=None):
+    return {
+        "receiver": {
+            "company_name": "Expo Client",
+            "name": "Jordan Miles",
+            "email": "jordan@example.com",
+            "phone": "1234567890",
+            "address_line1": "42 Convention Street",
+            "address_line2": "Dock 4",
+            "address_line3": "",
+            "city": "Dubai",
+            "state_code": "DU",
+            "postal_code": "00000",
+            "country_code": "AE",
+            "country_name": "United Arab Emirates",
+        },
+        "package": {
+            "pieces": 2,
+            "weight_kg": 12.5,
+            "length_cm": 40,
+            "width_cm": 30,
+            "height_cm": 25,
+            "declared_value": 2500,
+            "declared_currency": "USD",
+        },
+        "shipment": {
+            "description": "Trade show kiosk panels",
+            "service_type": "P",
+            "local_product_code": "P",
+            "terms_of_trade": "DAP",
+            "shipping_payment_type": "S",
+            "duty_payment_type": "R",
+            "is_dutiable": True,
+            "shipper_reference": "SCM-QUOTE-001",
+            "exhibition_name": "Build Expo",
+            "show_date": "2026-05-14",
+            "project_id": project_id,
+        },
+    }
 
 
 class TestHealthEndpoints:
@@ -229,6 +271,147 @@ class TestGetShipment:
         assert resp.status_code == 404
 
 
+class TestShipmentBooking:
+    def test_rate_shipment_returns_quote(self, client, monkeypatch):
+        monkeypatch.setattr(
+            "app.services.shipment_service._validate_dhl_booking_configuration",
+            lambda: None,
+        )
+        monkeypatch.setattr(
+            "app.services.dhl_booking_provider.DHLBookingProvider.rate",
+            lambda self, payload: {"price": 149.75, "currency": "USD", "delivery_time": "2 business days"},
+        )
+
+        resp = client.post("/api/v1/shipments/rate", json=booking_payload())
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["status"] == "RATED"
+        assert data["lifecycle_state"] == "RATED"
+        assert data["price"] == 149.75
+        assert data["currency"] == "USD"
+
+    def test_create_shipment_books_and_saves_label(self, client, monkeypatch, tmp_path):
+        project = create_project(client, "Booked Shipment Project")
+        pdf_base64 = base64.b64encode(b"%PDF-1.4\nbooked label\n").decode("ascii")
+
+        monkeypatch.setattr(
+            "app.services.shipment_service._validate_dhl_booking_configuration",
+            lambda: None,
+        )
+        monkeypatch.setattr(
+            "app.services.shipment_service._dhl_shipper_defaults",
+            lambda: {
+                "company": "Insta SCM",
+                "name": "Booking Desk",
+                "address1": "1 Warehouse Road",
+                "address2": "",
+                "address3": "",
+                "city": "Mumbai",
+                "postal_code": "400001",
+                "country_code": "IN",
+                "country_name": "India",
+                "phone": "9988776655",
+            },
+        )
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_SHIPPER_ACCOUNT_NUMBER", "ACC123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_BILLING_ACCOUNT_NUMBER", "ACC123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_DUTY_ACCOUNT_NUMBER", "ACC123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_SITE_ID", "SITE123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_WCF_USERNAME", "SITE123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_WCF_PASSWORD", "PASS123")
+        monkeypatch.setattr("app.services.label_storage.settings.STORAGE_DIR", str(tmp_path))
+        monkeypatch.setattr(
+            "app.services.dhl_booking_provider.DHLBookingProvider.rate",
+            lambda self, payload: {"price": 149.75, "currency": "USD", "delivery_time": "2 business days"},
+        )
+        monkeypatch.setattr(
+            "app.services.dhl_booking_provider.DHLBookingProvider.create_shipment",
+            lambda self, payload: {"awb": "1234567890", "label_base64": pdf_base64},
+        )
+
+        resp = client.post("/api/v1/shipments/create", json=booking_payload(project["id"]))
+        assert resp.status_code == 201, resp.text
+        data = resp.json()
+        assert data["status"] == "BOOKED"
+        assert data["lifecycle_state"] == "BOOKED"
+        assert data["awb"] == "1234567890"
+        assert data["label_url"] == "/storage/labels/1234567890.pdf"
+
+        list_resp = client.get("/api/v1/shipments/")
+        assert list_resp.status_code == 200
+        shipment = next(s for s in list_resp.json() if s["tracking_number"] == "1234567890")
+        assert shipment["status"] == "BOOKED"
+        assert shipment["lifecycle_state"] == "BOOKED"
+        assert shipment["label_url"] == "/storage/labels/1234567890.pdf"
+        assert shipment["quote_amount"] == 149.75
+        assert shipment["project_id"] == project["id"]
+
+        label_file = tmp_path / "labels" / "1234567890.pdf"
+        assert label_file.exists()
+        assert label_file.read_bytes().startswith(b"%PDF")
+
+    def test_schedule_pickup_updates_existing_booked_shipment(self, client, monkeypatch, tmp_path):
+        pdf_base64 = base64.b64encode(b"%PDF-1.4\npickup label\n").decode("ascii")
+
+        monkeypatch.setattr(
+            "app.services.shipment_service._validate_dhl_booking_configuration",
+            lambda: None,
+        )
+        monkeypatch.setattr(
+            "app.services.shipment_service._dhl_shipper_defaults",
+            lambda: {
+                "company": "Insta SCM",
+                "name": "Booking Desk",
+                "address1": "1 Warehouse Road",
+                "address2": "",
+                "address3": "",
+                "city": "Mumbai",
+                "postal_code": "400001",
+                "country_code": "IN",
+                "country_name": "India",
+                "phone": "9988776655",
+            },
+        )
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_SHIPPER_ACCOUNT_NUMBER", "ACC123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_BILLING_ACCOUNT_NUMBER", "ACC123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_DUTY_ACCOUNT_NUMBER", "ACC123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_SITE_ID", "SITE123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_WCF_USERNAME", "SITE123")
+        monkeypatch.setattr("app.services.shipment_service.settings.DHL_WCF_PASSWORD", "PASS123")
+        monkeypatch.setattr("app.services.label_storage.settings.STORAGE_DIR", str(tmp_path))
+        monkeypatch.setattr(
+            "app.services.dhl_booking_provider.DHLBookingProvider.rate",
+            lambda self, payload: {"price": 149.75, "currency": "USD", "delivery_time": "2 business days"},
+        )
+        monkeypatch.setattr(
+            "app.services.dhl_booking_provider.DHLBookingProvider.create_shipment",
+            lambda self, payload: {"awb": "1234567890", "label_base64": pdf_base64},
+        )
+        monkeypatch.setattr(
+            "app.services.dhl_booking_provider.DHLBookingProvider.schedule_pickup",
+            lambda self, payload: {"pickup_id": "PU12345", "pickup_status": "SCHEDULED"},
+        )
+
+        create_resp = client.post("/api/v1/shipments/create", json=booking_payload())
+        assert create_resp.status_code == 201, create_resp.text
+        shipment_id = create_resp.json()["shipment_id"]
+
+        pickup_resp = client.post("/api/v1/shipments/pickup", json={"awb": "1234567890"})
+        assert pickup_resp.status_code == 200, pickup_resp.text
+        pickup_data = pickup_resp.json()
+        assert pickup_data["status"] == "PICKUP_SCHEDULED"
+        assert pickup_data["pickup_status"] == "SCHEDULED"
+        assert pickup_data["pickup_id"] == "PU12345"
+
+        shipment_resp = client.get(f"/api/v1/shipments/{shipment_id}")
+        assert shipment_resp.status_code == 200
+        shipment = shipment_resp.json()
+        assert shipment["status"] == "PICKUP_SCHEDULED"
+        assert shipment["lifecycle_state"] == "PICKUP_SCHEDULED"
+        assert shipment["pickup_status"] == "SCHEDULED"
+        assert shipment["pickup_id"] == "PU12345"
+
+
 class TestDeleteShipment:
     def test_delete_existing(self, client):
         project = create_project(client, "Delete Shipment Project")
@@ -362,3 +545,46 @@ class TestGoogleSheetWebhook:
         assert master["is_master"] is True
         assert child["is_master"] is False
         assert child["master_tracking_number"] == "777777777777"
+
+    def test_webhook_keeps_different_client_row_under_active_master(self, client):
+        payload = {
+            "rows": [
+                {
+                    "Master AWB": "777777777777",
+                    "Client Name": "Master Client",
+                    "No of Box": "3",
+                    "Ship to location": "Dallas, TX, US",
+                },
+                {
+                    # Some sheets put child AWBs visually under the master column.
+                    # A different client name should not start a new master group.
+                    "Master AWB": "777777777778",
+                    "Client Name": "Child Client",
+                    "Ship to location": "Dallas, TX, US",
+                },
+                {
+                    "Master AWB": "777777777779",
+                    "Client Name": "Next Master Client",
+                    "No of Box": "2",
+                    "Ship to location": "Austin, TX, US",
+                },
+            ]
+        }
+
+        resp = client.post("/api/v1/shipments/webhook/google-sheet", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["failed"] == 0
+
+        rows = client.get("/api/v1/shipments/").json()
+        master = next(r for r in rows if r["tracking_number"] == "777777777777")
+        child = next(r for r in rows if r["tracking_number"] == "777777777778")
+        next_master = next(r for r in rows if r["tracking_number"] == "777777777779")
+
+        assert master["is_master"] is True
+        assert master["recipient"] == "Master Client"
+        assert child["is_master"] is False
+        assert child["master_tracking_number"] == "777777777777"
+        assert child["recipient"] == "Child Client"
+        assert next_master["is_master"] is True
+        assert next_master["recipient"] == "Next Master Client"
+        assert next_master["master_tracking_number"] is None

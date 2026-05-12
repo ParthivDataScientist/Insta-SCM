@@ -8,7 +8,7 @@ These are separate from the SQLModel `Shipment` table model so that:
 """
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 class ChildParcel(BaseModel):
@@ -43,6 +43,7 @@ class ShipmentResponse(BaseModel):
     tracking_number: str
     carrier: str
     status: str
+    lifecycle_state: Optional[str] = None
     origin: Optional[str] = None
     destination: Optional[str] = None
     recipient: Optional[str] = None
@@ -64,6 +65,18 @@ class ShipmentResponse(BaseModel):
     # MPS fields
     is_master: bool = False
     is_archived: bool = False
+    awb: Optional[str] = None
+    label_url: Optional[str] = None
+    pickup_id: Optional[str] = None
+    pickup_status: Optional[str] = None
+    quote_amount: Optional[float] = None
+    quote_currency: Optional[str] = None
+    quoted_delivery_time: Optional[str] = None
+    service_type: Optional[str] = None
+    package_weight_kg: Optional[float] = None
+    package_length_cm: Optional[float] = None
+    package_width_cm: Optional[float] = None
+    package_height_cm: Optional[float] = None
     master_tracking_number: Optional[str] = None
     # Rich child-parcel objects (preferred)
     child_parcels: List[ChildParcel] = []
@@ -106,3 +119,96 @@ class MPSDetailResponse(BaseModel):
             pieces_delivered=sum(1 for p in parcels if p.status == "Delivered"),
             pieces_in_exception=sum(1 for p in parcels if p.status == "Exception"),
         )
+
+
+class ShipmentReceiverInput(BaseModel):
+    company_name: Optional[str] = Field(default=None, max_length=120)
+    name: str = Field(min_length=2, max_length=120)
+    email: Optional[EmailStr] = None
+    phone: str = Field(min_length=5, max_length=40)
+    address_line1: str = Field(min_length=3, max_length=120)
+    address_line2: Optional[str] = Field(default=None, max_length=120)
+    address_line3: Optional[str] = Field(default=None, max_length=120)
+    city: str = Field(min_length=2, max_length=80)
+    state_code: Optional[str] = Field(default=None, max_length=40)
+    postal_code: str = Field(min_length=2, max_length=20)
+    country_code: str = Field(min_length=2, max_length=2)
+    country_name: Optional[str] = Field(default=None, max_length=80)
+
+    @field_validator("country_code")
+    @classmethod
+    def normalize_country_code(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class ShipmentPackageInput(BaseModel):
+    pieces: int = Field(default=1, ge=1, le=999)
+    weight_kg: float = Field(gt=0, le=9999)
+    length_cm: float = Field(gt=0, le=999)
+    width_cm: float = Field(gt=0, le=999)
+    height_cm: float = Field(gt=0, le=999)
+    declared_value: float = Field(default=0, ge=0, le=99999999)
+    declared_currency: str = Field(default="USD", min_length=3, max_length=3)
+
+    @field_validator("declared_currency")
+    @classmethod
+    def normalize_declared_currency(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class ShipmentBookingInput(BaseModel):
+    description: str = Field(min_length=2, max_length=120)
+    service_type: str = Field(default="P", min_length=1, max_length=10)
+    local_product_code: Optional[str] = Field(default=None, max_length=20)
+    terms_of_trade: Optional[str] = Field(default=None, max_length=20)
+    shipping_payment_type: Optional[str] = Field(default=None, max_length=20)
+    duty_payment_type: Optional[str] = Field(default=None, max_length=20)
+    is_dutiable: bool = True
+    shipper_reference: Optional[str] = Field(default=None, max_length=80)
+    exhibition_name: Optional[str] = Field(default=None, max_length=120)
+    show_date: Optional[str] = Field(default=None, max_length=40)
+    project_id: Optional[int] = None
+
+
+class ShipmentBookingRequest(BaseModel):
+    receiver: ShipmentReceiverInput
+    package: ShipmentPackageInput
+    shipment: ShipmentBookingInput
+
+
+class ShipmentRateResponse(BaseModel):
+    status: str
+    lifecycle_state: str
+    price: float
+    currency: str
+    delivery_time: Optional[str] = None
+    service_type: Optional[str] = None
+
+
+class ShipmentCreateResponse(BaseModel):
+    status: str
+    lifecycle_state: str
+    awb: str
+    tracking_number: str
+    label_url: str
+    shipment_id: int
+
+
+class PickupScheduleRequest(BaseModel):
+    awb: str = Field(min_length=8, max_length=50)
+    pickup_date: Optional[str] = Field(default=None, max_length=20)
+    ready_by_time: Optional[str] = Field(default=None, max_length=5)
+    closing_time: Optional[str] = Field(default=None, max_length=5)
+
+    @field_validator("awb")
+    @classmethod
+    def normalize_awb(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class PickupScheduleResponse(BaseModel):
+    status: str
+    lifecycle_state: str
+    awb: str
+    pickup_id: str
+    pickup_status: str

@@ -12,6 +12,7 @@ import ProjectsDashboardPremium from './views/ProjectsDashboardPremium';
 import ProjectBoardPremium from './views/ProjectBoardPremium';
 import ManagerTimelinePremium from './views/ManagerTimelinePremium';
 import ShipmentDashboardPremium from './views/ShipmentDashboardPremium';
+import ShipmentBookingPage from './views/ShipmentBookingPage';
 import { GlobalDateRangeProvider } from './contexts/GlobalDateRangeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './styles.css';
@@ -57,6 +58,7 @@ export default function App() {
                                 <Route path="/project-officer" element={<ProtectedRoute><ManagerTimelinePremium /></ProtectedRoute>} />
                                 <Route path="/timeline" element={<Navigate to="/project-officer" replace />} />
                                 <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
+                                <Route path="/shipments/new" element={<ProtectedRoute><ShipmentBookingPage /></ProtectedRoute>} />
                                 <Route path="/*" element={<Navigate to="/design" replace />} />
                             </Routes>
                         </GlobalDateRangeProvider>

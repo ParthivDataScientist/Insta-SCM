@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useShipments } from '../hooks/useShipments';
 import ShipmentTable from '../components/ShipmentTable';
 import TrackModal from '../components/TrackModal';
@@ -12,6 +13,7 @@ import AlertBanner from '../components/AlertBanner';
 import '../design-premium.css';
 
 export default function ShipmentDashboardPremium() {
+    const navigate = useNavigate();
     const {
         shipments, stats, loading, refreshing, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
@@ -192,7 +194,11 @@ export default function ShipmentDashboardPremium() {
                             </button>
 
                             <button className="design-premium-btn design-premium-btn--primary" onClick={() => setShowTrack(true)}>
-                                <Plus size={15} /> Add Shipment
+                                <Plus size={15} /> Track Shipment
+                            </button>
+
+                            <button className="design-premium-btn" onClick={() => navigate('/shipments/new')}>
+                                <Truck size={15} /> Book Shipment
                             </button>
 
                             <button
@@ -226,15 +232,25 @@ export default function ShipmentDashboardPremium() {
                     </button>
                 </div>
                 <div className="shipping-mobile-sheet__body">
+                        <button
+                            type="button"
+                            className="shipping-mobile-action shipping-mobile-action--primary"
+                            onClick={() => {
+                                setShowTrack(true);
+                            setShowMobileHeaderActions(false);
+                        }}
+                        >
+                        <Plus size={16} /> Track Shipment
+                    </button>
                     <button
                         type="button"
-                        className="shipping-mobile-action shipping-mobile-action--primary"
+                        className="shipping-mobile-action"
                         onClick={() => {
-                            setShowTrack(true);
+                            navigate('/shipments/new');
                             setShowMobileHeaderActions(false);
                         }}
                     >
-                        <Plus size={16} /> Add Shipment
+                        <Truck size={16} /> Book Shipment
                     </button>
                     <button
                         type="button"

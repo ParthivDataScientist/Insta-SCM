@@ -70,6 +70,39 @@ class Settings(BaseSettings):
     DHL_WCF_SOAP_ACTION: str = "http://tempuri.org/IDHLService/PostTracking"
     DHL_WCF_SOAP_VERSION: Literal["1.1", "1.2"] = "1.1"
     DHL_WCF_TIMEOUT_SECONDS: int = 20
+    STORAGE_DIR: str = os.path.join(_ROOT_DIR, "storage")
+    DHL_LABELS_SUBDIR: str = "labels"
+
+    DHL_SITE_ID: str = ""
+    DHL_SHIPPER_ID: str = ""
+    DHL_SHIPPER_ACCOUNT_NUMBER: str = ""
+    DHL_BILLING_ACCOUNT_NUMBER: str = ""
+    DHL_DUTY_ACCOUNT_NUMBER: str = ""
+
+    DHL_SHIPPER_COMPANY: str = "Insta Exhibition Production Site"
+    DHL_SHIPPER_NAME: str = "Insta Exhibition Production Site"
+    DHL_SHIPPER_ADDRESS1: str = "Insta House 1-A, K.T. Industrial Park"
+    DHL_SHIPPER_ADDRESS2: str = "Bilal Pada, Goraipada"
+    DHL_SHIPPER_ADDRESS3: str = ""
+    DHL_SHIPPER_CITY: str = "Vasai Road (East), Palghar"
+    DHL_SHIPPER_POSTAL_CODE: str = "401208"
+    DHL_SHIPPER_COUNTRY_CODE: str = "IN"
+    DHL_SHIPPER_COUNTRY_NAME: str = "India"
+    DHL_SHIPPER_PHONE: str = ""
+
+    DHL_DEFAULT_SHIPPING_PAYMENT_TYPE: str = "S"
+    DHL_DEFAULT_DUTY_PAYMENT_TYPE: str = "R"
+    DHL_DEFAULT_TERMS_OF_TRADE: str = "DAP"
+    DHL_DEFAULT_PRODUCT_CODE: str = "P"
+    DHL_DEFAULT_LOCAL_PRODUCT_CODE: str = ""
+    DHL_DEFAULT_NETWORK_TYPE_CODE: str = ""
+    DHL_DEFAULT_SPECIAL_SERVICE: str = ""
+    DHL_DEFAULT_DECLARED_CURRENCY: str = "USD"
+    DHL_DEFAULT_SHIP_CURRENCY: str = "USD"
+
+    DHL_DEFAULT_PICKUP_LOCATION: str = ""
+    DHL_DEFAULT_PICKUP_READY_TIME: str = "15:00"
+    DHL_DEFAULT_PICKUP_CLOSE_TIME: str = "18:00"
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

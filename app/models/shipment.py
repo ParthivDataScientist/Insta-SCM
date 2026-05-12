@@ -8,6 +8,7 @@ class ShipmentBase(SQLModel):
     tracking_number: str = Field(index=True, unique=True)
     carrier: str
     status: str = "Unknown"
+    lifecycle_state: Optional[str] = None
     origin: Optional[str] = None
     destination: Optional[str] = None
     recipient: Optional[str] = None
@@ -28,6 +29,20 @@ class ShipmentBase(SQLModel):
     project_id: Optional[int] = Field(default=None, foreign_key="dashboardproject.id")
     is_master: bool = Field(default=False)
     is_archived: bool = Field(default=False)
+    awb: Optional[str] = Field(default=None, index=True)
+    label_url: Optional[str] = None
+    label_path: Optional[str] = None
+    pickup_id: Optional[str] = None
+    pickup_status: Optional[str] = None
+    quote_amount: Optional[float] = None
+    quote_currency: Optional[str] = None
+    quoted_delivery_time: Optional[str] = None
+    service_type: Optional[str] = None
+    package_weight_kg: Optional[float] = None
+    package_length_cm: Optional[float] = None
+    package_width_cm: Optional[float] = None
+    package_height_cm: Optional[float] = None
+    booking_payload: dict = Field(default={}, sa_column=Column(JSON))
     # Stores [{"tracking_number": str, "status": str, "raw_status": str}, ...]
     child_parcels: List[dict] = Field(default=[], sa_column=Column(JSON))
 

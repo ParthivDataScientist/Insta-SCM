@@ -43,6 +43,21 @@ const shipmentsService = {
         return response.data;
     },
 
+    rateShipment: async (payload) => {
+        const response = await apiClient.post('/api/v1/shipments/rate', payload);
+        return response.data;
+    },
+
+    createShipment: async (payload) => {
+        const response = await apiClient.post('/api/v1/shipments/create', payload);
+        return response.data;
+    },
+
+    schedulePickup: async (payload) => {
+        const response = await apiClient.post('/api/v1/shipments/pickup', payload);
+        return response.data;
+    },
+
     refreshShipments: async (shipmentIds = null, options = {}) => {
         const { includeChildren = false, timeoutMs = 120000 } = options;
         const payload = shipmentIds && shipmentIds.length > 0

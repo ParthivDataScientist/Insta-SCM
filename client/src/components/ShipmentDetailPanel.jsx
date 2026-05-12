@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package, MapPin, Phone, Mail } from 'lucide-react';
+import { X, Truck, Calendar, Clock, AlertTriangle, Trash2, Package, MapPin, Phone, Mail, Tag } from 'lucide-react';
 import shipmentsService from '../api/shipments';
 
 const formatHistoryDate = (dateStr) => {
@@ -310,6 +310,11 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                     Contact the carrier directly for real-time adjustments or claims.
                 </p>
                 <div className="support-buttons">
+                    {s.label_url ? (
+                        <a href={s.label_url} target="_blank" rel="noreferrer" className="support-btn tertiary">
+                            <Tag size={14} /> Download Label
+                        </a>
+                    ) : null}
                     {emailDraft.phone ? (
                         <a href={`tel:${emailDraft.phone}`} className="support-btn">
                             <Phone size={14} /> Call {s.carrier || 'Carrier'}

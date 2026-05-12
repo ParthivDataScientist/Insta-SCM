@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -9,6 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlmodel import SQLModel, Session, select, text
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.error_handlers import (
@@ -38,6 +40,8 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: create DB tables on startup and run lightweight schema sync."""
+    Path(settings.STORAGE_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.STORAGE_DIR, settings.DHL_LABELS_SUBDIR).mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(engine)
     _ensure_project_schema_compatibility()
     _backfill_project_canonical_fields()
@@ -98,8 +102,28 @@ def _ensure_project_schema_compatibility() -> None:
         for column_name, ddl in dashboardproject_columns.items():
             if column_name not in existing_columns:
                 connection.execute(text(ddl))
-        if "shipment" in inspector.get_table_names() and "project_id" not in shipment_columns:
-            connection.execute(text("ALTER TABLE shipment ADD COLUMN project_id INTEGER"))
+        if "shipment" in inspector.get_table_names():
+            shipment_ddl = {
+                "project_id": "ALTER TABLE shipment ADD COLUMN project_id INTEGER",
+                "lifecycle_state": "ALTER TABLE shipment ADD COLUMN lifecycle_state VARCHAR",
+                "awb": "ALTER TABLE shipment ADD COLUMN awb VARCHAR",
+                "label_url": "ALTER TABLE shipment ADD COLUMN label_url VARCHAR",
+                "label_path": "ALTER TABLE shipment ADD COLUMN label_path VARCHAR",
+                "pickup_id": "ALTER TABLE shipment ADD COLUMN pickup_id VARCHAR",
+                "pickup_status": "ALTER TABLE shipment ADD COLUMN pickup_status VARCHAR",
+                "quote_amount": "ALTER TABLE shipment ADD COLUMN quote_amount FLOAT",
+                "quote_currency": "ALTER TABLE shipment ADD COLUMN quote_currency VARCHAR",
+                "quoted_delivery_time": "ALTER TABLE shipment ADD COLUMN quoted_delivery_time VARCHAR",
+                "service_type": "ALTER TABLE shipment ADD COLUMN service_type VARCHAR",
+                "package_weight_kg": "ALTER TABLE shipment ADD COLUMN package_weight_kg FLOAT",
+                "package_length_cm": "ALTER TABLE shipment ADD COLUMN package_length_cm FLOAT",
+                "package_width_cm": "ALTER TABLE shipment ADD COLUMN package_width_cm FLOAT",
+                "package_height_cm": "ALTER TABLE shipment ADD COLUMN package_height_cm FLOAT",
+                "booking_payload": "ALTER TABLE shipment ADD COLUMN booking_payload JSON",
+            }
+            for col_name, ddl in shipment_ddl.items():
+                if col_name not in shipment_columns:
+                    connection.execute(text(ddl))
         
         for col_name, ddl in user_ddl.items():
             if col_name not in user_columns:
@@ -161,6 +185,7 @@ app.add_middleware(
 app.add_middleware(RequestIdMiddleware)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.mount("/storage", StaticFiles(directory=settings.STORAGE_DIR, check_dir=False), name="storage")
 
 
 @app.get("/api/admin/reseed")

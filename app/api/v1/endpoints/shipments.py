@@ -18,8 +18,24 @@ from app.core.security import verify_api_key
 from app.db.session import get_session
 from app.models.dashboard_project import DashboardProject
 from app.models.shipment import Shipment
-from app.schemas.shipment import MPSDetailResponse, ShipmentResponse
-from app.services.shipment_service import get_stats, track_and_save, preview_track, refresh_tracked_shipments
+from app.schemas.shipment import (
+    MPSDetailResponse,
+    PickupScheduleRequest,
+    PickupScheduleResponse,
+    ShipmentBookingRequest,
+    ShipmentCreateResponse,
+    ShipmentRateResponse,
+    ShipmentResponse,
+)
+from app.services.shipment_service import (
+    create_shipment,
+    get_stats,
+    preview_track,
+    rate_shipment,
+    refresh_tracked_shipments,
+    schedule_pickup,
+    track_and_save,
+)
 from app.services.dhl import DHLService
 
 logger = logging.getLogger(__name__)
@@ -54,8 +70,14 @@ class RefreshRequest(BaseModel):
 class SheetRow(BaseModel):
     model_config = {"populate_by_name": True}
 
-    ship_to_location: Optional[str] = None
-    client_name: Optional[str] = None
+    ship_to_location: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("ship_to_location", "shipToLocation", "Ship to location"),
+    )
+    client_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("client_name", "clientName", "Client Name"),
+    )
     booking_date: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("booking_date", "bookingDate", "booking_dt", "Booking Date", "Booking dt."),
@@ -64,13 +86,34 @@ class SheetRow(BaseModel):
         default=None,
         validation_alias=AliasChoices("show_date", "showDate", "Show Date", "Show date", "show date"),
     )
-    show_city: Optional[str] = None
-    cs_type: Optional[str] = None
-    no_of_box: Optional[str] = None
-    courier: Optional[str] = None
-    master_awb: Optional[str] = None
-    child_awb: Optional[str] = None
-    remarks: Optional[str] = None
+    show_city: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("show_city", "showCity", "Show City"),
+    )
+    cs_type: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("cs_type", "csType", "C/S", "CS"),
+    )
+    no_of_box: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("no_of_box", "noOfBox", "No of Box"),
+    )
+    courier: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("courier", "Courier"),
+    )
+    master_awb: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("master_awb", "masterAwb", "Master AWB"),
+    )
+    child_awb: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("child_awb", "childAwb", "Child AWB", "Child AWB #", "Child AWB#"),
+    )
+    remarks: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("remarks", "Remarks"),
+    )
 
 class WebhookPayload(BaseModel):
     rows: List[SheetRow]
@@ -88,40 +131,88 @@ def _normalize_tracking_cell(value: Optional[str]) -> str:
     return token.upper()
 
 
+def _normalize_text_cell(value: Optional[str]) -> str:
+    token = str(value or "").strip()
+    return "" if token.lower() in EMPTY_TRACKING_TOKENS else token
+
+
+def _normalize_import_column(column_name: str) -> str:
+    token = str(column_name or "").strip().lower()
+    for old, new in (("/", "_"), ("#", ""), (".", ""), (" ", "_")):
+        token = token.replace(old, new)
+    while "__" in token:
+        token = token.replace("__", "_")
+    return token.strip("_")
+
+
+def _first_present_row_value(row, *keys: str) -> Optional[str]:
+    for key in keys:
+        value = row.get(key)
+        if value is None or pd.isna(value):
+            continue
+        token = _normalize_text_cell(value)
+        if token:
+            return token
+    return None
+
+
 def _resolve_tracking_row(
     *,
     master_awb: Optional[str],
     child_awb: Optional[str],
     legacy_tracking: Optional[str] = None,
     last_master_awb: Optional[str] = None,
-) -> tuple[Optional[str], Optional[str], bool, Optional[str]]:
+    current_client_name: Optional[str] = None,
+    current_no_of_box: Optional[str] = None,
+    last_master_client_name: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str], bool, Optional[str], Optional[str]]:
     """
     Resolve the row tracking number and MPS relationship.
 
     Returns:
-        (tracking_number, master_tracking_number, is_master, next_last_master_awb)
+        (
+            tracking_number,
+            master_tracking_number,
+            is_master,
+            next_last_master_awb,
+            next_last_master_client_name,
+        )
     """
     master = _normalize_tracking_cell(master_awb)
     child = _normalize_tracking_cell(child_awb)
     legacy = _normalize_tracking_cell(legacy_tracking)
+    last_master = _normalize_tracking_cell(last_master_awb)
+    current_client = _normalize_text_cell(current_client_name).lower()
+    has_master_marker = bool(_normalize_text_cell(current_no_of_box))
+    last_master_client = _normalize_text_cell(last_master_client_name).lower()
 
     if master and child:
         if master == child:
-            return master, None, True, master
+            return master, None, True, master, _normalize_text_cell(current_client_name)
         # Google Sheet flow can provide both columns for child rows:
         # master_awb is the parent, child_awb is the parcel being tracked.
-        return child, master, False, master
+        next_master_client = last_master_client_name if master == last_master else None
+        return child, master, False, master, next_master_client
 
     if master:
-        return master, None, True, master
+        if (
+            last_master
+            and master != last_master
+            and not has_master_marker
+            and current_client
+            and last_master_client
+            and current_client != last_master_client
+        ):
+            return master, last_master, False, last_master, last_master_client_name
+        return master, None, True, master, _normalize_text_cell(current_client_name)
 
     if child:
-        return child, _normalize_tracking_cell(last_master_awb), False, _normalize_tracking_cell(last_master_awb)
+        return child, last_master, False, last_master, last_master_client_name
 
     if legacy:
-        return legacy, None, False, _normalize_tracking_cell(last_master_awb)
+        return legacy, None, False, last_master, last_master_client_name
 
-    return None, None, False, _normalize_tracking_cell(last_master_awb)
+    return None, None, False, last_master, last_master_client_name
 
 
 def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
@@ -205,6 +296,54 @@ def preview_dhl_shipment(
     }
 
 
+@router.post("/rate", response_model=ShipmentRateResponse, status_code=200)
+def rate_dhl_shipment(
+    body: ShipmentBookingRequest,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    if body.shipment.project_id is not None:
+        _validate_project_reference(db, body.shipment.project_id)
+
+    result = rate_shipment(body.model_dump(mode="json"))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/create", response_model=ShipmentCreateResponse, status_code=201)
+def create_dhl_shipment(
+    body: ShipmentBookingRequest,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    if body.shipment.project_id is not None:
+        _validate_project_reference(db, body.shipment.project_id)
+
+    result = create_shipment(body.model_dump(mode="json"), db)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/pickup", response_model=PickupScheduleResponse, status_code=200)
+def schedule_dhl_pickup(
+    body: PickupScheduleRequest,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    result = schedule_pickup(
+        body.awb,
+        db,
+        pickup_date=body.pickup_date,
+        ready_by_time=body.ready_by_time,
+        closing_time=body.closing_time,
+    )
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @router.post("/track/{tracking_number}", status_code=201)
 def track_shipment(
     tracking_number: str = Path(
@@ -246,7 +385,7 @@ def _process_excel_import(contents: bytes, db: Session):
     """Parse Excel rows and track each shipment, supporting Master/Child vertical nesting logic."""
     df = pd.read_excel(io.BytesIO(contents))
     # Normalize column names for easier lookup
-    df.columns = [c.strip().lower().replace(" ", "_").replace("#", "").replace("/", "") for c in df.columns]
+    df.columns = [_normalize_import_column(c) for c in df.columns]
 
     # Required columns check (allowing for either tracking_number OR master/child structure)
     has_legacy = "tracking_number" in df.columns
@@ -261,30 +400,31 @@ def _process_excel_import(contents: bytes, db: Session):
     errors = []
     
     last_master_awb = None
+    last_master_client_name = None
     
     for _, row in df.iterrows():
-        tracking_num, master_to_use, is_master, last_master_awb = _resolve_tracking_row(
+        row_client_name = _first_present_row_value(row, "client_name", "recipient")
+        tracking_num, master_to_use, is_master, last_master_awb, last_master_client_name = _resolve_tracking_row(
             master_awb=row.get("master_awb"),
             child_awb=row.get("child_awb"),
             legacy_tracking=row.get("tracking_number"),
             last_master_awb=last_master_awb,
+            current_client_name=row_client_name,
+            current_no_of_box=_first_present_row_value(row, "no_of_box", "boxes"),
+            last_master_client_name=last_master_client_name,
         )
         if not tracking_num:
             continue
 
         # Metadata extraction
-        items_name = str(row.get("name") or row.get("items") or "").strip() if pd.notna(row.get("name")) or pd.notna(row.get("items")) else None
-        recipient = str(row.get("client_name") or row.get("recipient") or "").strip() if pd.notna(row.get("client_name")) or pd.notna(row.get("recipient")) else items_name
-        show_date = str(row.get("show_date")).strip() if pd.notna(row.get("show_date")) else None
+        items_name = _first_present_row_value(row, "name", "items")
+        recipient = row_client_name or items_name
+        show_date = _first_present_row_value(row, "show_date")
         
-        exhibition_name = str(row.get("exhibition_name") or row.get("show_city") or "Unknown Exhibition").strip()
-        cs = str(row.get("cs") or row.get("cs_type")).strip() if pd.notna(row.get("cs")) or pd.notna(row.get("cs_type")) else None
-        no_of_box = str(row.get("no_of_box") or row.get("boxes")).strip() if pd.notna(row.get("no_of_box")) or pd.notna(row.get("boxes")) else None
-        destination_hint = (
-            str(row.get("ship_to_location") or row.get("destination") or "").strip()
-            if pd.notna(row.get("ship_to_location")) or pd.notna(row.get("destination"))
-            else None
-        )
+        exhibition_name = _first_present_row_value(row, "exhibition_name", "show_city") or "Unknown Exhibition"
+        cs = _first_present_row_value(row, "cs", "cs_type")
+        no_of_box = _first_present_row_value(row, "no_of_box", "boxes")
+        destination_hint = _first_present_row_value(row, "ship_to_location", "destination")
         
         project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
 
@@ -307,8 +447,8 @@ def _process_excel_import(contents: bytes, db: Session):
             # Pass MPS flags
             master_tracking_number=master_to_use,
             is_master=is_master,
-            remarks=str(row.get("remarks")).strip() if pd.notna(row.get("remarks")) else None,
-            booking_date=str(row.get("booking_dt")).strip() if pd.notna(row.get("booking_dt")) else None
+            remarks=_first_present_row_value(row, "remarks"),
+            booking_date=_first_present_row_value(row, "booking_dt", "booking_date")
         )
         
         if "error" in res:
@@ -360,12 +500,16 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
     errors = []
     
     last_master_awb = None
+    last_master_client_name = None
     
     for row in payload.rows:
-        tracking_number, master_to_use, is_master, last_master_awb = _resolve_tracking_row(
+        tracking_number, master_to_use, is_master, last_master_awb, last_master_client_name = _resolve_tracking_row(
             master_awb=row.master_awb,
             child_awb=row.child_awb,
             last_master_awb=last_master_awb,
+            current_client_name=row.client_name,
+            current_no_of_box=row.no_of_box,
+            last_master_client_name=last_master_client_name,
         )
         if not tracking_number:
             continue
