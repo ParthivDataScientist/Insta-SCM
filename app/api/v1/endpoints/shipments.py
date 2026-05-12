@@ -539,6 +539,7 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
             else:
                 success += 1
         except Exception as e:
+            db.rollback()
             logger.error(f"Error processing webhook row {tracking_number}: {str(e)}")
             failed += 1
             errors.append(f"{tracking_number}: {str(e)}")

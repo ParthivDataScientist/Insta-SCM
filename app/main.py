@@ -104,6 +104,18 @@ def _ensure_project_schema_compatibility() -> None:
                 connection.execute(text(ddl))
         if "shipment" in inspector.get_table_names():
             shipment_ddl = {
+                "master_tracking_number": "ALTER TABLE shipment ADD COLUMN master_tracking_number VARCHAR",
+                "is_master": "ALTER TABLE shipment ADD COLUMN is_master BOOLEAN DEFAULT FALSE",
+                "child_tracking_numbers": "ALTER TABLE shipment ADD COLUMN child_tracking_numbers JSON",
+                "child_parcels": "ALTER TABLE shipment ADD COLUMN child_parcels JSON",
+                "is_archived": "ALTER TABLE shipment ADD COLUMN is_archived BOOLEAN DEFAULT FALSE",
+                "cs": "ALTER TABLE shipment ADD COLUMN cs VARCHAR",
+                "no_of_box": "ALTER TABLE shipment ADD COLUMN no_of_box VARCHAR",
+                "booking_date": "ALTER TABLE shipment ADD COLUMN booking_date VARCHAR",
+                "show_city": "ALTER TABLE shipment ADD COLUMN show_city VARCHAR",
+                "cs_type": "ALTER TABLE shipment ADD COLUMN cs_type VARCHAR",
+                "remarks": "ALTER TABLE shipment ADD COLUMN remarks VARCHAR",
+                "last_scan_date": "ALTER TABLE shipment ADD COLUMN last_scan_date VARCHAR",
                 "project_id": "ALTER TABLE shipment ADD COLUMN project_id INTEGER",
                 "lifecycle_state": "ALTER TABLE shipment ADD COLUMN lifecycle_state VARCHAR",
                 "awb": "ALTER TABLE shipment ADD COLUMN awb VARCHAR",
