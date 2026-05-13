@@ -32,7 +32,11 @@ DHL_STATUS_MAP = {
     "with delivery courier": "Out for Delivery",
     "exception": "Exception",
     "held": "Exception",
-    "customs": "Exception",
+    "customs": "In Transit",
+    "clearance": "In Transit",
+    "customs delay": "Exception",
+    "customs hold": "Exception",
+    "clearance delay": "Exception",
     "delay": "Exception",
     "returned": "Exception",
 }

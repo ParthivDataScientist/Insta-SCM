@@ -724,7 +724,7 @@ class DHLProvider:
             return "Out for Delivery"
 
         # Exception first to avoid false "delivered" positives like "undelivered".
-        if any(token in status for token in ("exception", "hold", "custom", "delay", "return", "undeliver", "attempted")):
+        if any(token in status for token in ("exception", "hold", "customs delay", "customs hold", "clearance delay", "delay", "return", "undeliver", "attempted")):
             return "Exception"
 
         if any(token in status for token in ("out for delivery", "with delivery courier", "with courier")):

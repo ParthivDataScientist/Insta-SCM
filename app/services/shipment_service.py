@@ -110,6 +110,9 @@ def _apply_stuck_exception_policy(result: dict) -> dict:
     if not isinstance(result, dict) or "error" in result:
         return result
 
+    # Disabled artificial stuck exception policy per user request so the DB uses the true API status
+    return result
+
     current_status = str(result.get("status", "") or "")
     if _is_delivered_status(current_status):
         return result

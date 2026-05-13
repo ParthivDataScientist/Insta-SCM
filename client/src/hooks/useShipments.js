@@ -132,6 +132,8 @@ export function useShipments() {
             if (result.failed > 0) {
                 const message = `Refreshed ${result.refreshed} shipment(s), but ${result.failed} could not be re-synced.`;
                 setError(message);
+            } else {
+                alert("Done");
             }
             return result;
         } catch (err) {
