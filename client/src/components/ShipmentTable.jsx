@@ -173,6 +173,74 @@ const stripLocationFromDescription = (description, location) => {
     return cleaned.trim().replace(/[,:;.\-]+$/, '').trim();
 };
 
+const normalizeHistoryForCompare = (history = []) => {
+    if (!Array.isArray(history)) return [];
+    return history
+        .filter(Boolean)
+        .map((entry) => ({
+            description: normalizeToken(entry?.description),
+            location: normalizeToken(entry?.location),
+            status: normalizeToken(entry?.status),
+            date: normalizeToken(entry?.date),
+        }));
+};
+
+const historiesMatch = (left = [], right = []) => {
+    const a = normalizeHistoryForCompare(left);
+    const b = normalizeHistoryForCompare(right);
+    if (!a.length || a.length !== b.length) return false;
+    return JSON.stringify(a) === JSON.stringify(b);
+};
+
+const isEmptyStatus = (value) => {
+    const token = normalizeToken(value).toLowerCase();
+    return !token || ['unknown', 'pending', 'tracking unavailable', 'awaiting child scan'].includes(token);
+};
+
+const buildChildScanHistory = (child, master) => {
+    const explicitHistory = Array.isArray(child?.history) ? child.history.filter(Boolean) : [];
+    if (explicitHistory.length > 0 && !historiesMatch(explicitHistory, master?.history)) {
+        return explicitHistory;
+    }
+
+    const lastDate = normalizeToken(child?.last_date || child?.lastScanDate || child?.last_scan_date);
+    const lastLocation = normalizeToken(child?.last_location || child?.lastLocation);
+    const rawStatus = normalizeToken(child?.raw_status || child?.current_status || child?.status);
+    if (lastDate || lastLocation || (!isEmptyStatus(rawStatus) && rawStatus !== normalizeToken(master?.status))) {
+        return [{
+            description: rawStatus || 'Child package update',
+            location: lastLocation,
+            status: normalizeToken(child?.status) || rawStatus,
+            date: lastDate,
+        }];
+    }
+
+    return [];
+};
+
+const resolveChildTrackingFields = (child, master) => {
+    const history = buildChildScanHistory(child, master);
+    const childStatus = normalizeToken(child?.status);
+    const masterStatus = normalizeToken(master?.status);
+    const childRawStatus = normalizeToken(child?.raw_status || child?.current_status);
+    const hasDistinctStatus = !isEmptyStatus(childStatus) && childStatus.toLowerCase() !== masterStatus.toLowerCase();
+    const hasDistinctRawStatus = !isEmptyStatus(childRawStatus) && childRawStatus.toLowerCase() !== masterStatus.toLowerCase();
+    const status = history.length > 0
+        ? (childStatus || history[0]?.status || 'In Transit')
+        : (hasDistinctStatus ? childStatus : 'Pending');
+    const currentStatus = history.length > 0
+        ? (child?.current_status || childRawStatus || history[0]?.description || status)
+        : (hasDistinctRawStatus ? childRawStatus : 'Awaiting child scan');
+
+    return {
+        history,
+        status,
+        raw_status: childRawStatus || currentStatus,
+        current_status: currentStatus,
+        progress: history.length > 0 ? child?.progress : 0,
+    };
+};
+
 const getCurrentStatusMeta = (shipment) => {
     const history = Array.isArray(shipment?.history) ? shipment.history : [];
     if (history.length > 0) {
@@ -206,7 +274,7 @@ const getCurrentStatusMeta = (shipment) => {
     const fallbackDate = String(shipment?.last_scan_date || '').trim();
     return {
         date: fallbackDate,
-        headline: shipment?.status || '-',
+        headline: shipment?.current_status || shipment?.raw_status || shipment?.status || '-',
         location: '',
     };
 };
@@ -341,11 +409,13 @@ const buildPositionalGroups = (rows = []) => {
 const expandChildRows = (children, master) => children.flatMap((child, childIndex) => {
     const packages = readChildPackages(child);
     const baseKey = child.id ?? `${master.tracking_number || 'master'}-${childIndex}`;
+    const childTrackingFields = resolveChildTrackingFields(child, master);
 
     if (packages.length <= 1) {
         const resolvedTracking = packages[0] || child.tracking_number;
         return [{
             ...child,
+            ...childTrackingFields,
             tracking_number: resolvedTracking,
             __displayTracking: resolvedTracking,
             __sourceChild: child,
@@ -355,6 +425,7 @@ const expandChildRows = (children, master) => children.flatMap((child, childInde
 
     return packages.map((pkg, packageIndex) => ({
         ...child,
+        ...childTrackingFields,
         tracking_number: pkg,
         __displayTracking: pkg,
         __sourceChild: child,
@@ -369,27 +440,12 @@ const buildInlineChildrenFromMaster = (master, masterKey) => {
             .map((parcel, index) => {
                 const tracking = readParcelTrackingNumber(parcel);
                 if (!tracking) return null;
-
-                const explicitParcelHistory = Array.isArray(parcel?.history)
-                    ? parcel.history.filter(Boolean)
-                    : [];
-                const parcelHistory = explicitParcelHistory.length > 0
-                    ? explicitParcelHistory
-                    : ((parcel?.last_date || parcel?.last_location || parcel?.raw_status || parcel?.status)
-                        ? [{
-                            description: parcel?.raw_status || parcel?.status || master.status || 'Update',
-                            location: parcel?.last_location || parcel?.destination || '',
-                            status: parcel?.status || parcel?.raw_status || master.status || 'In Transit',
-                            date: parcel?.last_date || '',
-                        }]
-                        : (Array.isArray(master?.history) ? master.history : []));
+                const childTrackingFields = resolveChildTrackingFields(parcel, master);
 
                 return {
                     ...master,
                     ...parcel,
-                    history: parcelHistory,
-                    status: parcel?.status || master.status,
-                    raw_status: parcel?.raw_status || master.raw_status,
+                    ...childTrackingFields,
                     origin: parcel?.origin || master.origin,
                     destination: parcel?.destination || master.destination,
                     eta: parcel?.eta || master.eta,
@@ -407,6 +463,7 @@ const buildInlineChildrenFromMaster = (master, masterKey) => {
 
     return packages.map((pkg, index) => ({
         ...master,
+        ...resolveChildTrackingFields({}, master),
         tracking_number: pkg,
         __displayTracking: pkg,
         __sourceChild: master,
@@ -418,9 +475,7 @@ const toChildSelectionPayload = (child, master) => ({
     ...(child.__sourceChild || child),
     ...child,
     id: child?.__sourceChild?.id ?? (child?.id === master?.id ? null : (child?.id ?? null)),
-    history: Array.isArray(child?.history) && child.history.length > 0
-        ? child.history
-        : (Array.isArray(master?.history) ? master.history : []),
+    history: Array.isArray(child?.history) ? child.history : [],
     tracking_number: child.__displayTracking || child.tracking_number,
     master_tracking_number: master?.tracking_number || readParentTrackingNumber(child) || null,
     is_master: false,

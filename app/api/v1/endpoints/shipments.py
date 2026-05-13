@@ -36,6 +36,7 @@ from app.services.shipment_service import (
     schedule_pickup,
     track_and_save,
 )
+from app.services.carrier_detection import detect_carrier
 from app.services.dhl import DHLService
 
 logger = logging.getLogger(__name__)
@@ -108,7 +109,22 @@ class SheetRow(BaseModel):
     )
     child_awb: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices("child_awb", "childAwb", "Child AWB", "Child AWB #", "Child AWB#"),
+        validation_alias=AliasChoices(
+            "child_awb",
+            "childAwb",
+            "childPackage",
+            "child_package",
+            "Child AWB",
+            "Child AWB #",
+            "Child AWB#",
+            "Child Package",
+            "Child Package #",
+            "Child Package#",
+            "Child Package AWB",
+            "Package AWB",
+            "Piece AWB",
+            "Piece ID",
+        ),
     )
     remarks: Optional[str] = Field(
         default=None,
@@ -120,6 +136,16 @@ class WebhookPayload(BaseModel):
 
 
 EMPTY_TRACKING_TOKENS = {"", "nan", "none", "null", "-", "n/a", "na"}
+CHILD_TRACKING_COLUMN_KEYS = (
+    "child_awb",
+    "child_package",
+    "child_package_awb",
+    "package_awb",
+    "piece_awb",
+    "piece_id",
+    "child_tracking",
+    "child_tracking_number",
+)
 
 
 def _normalize_tracking_cell(value: Optional[str]) -> str:
@@ -156,6 +182,17 @@ def _first_present_row_value(row, *keys: str) -> Optional[str]:
     return None
 
 
+def _first_present_tracking_value(row, *keys: str) -> Optional[str]:
+    for key in keys:
+        value = row.get(key)
+        if value is None or pd.isna(value):
+            continue
+        token = _normalize_tracking_cell(value)
+        if token:
+            return token
+    return None
+
+
 def _resolve_tracking_row(
     *,
     master_awb: Optional[str],
@@ -163,11 +200,15 @@ def _resolve_tracking_row(
     legacy_tracking: Optional[str] = None,
     last_master_awb: Optional[str] = None,
     current_client_name: Optional[str] = None,
-    current_no_of_box: Optional[str] = None,
     last_master_client_name: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[str], bool, Optional[str], Optional[str]]:
     """
     Resolve the row tracking number and MPS relationship.
+
+    Vertical sheet rules:
+    - a master-only row starts a new active master group;
+    - a child-only row belongs to the active master above it;
+    - a row with both columns tracks the child under that row's master.
 
     Returns:
         (
@@ -182,28 +223,16 @@ def _resolve_tracking_row(
     child = _normalize_tracking_cell(child_awb)
     legacy = _normalize_tracking_cell(legacy_tracking)
     last_master = _normalize_tracking_cell(last_master_awb)
-    current_client = _normalize_text_cell(current_client_name).lower()
-    has_master_marker = bool(_normalize_text_cell(current_no_of_box))
-    last_master_client = _normalize_text_cell(last_master_client_name).lower()
 
     if master and child:
         if master == child:
             return master, None, True, master, _normalize_text_cell(current_client_name)
         # Google Sheet flow can provide both columns for child rows:
         # master_awb is the parent, child_awb is the parcel being tracked.
-        next_master_client = last_master_client_name if master == last_master else None
+        next_master_client = last_master_client_name if master == last_master else _normalize_text_cell(current_client_name)
         return child, master, False, master, next_master_client
 
     if master:
-        if (
-            last_master
-            and master != last_master
-            and not has_master_marker
-            and current_client
-            and last_master_client
-            and current_client != last_master_client
-        ):
-            return master, last_master, False, last_master, last_master_client_name
         return master, None, True, master, _normalize_text_cell(current_client_name)
 
     if child:
@@ -213,6 +242,102 @@ def _resolve_tracking_row(
         return legacy, None, False, last_master, last_master_client_name
 
     return None, None, False, last_master, last_master_client_name
+
+
+def _save_sheet_row_without_live_tracking(
+    *,
+    db: Session,
+    tracking_number: str,
+    recipient: Optional[str] = None,
+    items: Optional[str] = None,
+    show_date: Optional[str] = None,
+    exhibition_name: Optional[str] = None,
+    cs: Optional[str] = None,
+    no_of_box: Optional[str] = None,
+    project_id: Optional[int] = None,
+    booking_date: Optional[str] = None,
+    show_city: Optional[str] = None,
+    cs_type: Optional[str] = None,
+    remarks: Optional[str] = None,
+    destination: Optional[str] = None,
+    master_tracking_number: Optional[str] = None,
+    is_master: Optional[bool] = None,
+) -> Optional[dict]:
+    """
+    Keep spreadsheet imports complete even when live tracking is unsupported.
+
+    UPS tracking is intentionally not wired to a carrier provider yet, but
+    Google Sheet rows still need to appear on the shipping page.
+    """
+    tracking_number = _normalize_tracking_cell(tracking_number)
+    carrier = detect_carrier(tracking_number)
+    if carrier != "UPS":
+        return None
+
+    shipment = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
+    if not shipment:
+        shipment = Shipment(
+            tracking_number=tracking_number,
+            carrier=carrier,
+            status="Tracking Unavailable",
+            lifecycle_state="TRACKING_UNAVAILABLE",
+            recipient=recipient or "",
+            exhibition_name=exhibition_name,
+            items=items or "Package",
+            show_date=show_date,
+            cs=cs,
+            no_of_box=no_of_box,
+            project_id=project_id,
+            booking_date=booking_date,
+            show_city=show_city,
+            cs_type=cs_type,
+            remarks=remarks,
+            destination=(destination or "").strip() or "Unknown",
+            origin="Unknown",
+            eta="TBD",
+            progress=0,
+            history=[],
+            master_tracking_number=master_tracking_number,
+            is_master=bool(is_master),
+            child_parcels=[],
+        )
+    else:
+        shipment.carrier = carrier
+        shipment.status = shipment.status or "Tracking Unavailable"
+        shipment.lifecycle_state = shipment.lifecycle_state or "TRACKING_UNAVAILABLE"
+        if recipient:
+            shipment.recipient = recipient
+        if items:
+            shipment.items = items
+        if show_date:
+            shipment.show_date = show_date
+        if exhibition_name and exhibition_name != "Unknown Exhibition":
+            shipment.exhibition_name = exhibition_name
+        if cs:
+            shipment.cs = cs
+        if no_of_box is not None:
+            shipment.no_of_box = no_of_box
+        if project_id is not None:
+            shipment.project_id = project_id
+        if booking_date is not None:
+            shipment.booking_date = booking_date
+        if show_city is not None:
+            shipment.show_city = show_city
+        if cs_type is not None:
+            shipment.cs_type = cs_type
+        if remarks is not None:
+            shipment.remarks = remarks
+        if destination:
+            shipment.destination = destination
+        if master_tracking_number is not None:
+            shipment.master_tracking_number = master_tracking_number
+        if is_master is not None:
+            shipment.is_master = is_master
+
+    db.add(shipment)
+    db.commit()
+    db.refresh(shipment)
+    return {"tracking_number": tracking_number, "status": "saved_without_live_tracking", "carrier": carrier}
 
 
 def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
@@ -389,7 +514,7 @@ def _process_excel_import(contents: bytes, db: Session):
 
     # Required columns check (allowing for either tracking_number OR master/child structure)
     has_legacy = "tracking_number" in df.columns
-    has_mps = "master_awb" in df.columns or "child_awb" in df.columns
+    has_mps = "master_awb" in df.columns or any(key in df.columns for key in CHILD_TRACKING_COLUMN_KEYS)
     
     if not has_legacy and not has_mps:
         logger.error("Excel import: missing tracking columns (tracking_number or master_awb/child_awb)")
@@ -406,11 +531,10 @@ def _process_excel_import(contents: bytes, db: Session):
         row_client_name = _first_present_row_value(row, "client_name", "recipient")
         tracking_num, master_to_use, is_master, last_master_awb, last_master_client_name = _resolve_tracking_row(
             master_awb=row.get("master_awb"),
-            child_awb=row.get("child_awb"),
+            child_awb=_first_present_tracking_value(row, *CHILD_TRACKING_COLUMN_KEYS),
             legacy_tracking=row.get("tracking_number"),
             last_master_awb=last_master_awb,
             current_client_name=row_client_name,
-            current_no_of_box=_first_present_row_value(row, "no_of_box", "boxes"),
             last_master_client_name=last_master_client_name,
         )
         if not tracking_num:
@@ -452,9 +576,29 @@ def _process_excel_import(contents: bytes, db: Session):
         )
         
         if "error" in res:
-            logger.warning("Import failed for %s: %s", tracking_num, res["error"])
-            failed += 1
-            errors.append(f"{tracking_num}: {res['error']}")
+            fallback_res = _save_sheet_row_without_live_tracking(
+                db=db,
+                tracking_number=tracking_num,
+                recipient=recipient,
+                items=items_name,
+                show_date=show_date,
+                exhibition_name=exhibition_name,
+                cs=cs,
+                no_of_box=no_of_box,
+                project_id=project_id,
+                destination=destination_hint,
+                master_tracking_number=master_to_use,
+                is_master=is_master,
+                remarks=_first_present_row_value(row, "remarks"),
+                booking_date=_first_present_row_value(row, "booking_dt", "booking_date"),
+            )
+            if fallback_res:
+                logger.info("Imported %s without live tracking provider (%s)", tracking_num, fallback_res["carrier"])
+                success += 1
+            else:
+                logger.warning("Import failed for %s: %s", tracking_num, res["error"])
+                failed += 1
+                errors.append(f"{tracking_num}: {res['error']}")
         else:
             success += 1
 
@@ -508,7 +652,6 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
             child_awb=row.child_awb,
             last_master_awb=last_master_awb,
             current_client_name=row.client_name,
-            current_no_of_box=row.no_of_box,
             last_master_client_name=last_master_client_name,
         )
         if not tracking_number:
@@ -534,8 +677,29 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
                 is_master=is_master
             )
             if "error" in res:
-                failed += 1
-                errors.append(f"{tracking_number}: {res['error']}")
+                fallback_res = _save_sheet_row_without_live_tracking(
+                    db=db,
+                    tracking_number=tracking_number,
+                    recipient=row.client_name,
+                    items=None,
+                    show_date=row.show_date,
+                    exhibition_name="Unknown Exhibition",
+                    cs=row.cs_type,
+                    no_of_box=row.no_of_box,
+                    project_id=None,
+                    destination=row.ship_to_location,
+                    booking_date=row.booking_date,
+                    show_city=row.show_city,
+                    cs_type=row.cs_type,
+                    remarks=row.remarks,
+                    master_tracking_number=master_to_use,
+                    is_master=is_master,
+                )
+                if fallback_res:
+                    success += 1
+                else:
+                    failed += 1
+                    errors.append(f"{tracking_number}: {res['error']}")
             else:
                 success += 1
         except Exception as e:

@@ -93,3 +93,36 @@ class TestDHLMPSParser:
     def test_mps_backward_compat_list(self, dhl_service, dhl_mps_response):
         result = dhl_service._standardize_response(dhl_mps_response, "DHL8880001")
         assert result["child_tracking_numbers"] == ["DHL8880002"]
+
+    def test_piece_children_do_not_inherit_master_history_without_piece_scans(self, dhl_service):
+        response = {
+            "shipments": [
+                {
+                    "id": "DHL8880001",
+                    "status": {"status": "processed"},
+                    "origin": {"address": {"addressLocality": "Mumbai", "countryCode": "IN"}},
+                    "destination": {"address": {"addressLocality": "Dallas", "countryCode": "US"}},
+                    "events": [
+                        {
+                            "description": "Processed",
+                            "timestamp": "2026-05-13T10:00:00",
+                            "typeCode": "PL",
+                            "location": {"address": {"addressLocality": "Cincinnati Hub", "countryCode": "US"}},
+                        }
+                    ],
+                    "pieces": [
+                        {"trackingNumber": "JD014600012603871337"},
+                        {"trackingNumber": "JD014600012603871338"},
+                    ],
+                }
+            ]
+        }
+
+        result = dhl_service._standardize_response(response, "DHL8880001")
+
+        assert result["is_master"] is True
+        assert result["status"] == "In Transit"
+        for child in result["child_parcels"]:
+            assert child["status"] == "Pending"
+            assert child["raw_status"] == "Pending"
+            assert child["history"] == []

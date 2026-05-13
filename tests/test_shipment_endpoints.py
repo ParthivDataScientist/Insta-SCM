@@ -546,7 +546,7 @@ class TestGoogleSheetWebhook:
         assert child["is_master"] is False
         assert child["master_tracking_number"] == "777777777777"
 
-    def test_webhook_keeps_different_client_row_under_active_master(self, client):
+    def test_webhook_groups_child_package_alias_under_active_master(self, client):
         payload = {
             "rows": [
                 {
@@ -556,17 +556,9 @@ class TestGoogleSheetWebhook:
                     "Ship to location": "Dallas, TX, US",
                 },
                 {
-                    # Some sheets put child AWBs visually under the master column.
-                    # A different client name should not start a new master group.
-                    "Master AWB": "777777777778",
+                    "Child Package": "777777777778",
                     "Client Name": "Child Client",
                     "Ship to location": "Dallas, TX, US",
-                },
-                {
-                    "Master AWB": "777777777779",
-                    "Client Name": "Next Master Client",
-                    "No of Box": "2",
-                    "Ship to location": "Austin, TX, US",
                 },
             ]
         }
@@ -578,13 +570,95 @@ class TestGoogleSheetWebhook:
         rows = client.get("/api/v1/shipments/").json()
         master = next(r for r in rows if r["tracking_number"] == "777777777777")
         child = next(r for r in rows if r["tracking_number"] == "777777777778")
+
+        assert master["is_master"] is True
+        assert child["is_master"] is False
+        assert child["master_tracking_number"] == "777777777777"
+        assert child["recipient"] == "Child Client"
+
+    def test_webhook_treats_next_master_column_value_as_new_master(self, client):
+        payload = {
+            "rows": [
+                {
+                    "Master AWB": "777777777777",
+                    "Client Name": "Master Client",
+                    "No of Box": "3",
+                    "Ship to location": "Dallas, TX, US",
+                },
+                {
+                    "Master AWB": "777777777779",
+                    "Client Name": "Next Master Client",
+                    "Ship to location": "Austin, TX, US",
+                },
+            ]
+        }
+
+        resp = client.post("/api/v1/shipments/webhook/google-sheet", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["failed"] == 0
+
+        rows = client.get("/api/v1/shipments/").json()
+        master = next(r for r in rows if r["tracking_number"] == "777777777777")
         next_master = next(r for r in rows if r["tracking_number"] == "777777777779")
 
         assert master["is_master"] is True
         assert master["recipient"] == "Master Client"
-        assert child["is_master"] is False
-        assert child["master_tracking_number"] == "777777777777"
-        assert child["recipient"] == "Child Client"
         assert next_master["is_master"] is True
         assert next_master["recipient"] == "Next Master Client"
         assert next_master["master_tracking_number"] is None
+
+    def test_webhook_groups_vertical_sheet_children_under_previous_master(self, client):
+        payload = {
+            "rows": [
+                {"Master AWB": "8585955416"},
+                {"Master AWB": "1106940973"},
+                {"Master AWB": "8259614521"},
+                {"Master AWB": "8259668620"},
+                {"Child AWB #": "JD014600012595408404"},
+                {"Master AWB": "1261917064"},
+                {},
+                {"Master AWB": "1261942846"},
+                {"Master AWB": "1261863551"},
+                {},
+                {"Master AWB": "2243432936"},
+                {"Child AWB #": "JD014600012598935784"},
+                {"Child AWB #": "JD014600012598935785"},
+                {"Child AWB #": "JD014600012598935786"},
+                {"Child AWB #": "JD014600012598935787"},
+                {"Child AWB #": "JD014600012598935788"},
+                {"Master AWB": "1ZA329R80492831574"},
+                {"Master AWB": "4323923586"},
+                {"Child AWB #": "JD014600012599552906"},
+                {"Child AWB #": "JD014600012599552907"},
+                {"Master AWB": "871422910760"},
+            ]
+        }
+
+        resp = client.post("/api/v1/shipments/webhook/google-sheet", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["failed"] == 0
+
+        rows = client.get("/api/v1/shipments/").json()
+        by_tracking = {row["tracking_number"]: row for row in rows}
+
+        assert by_tracking["8259668620"]["is_master"] is True
+        assert by_tracking["JD014600012595408404"]["is_master"] is False
+        assert by_tracking["JD014600012595408404"]["master_tracking_number"] == "8259668620"
+
+        for child_tn in [
+            "JD014600012598935784",
+            "JD014600012598935785",
+            "JD014600012598935786",
+            "JD014600012598935787",
+            "JD014600012598935788",
+        ]:
+            assert by_tracking[child_tn]["is_master"] is False
+            assert by_tracking[child_tn]["master_tracking_number"] == "2243432936"
+
+        assert by_tracking["1ZA329R80492831574"]["is_master"] is True
+        assert by_tracking["4323923586"]["is_master"] is True
+        assert by_tracking["4323923586"]["master_tracking_number"] is None
+        assert by_tracking["JD014600012599552906"]["master_tracking_number"] == "4323923586"
+        assert by_tracking["JD014600012599552907"]["master_tracking_number"] == "4323923586"
+        assert by_tracking["871422910760"]["is_master"] is True
+        assert by_tracking["871422910760"]["master_tracking_number"] is None
