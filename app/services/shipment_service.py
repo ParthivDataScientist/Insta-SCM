@@ -305,12 +305,19 @@ def _build_dhl_shipment_payload(payload: dict) -> dict[str, str]:
         shipper_country=shipper["country_code"],
     )
 
+    duty_payment_type = shipment.get("duty_payment_type") or settings.DHL_DEFAULT_DUTY_PAYMENT_TYPE
+    duty_account_number = (
+        settings.DHL_DUTY_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER
+        if duty_payment_type == "T"
+        else ""
+    )
+
     return {
         "ShippingPaymentType": shipment.get("shipping_payment_type") or settings.DHL_DEFAULT_SHIPPING_PAYMENT_TYPE,
         "ShipperAccNumber": settings.DHL_SHIPPER_ACCOUNT_NUMBER,
         "BillingAccNumber": settings.DHL_BILLING_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
-        "DutyPaymentType": shipment.get("duty_payment_type") or settings.DHL_DEFAULT_DUTY_PAYMENT_TYPE,
-        "DutyAccNumber": settings.DHL_DUTY_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
+        "DutyPaymentType": duty_payment_type,
+        "DutyAccNumber": duty_account_number,
         "ConsigneeCompName": receiver.get("company_name") or receiver["name"],
         "ConsigneeAddLine1": receiver["address_line1"],
         "ConsigneeAddLine2": receiver.get("address_line2") or "",

@@ -82,16 +82,16 @@ class Settings(BaseSettings):
     DHL_DUTY_ACCOUNT_NUMBER: str = ""
 
     # DHL shipper defaults used when creating shipments and pickups.
-    DHL_SHIPPER_COMPANY: str = ""
-    DHL_SHIPPER_NAME: str = ""
-    DHL_SHIPPER_ADDRESS1: str = ""
+    DHL_SHIPPER_COMPANY: str = "Insta Exhibition"
+    DHL_SHIPPER_NAME: str = "Insta Exhibition"
+    DHL_SHIPPER_ADDRESS1: str = "1001, 10th Floor, Kohinoor Continental, J.B Nagar, Andheri-Kurla Road"
     DHL_SHIPPER_ADDRESS2: str = ""
     DHL_SHIPPER_ADDRESS3: str = ""
-    DHL_SHIPPER_CITY: str = ""
-    DHL_SHIPPER_POSTAL_CODE: str = ""
+    DHL_SHIPPER_CITY: str = "Mumbai"
+    DHL_SHIPPER_POSTAL_CODE: str = "400059"
     DHL_SHIPPER_COUNTRY_CODE: str = "IN"
     DHL_SHIPPER_COUNTRY_NAME: str = "India"
-    DHL_SHIPPER_PHONE: str = ""
+    DHL_SHIPPER_PHONE: str = "7977572486"
 
     # DHL booking defaults
     DHL_DEFAULT_PRODUCT_CODE: str = "P"
