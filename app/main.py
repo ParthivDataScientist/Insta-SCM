@@ -30,7 +30,7 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 # Import models so SQLModel can discover them for schema creation
-from app.models.dashboard_project import DashboardProject
+from app.models.dashboard_project import DashboardProject, Client, ProjectAuditLog, ProjectLink, ProjectResource
 from app.models.shipment import Shipment  # noqa: F401 — register table metadata
 from app.models.user import User
 from app.api.v1.endpoints.dashboard_projects_v2 import _apply_design_state
@@ -42,21 +42,40 @@ async def lifespan(app: FastAPI):
     """Application lifespan: create DB tables on startup and run lightweight schema sync."""
     Path(settings.STORAGE_DIR).mkdir(parents=True, exist_ok=True)
     Path(settings.STORAGE_DIR, settings.DHL_LABELS_SUBDIR).mkdir(parents=True, exist_ok=True)
-    SQLModel.metadata.create_all(engine)
-    _ensure_project_schema_compatibility()
-    _backfill_project_canonical_fields()
-    logger.info(
-        "application_startup_complete",
-        extra={"event": "application_startup_complete"},
-    )
+    
+    try:
+        logger.info("db_init_started", extra={"event": "db_init_started"})
+        SQLModel.metadata.create_all(engine)
+        
+        if settings.AUTO_SYNC_SCHEMA:
+            changes = _ensure_project_schema_compatibility()
+            if changes:
+                logger.info("schema_auto_sync_applied", extra={"event": "schema_auto_sync_applied", "changes": changes})
+            
+            _backfill_project_canonical_fields()
+            
+        logger.info(
+            "application_startup_complete",
+            extra={"event": "application_startup_complete"},
+        )
+    except Exception as e:
+        logger.error(
+            "application_startup_db_error",
+            extra={"event": "application_startup_db_error", "error": str(e)},
+            exc_info=True
+        )
+        # We don't crash the app here so the health check can still return 500/errors 
+        # instead of the whole function being unreachable on Vercel.
+        
     yield
 
 
-def _ensure_project_schema_compatibility() -> None:
-    """Add newly introduced nullable columns when running against an older DB."""
+def _ensure_project_schema_compatibility() -> list[str]:
+    """Add newly introduced nullable columns when running against an older DB. Returns list of applied changes."""
+    applied_changes = []
     inspector = inspect(engine)
     if "dashboardproject" not in inspector.get_table_names():
-        return
+        return []
 
     existing_columns = {
         column["name"]
@@ -102,6 +121,7 @@ def _ensure_project_schema_compatibility() -> None:
         for column_name, ddl in dashboardproject_columns.items():
             if column_name not in existing_columns:
                 connection.execute(text(ddl))
+                applied_changes.append(f"dashboardproject.{column_name}")
         if "shipment" in inspector.get_table_names():
             shipment_ddl = {
                 "master_tracking_number": "ALTER TABLE shipment ADD COLUMN master_tracking_number VARCHAR",
@@ -136,10 +156,14 @@ def _ensure_project_schema_compatibility() -> None:
             for col_name, ddl in shipment_ddl.items():
                 if col_name not in shipment_columns:
                     connection.execute(text(ddl))
+                    applied_changes.append(f"shipment.{col_name}")
         
         for col_name, ddl in user_ddl.items():
             if col_name not in user_columns:
                 connection.execute(text(ddl))
+                applied_changes.append(f"user.{col_name}")
+
+    return applied_changes
 
 
 def _backfill_project_canonical_fields() -> None:
@@ -200,10 +224,29 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 app.mount("/storage", StaticFiles(directory=settings.STORAGE_DIR, check_dir=False), name="storage")
 
 
+@app.get("/api/admin/db-init")
+def admin_db_init():
+    """Manual trigger to create database tables. Useful for fresh deployments or after cleaning DB."""
+    try:
+        SQLModel.metadata.create_all(engine)
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        return {
+            "status": "success", 
+            "message": "Database schema synchronization complete.",
+            "tables_found": tables
+        }
+    except Exception as e:
+        logger.error(f"Manual DB init failed: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/api/admin/reseed")
 def admin_reseed(session: Session = Depends(get_session)):
     """Secret admin endpoint to wipe and re-seed the project database with the new 2-table schema."""
     try:
+        # Ensure tables exist before trying to delete
+        SQLModel.metadata.create_all(engine)
         import os
         import pandas as pd
         import math
@@ -316,4 +359,10 @@ def root():
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "message": "Backend is active & DB connected"}
+    try:
+        # Test DB connection
+        with Session(engine) as session:
+            session.execute(text("SELECT 1"))
+        return {"status": "ok", "message": "Backend is active & DB connected", "database": "connected"}
+    except Exception as e:
+        return {"status": "error", "message": f"Backend active but DB unreachable: {str(e)}", "database": "error"}
