@@ -366,10 +366,11 @@ def _build_awb_map(session: Session) -> dict[int, list[str]]:
             awb_map[shipment.project_id].add(shipment.tracking_number)
         if shipment.master_tracking_number:
             awb_map[shipment.project_id].add(shipment.master_tracking_number)
-        for child in shipment.child_parcels or []:
-            tracking = child.get("tracking_number")
-            if tracking:
-                awb_map[shipment.project_id].add(tracking)
+        for child in _coerce_list(shipment.child_parcels):
+            if isinstance(child, dict):
+                tracking = child.get("tracking_number")
+                if tracking:
+                    awb_map[shipment.project_id].add(tracking)
     return {project_id: sorted(values) for project_id, values in awb_map.items()}
 
 

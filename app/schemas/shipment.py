@@ -11,6 +11,36 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
+def _parse_json_maybe_list(value):
+    if isinstance(value, str):
+        import json
+
+        try:
+            value = json.loads(value)
+        except Exception:
+            value = []
+    return value if value is not None else []
+
+
+def normalize_child_parcel_dicts(value) -> list[dict]:
+    """Turn stored JSON into a list of dicts safe for ChildParcel validation."""
+    raw = _parse_json_maybe_list(value)
+    if not isinstance(raw, list):
+        return []
+
+    normalized: list[dict] = []
+    for item in raw:
+        if isinstance(item, dict):
+            row = dict(item)
+            tn = row.get("tracking_number")
+            if tn is None or (isinstance(tn, str) and not str(tn).strip()):
+                row["tracking_number"] = "UNKNOWN"
+            normalized.append(row)
+        else:
+            normalized.append({"tracking_number": "UNKNOWN", "status": str(item or "Unknown")})
+    return normalized
+
+
 class ChildParcel(BaseModel):
     """
     A single parcel within a Multi-Piece Shipment (MPS).
@@ -18,7 +48,10 @@ class ChildParcel(BaseModel):
     FedEx returns these inside `associatedShipments` when the queried
     tracking number is the master of an MPS group.
     """
-    tracking_number: str
+
+    model_config = {"extra": "ignore"}
+
+    tracking_number: str = Field(default="UNKNOWN")
     status: str = "Unknown"
     raw_status: str = ""
     origin: Optional[str] = None
@@ -28,6 +61,14 @@ class ChildParcel(BaseModel):
     last_date: Optional[str] = None
     last_location: Optional[str] = None
     carrier: Optional[str] = None
+
+    @field_validator("tracking_number", mode="before")
+    @classmethod
+    def ensure_tracking_number(cls, value):
+        if value is None:
+            return "UNKNOWN"
+        token = str(value).strip()
+        return token if token else "UNKNOWN"
 
 
 class ShipmentResponse(BaseModel):
@@ -83,10 +124,89 @@ class ShipmentResponse(BaseModel):
     # Flat list of child tracking numbers (derived for backward compat)
     child_tracking_numbers: List[str] = []
 
-    @field_validator("child_parcels", "child_tracking_numbers", "history", mode="before")
+    @staticmethod
+    def _parse_json_list(v):
+        return _parse_json_maybe_list(v)
+
+    @field_validator("tracking_number", mode="before")
     @classmethod
-    def default_to_empty_list(cls, v):
-        return v if v is not None else []
+    def coerce_tracking_number(cls, value):
+        if value is None:
+            return "UNKNOWN"
+        token = str(value).strip()
+        return token if token else "UNKNOWN"
+
+    @field_validator("carrier", mode="before")
+    @classmethod
+    def coerce_carrier(cls, value):
+        if value is None:
+            return "Unknown"
+        token = str(value).strip()
+        return token if token else "Unknown"
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def coerce_status(cls, value):
+        if value is None:
+            return "Unknown"
+        token = str(value).strip()
+        return token if token else "Unknown"
+
+    @field_validator("progress", mode="before")
+    @classmethod
+    def coerce_progress(cls, value):
+        if value is None:
+            return 0
+        if isinstance(value, bool):
+            return int(value)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    @field_validator("history", mode="before")
+    @classmethod
+    def normalize_history(cls, v):
+        """
+        Neon/SQLite sometimes store a single object or non-list in JSON columns.
+        Pydantic expects List[dict]; mismatches produced HTTP 500 on list endpoints.
+        """
+        raw = ShipmentResponse._parse_json_list(v)
+        if isinstance(raw, dict):
+            raw = [raw]
+        if not isinstance(raw, list):
+            return []
+        out: List[dict] = []
+        for item in raw:
+            if isinstance(item, dict):
+                out.append(item)
+            elif item is not None:
+                out.append({"description": str(item)})
+        return out
+
+    @field_validator("child_tracking_numbers", mode="before")
+    @classmethod
+    def normalize_child_tracking_numbers_flat(cls, v):
+        raw = ShipmentResponse._parse_json_list(v)
+        if not isinstance(raw, list):
+            return []
+        result: List[str] = []
+        for x in raw:
+            if x is None:
+                continue
+            token = str(x).strip()
+            if token:
+                result.append(token)
+        return result
+
+    @field_validator("child_parcels", mode="before")
+    @classmethod
+    def normalize_child_parcels(cls, v):
+        """
+        DB JSON may contain incomplete legacy rows (missing tracking_number).
+        Those used to raise ValidationError and surface as HTTP 500 on list/detail routes.
+        """
+        return normalize_child_parcel_dicts(v)
 
     @model_validator(mode="after")
     def derive_child_tracking_numbers(self) -> "ShipmentResponse":
@@ -111,7 +231,7 @@ class MPSDetailResponse(BaseModel):
 
     @classmethod
     def from_shipment(cls, shipment: "Shipment") -> "MPSDetailResponse":  # noqa: F821
-        parcels = [ChildParcel(**p) for p in (shipment.child_parcels or [])]
+        parcels = [ChildParcel.model_validate(row) for row in normalize_child_parcel_dicts(shipment.child_parcels)]
         return cls(
             master=ShipmentResponse.model_validate(shipment),
             child_parcels=parcels,

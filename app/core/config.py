@@ -107,9 +107,16 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_connection(cls, v: str | None) -> str:
-        if isinstance(v, str) and v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql://", 1)
-        return v or "sqlite:///./sql_app.db"
+        url = (v or "").strip() if isinstance(v, str) else ""
+        if not url:
+            url = "sqlite:///./sql_app.db"
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql://", 1)
+        # Vercel serverless: the deployment bundle path is read-only; only /tmp is writable.
+        # Default cwd-relative SQLite raises OperationalError and surfaces as HTTP 500 on API routes.
+        if os.environ.get("VERCEL") and url.startswith("sqlite") and "/tmp/" not in url:
+            return "sqlite:////tmp/insta_track.db"
+        return url
 
     @model_validator(mode="after")
     def reject_weak_jwt_in_production(self) -> Self:

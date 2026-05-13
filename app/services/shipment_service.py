@@ -971,6 +971,8 @@ def get_stats(db: Session) -> dict:
         parcels = m.child_parcels or []
         child_total += len(parcels)
         for p in parcels:
+            if not isinstance(p, dict):
+                continue
             status = p.get("status")
             if status == "Delivered":
                 child_delivered += 1
