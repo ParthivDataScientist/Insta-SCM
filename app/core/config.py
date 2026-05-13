@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./sql_app.db"
     SQLALCHEMY_ECHO: bool = False
+    SQLALCHEMY_POOL_PRE_PING: bool = True
+    SQLALCHEMY_POOL_RECYCLE_SECONDS: int = 300
+    SQLALCHEMY_DISABLE_POOL: bool = False
     
     # Set to True to allow automatic schema updates (ALTER TABLE) on startup
     AUTO_SYNC_SCHEMA: bool = True
