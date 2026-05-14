@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./sql_app.db"
     SQLALCHEMY_ECHO: bool = False
+    SQLALCHEMY_POOL_PRE_PING: bool = True
+    SQLALCHEMY_POOL_RECYCLE_SECONDS: int = 300
+    SQLALCHEMY_DISABLE_POOL: bool = False
     
     # Set to True to allow automatic schema updates (ALTER TABLE) on startup
     AUTO_SYNC_SCHEMA: bool = True
@@ -70,22 +73,39 @@ class Settings(BaseSettings):
     DHL_WCF_SOAP_ACTION: str = "http://tempuri.org/IDHLService/PostTracking"
     DHL_WCF_SOAP_VERSION: Literal["1.1", "1.2"] = "1.1"
     DHL_WCF_TIMEOUT_SECONDS: int = 20
+
+    # DHL booking / pickup credentials
+    DHL_SITE_ID: str = ""
+    DHL_SHIPPER_ID: str = ""
     DHL_SHIPPER_ACCOUNT_NUMBER: str = ""
-    DHL_SHIPPER_COMPANY: str = ""
-    DHL_SHIPPER_NAME: str = ""
-    DHL_SHIPPER_ADDRESS1: str = ""
+    DHL_BILLING_ACCOUNT_NUMBER: str = ""
+    DHL_DUTY_ACCOUNT_NUMBER: str = ""
+
+    # DHL shipper defaults used when creating shipments and pickups.
+    DHL_SHIPPER_COMPANY: str = "Insta Exhibition"
+    DHL_SHIPPER_NAME: str = "Insta Exhibition"
+    DHL_SHIPPER_ADDRESS1: str = "1001, 10th Floor, Kohinoor Continental, J.B Nagar, Andheri-Kurla Road"
     DHL_SHIPPER_ADDRESS2: str = ""
     DHL_SHIPPER_ADDRESS3: str = ""
-    DHL_SHIPPER_CITY: str = ""
-    DHL_SHIPPER_POSTAL_CODE: str = ""
+    DHL_SHIPPER_CITY: str = "Mumbai"
+    DHL_SHIPPER_POSTAL_CODE: str = "400059"
     DHL_SHIPPER_COUNTRY_CODE: str = "IN"
     DHL_SHIPPER_COUNTRY_NAME: str = "India"
-    DHL_SHIPPER_PHONE: str = ""
+    DHL_SHIPPER_PHONE: str = "7977572486"
+
+    # DHL booking defaults
     DHL_DEFAULT_PRODUCT_CODE: str = "P"
+    DHL_DEFAULT_LOCAL_PRODUCT_CODE: str = "P"
     DHL_DEFAULT_NETWORK_TYPE_CODE: str = "AL"
     DHL_DEFAULT_SPECIAL_SERVICE: str = ""
-    DHL_DEFAULT_DECLARED_CURRENCY: str = "USD"
-    DHL_DEFAULT_PICKUP_READY_TIME: str = "18:00"
+    DHL_DEFAULT_SHIPPING_PAYMENT_TYPE: str = "S"
+    DHL_DEFAULT_DUTY_PAYMENT_TYPE: str = "R"
+    DHL_DEFAULT_SHIP_CURRENCY: str = "INR"
+    DHL_DEFAULT_DECLARED_CURRENCY: str = "INR"
+    DHL_DEFAULT_TERMS_OF_TRADE: str = "DAP"
+    DHL_DEFAULT_PICKUP_READY_TIME: str = "10:00"
+    DHL_DEFAULT_PICKUP_CLOSE_TIME: str = "18:00"
+    DHL_DEFAULT_PICKUP_LOCATION: str = ""
     
     STORAGE_DIR: str = os.path.join(_ROOT_DIR, "storage")
     DHL_LABELS_SUBDIR: str = "labels"

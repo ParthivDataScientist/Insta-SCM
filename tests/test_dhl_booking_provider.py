@@ -1,6 +1,7 @@
 import html
 
 from app.services.dhl_booking_provider import DHLBookingProvider
+from app.services.shipment_service import _build_dhl_shipment_payload
 
 
 class _MockResponse:
@@ -79,3 +80,68 @@ def test_rate_falls_back_to_legacy_postquote_when_v6_faults(monkeypatch):
 
     assert result["price"] == 26451.73
     assert result["currency"] == "INR"
+
+
+def test_create_shipment_returns_condition_data_as_error():
+    provider = DHLBookingProvider()
+    result = provider._parse_create_payload(
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<ConditionData>Duty Account Number is not acceptable for Duty Payment Type is R</ConditionData>"
+    )
+
+    assert result["error"] == "Duty Account Number is not acceptable for Duty Payment Type is R"
+
+
+def test_shipment_payload_omits_duty_account_for_receiver_payment(monkeypatch):
+    monkeypatch.setattr("app.services.shipment_service.settings.DHL_DUTY_ACCOUNT_NUMBER", "DUTY123")
+    monkeypatch.setattr("app.services.shipment_service.settings.DHL_SHIPPER_ACCOUNT_NUMBER", "SHIPPER123")
+    monkeypatch.setattr(
+        "app.services.shipment_service._dhl_shipper_defaults",
+        lambda: {
+            "company": "Insta Exhibition",
+            "name": "Insta Exhibition",
+            "address1": "Andheri",
+            "address2": "",
+            "address3": "",
+            "city": "Mumbai",
+            "postal_code": "400059",
+            "country_code": "IN",
+            "country_name": "India",
+            "phone": "7977572486",
+        },
+    )
+
+    payload = _build_dhl_shipment_payload(
+        {
+            "receiver": {
+                "company_name": "Tech Showcase Ltd",
+                "name": "John Doe",
+                "email": "test@example.com",
+                "phone": "+1 5550123456",
+                "address_line1": "123 Innovation Way",
+                "address_line2": "",
+                "address_line3": "",
+                "city": "New York",
+                "state_code": "NY",
+                "postal_code": "10001",
+                "country_code": "US",
+                "country_name": "United States",
+            },
+            "package": {
+                "pieces": 1,
+                "weight_kg": 100,
+                "length_cm": 20,
+                "width_cm": 20,
+                "height_cm": 20,
+                "declared_value": 10,
+                "declared_currency": "USD",
+            },
+            "shipment": {
+                "description": "Exhibition Sample",
+                "duty_payment_type": "R",
+            },
+        }
+    )
+
+    assert payload["DutyPaymentType"] == "R"
+    assert payload["DutyAccNumber"] == ""

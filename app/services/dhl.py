@@ -206,19 +206,19 @@ class DHLService(CarrierService):
                         if not p_tn or p_tn == tracking_number:
                             continue
                         
-                        # Note: Piece objects might have less info than full Shipment objects
-                        # We try to use piece info if available, otherwise fallback to master info
-                        p_raw_status = p.get("status", {}).get("status") or data["raw_status"]
+                        # Piece objects may omit scan data. Do not copy the master
+                        # timeline/status into each child because pieces can move
+                        # independently after the master scan.
+                        p_raw_status = p.get("status", {}).get("status") or "Pending"
+                        p_status = map_dhl_status(p_raw_status) if p_raw_status != "Pending" else "Pending"
                         child_parcels.append({
                             "tracking_number": p_tn,
-                            "status": map_dhl_status(p_raw_status),
+                            "status": p_status,
                             "raw_status": p_raw_status,
                             "origin": data["origin"],
                             "destination": data["destination"],
                             "eta": data["eta"],
-                            # Piece-level history is not always exposed by this response;
-                            # fall back to the master timeline so the UI can show full flow.
-                            "history": list(data.get("history", [])),
+                            "history": [],
                             "carrier": "DHL",
                         })
 

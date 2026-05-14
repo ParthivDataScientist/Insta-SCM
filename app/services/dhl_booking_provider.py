@@ -29,6 +29,21 @@ def _text(value: Any) -> str:
     return str(value).strip()
 
 
+def _redact_xml_for_log(xml: str) -> str:
+    redacted = re.sub(
+        r"(<(?:[^:>]+:)?(?:Password|SitePassword|DutyAccNumber|ShipperAccNumber|BillingAccNumber)>).*?(</(?:[^:>]+:)?(?:Password|SitePassword|DutyAccNumber|ShipperAccNumber|BillingAccNumber)>)",
+        r"\1***REDACTED***\2",
+        xml,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"(<(?:[^:>]+:)?(?:LabelImage|LabelPDF|LabelData|ShipmentLabel|Label)>).*?(</(?:[^:>]+:)?(?:LabelImage|LabelPDF|LabelData|ShipmentLabel|Label)>)",
+        r"\1***REDACTED_LABEL***\2",
+        redacted,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+
 class DHLBookingProvider:
     SOAP11_ENVELOPE_NS = "http://schemas.xmlsoap.org/soap/envelope/"
     ACTION_POST_QUOTE = "http://tempuri.org/IDHLService/PostQuotePos_V6"
@@ -110,7 +125,7 @@ class DHLBookingProvider:
         envelope = self._build_envelope(operation=operation, fields=fields)
         headers = self._build_headers(action=action)
 
-        logger.info("dhl_booking_request operation=%s body=%s", operation, envelope)
+        logger.info("dhl_booking_request operation=%s body=%s", operation, _redact_xml_for_log(envelope))
 
         try:
             response = requests.post(
@@ -127,7 +142,7 @@ class DHLBookingProvider:
             "dhl_booking_response operation=%s status_code=%s body=%s",
             operation,
             response.status_code,
-            response.text,
+            _redact_xml_for_log(response.text),
         )
 
         if response.status_code >= 400:
@@ -313,6 +328,10 @@ class DHLBookingProvider:
         root = self._parse_payload_root(payload)
         if root is None:
             return {"error": f"Unable to parse DHL shipment payload: {payload}"}
+
+        condition_data = self._find_first_text(root, ["ConditionData"])
+        if condition_data:
+            return {"error": condition_data}
 
         error = self._extract_embedded_error(root)
         if error:

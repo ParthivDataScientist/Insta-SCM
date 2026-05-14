@@ -305,12 +305,19 @@ def _build_dhl_shipment_payload(payload: dict) -> dict[str, str]:
         shipper_country=shipper["country_code"],
     )
 
+    duty_payment_type = shipment.get("duty_payment_type") or settings.DHL_DEFAULT_DUTY_PAYMENT_TYPE
+    duty_account_number = (
+        settings.DHL_DUTY_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER
+        if duty_payment_type == "T"
+        else ""
+    )
+
     return {
         "ShippingPaymentType": shipment.get("shipping_payment_type") or settings.DHL_DEFAULT_SHIPPING_PAYMENT_TYPE,
         "ShipperAccNumber": settings.DHL_SHIPPER_ACCOUNT_NUMBER,
         "BillingAccNumber": settings.DHL_BILLING_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
-        "DutyPaymentType": shipment.get("duty_payment_type") or settings.DHL_DEFAULT_DUTY_PAYMENT_TYPE,
-        "DutyAccNumber": settings.DHL_DUTY_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
+        "DutyPaymentType": duty_payment_type,
+        "DutyAccNumber": duty_account_number,
         "ConsigneeCompName": receiver.get("company_name") or receiver["name"],
         "ConsigneeAddLine1": receiver["address_line1"],
         "ConsigneeAddLine2": receiver.get("address_line2") or "",
@@ -477,14 +484,15 @@ def _resolve_child_fallback_result(
             if child_tn != tn:
                 continue
 
-            child_status = parcel.get("status") or master.status or "In Transit"
+            has_explicit_child_status = bool(parcel.get("status") or parcel.get("raw_status"))
+            child_status = parcel.get("status") or "Pending"
             child_raw_status = parcel.get("raw_status") or child_status
             child_last_date = parcel.get("last_date") or ""
             child_last_location = parcel.get("last_location") or ""
             stored_child_history = parcel.get("history")
 
             child_history = list(stored_child_history) if isinstance(stored_child_history, list) else []
-            if not child_history and (child_last_date or child_last_location or child_raw_status):
+            if not child_history and (child_last_date or child_last_location or has_explicit_child_status):
                 child_history.append(
                     {
                         "description": child_raw_status,
@@ -493,9 +501,6 @@ def _resolve_child_fallback_result(
                         "date": child_last_date,
                     }
                 )
-            elif not child_history and master.history:
-                # Use full parent history when child-specific checkpoints are unavailable.
-                child_history = list(master.history)
 
             return {
                 "carrier": master.carrier or "DHL",
@@ -515,17 +520,18 @@ def _resolve_child_fallback_result(
         if allow_master_context and master_hint and master_tn == master_hint and tn != master_tn:
             return {
                 "carrier": master.carrier or "DHL",
-                "status": master.status or "In Transit",
+                "status": "Pending",
                 "origin": master.origin or "Unknown",
                 "destination": master.destination or "Unknown",
                 "eta": master.eta or "Unknown",
-                "progress": master.progress if master.progress is not None else _progress_from_status(master.status),
-                "history": list(master.history or []),
+                "progress": 0,
+                "history": [],
                 "master_tracking_number": master.tracking_number,
                 "is_master": False,
                 "child_parcels": [],
-                "raw_status": master.status or "In Transit",
-                "last_scan_date": master.last_scan_date or "",
+                "raw_status": "Awaiting child scan",
+                "current_status": "Awaiting child scan",
+                "last_scan_date": "",
             }
 
     return None
