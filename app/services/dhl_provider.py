@@ -181,6 +181,8 @@ class DHLProvider:
             "origin": detailed.get("origin") or summary.get("origin") or "Unknown",
             "destination": detailed.get("destination") or summary.get("destination") or "Unknown",
             "progress": detailed.get("progress") if detailed.get("progress") is not None else summary.get("progress", 40),
+            "child_parcels": detailed.get("child_parcels") or summary.get("child_parcels") or [],
+            "is_master": detailed.get("is_master") or summary.get("is_master") or False,
         }
 
     def _build_headers(self, soap_action_override: str | None = None) -> dict[str, str]:
@@ -355,6 +357,8 @@ class DHLProvider:
             "origin": "Unknown",
             "destination": "Unknown",
             "progress": progress,
+            "child_parcels": self._extract_pieces_from_dict(payload_data),
+            "is_master": len(self._extract_pieces_from_dict(payload_data)) > 1,
         }
 
     def _parse_awb_info_payload(self, payload_root: ET.Element) -> dict[str, Any] | None:
@@ -414,7 +418,18 @@ class DHLProvider:
             if estimated_delivery:
                 estimated_delivery = self._normalize_datetime_string(estimated_delivery)[:10]
 
-            status_bucket = self._to_status_bucket(current_status, event_code=latest_event_code)
+            pieces = []
+            for piece_node in payload_root.findall(".//PieceInfo"):
+                p_id = _text_or_empty(piece_node.findtext("PieceID"))
+                if p_id:
+                    pieces.append({
+                        "tracking_number": p_id,
+                        "status": status_bucket,
+                        "raw_status": current_status,
+                        "history": [],
+                        "carrier": "DHL"
+                    })
+
             return {
                 "current_status": current_status,
                 "estimated_delivery": estimated_delivery,
@@ -430,6 +445,8 @@ class DHLProvider:
                     "In Transit": 40,
                     "Exception": 10,
                 }.get(status_bucket, 40),
+                "child_parcels": pieces,
+                "is_master": len(pieces) > 1,
             }
 
         # Some PostTracking responses only return summary fields.
@@ -506,6 +523,36 @@ class DHLProvider:
 
         walk(payload_data)
         return events
+
+    def _extract_pieces_from_dict(self, payload_data: Any) -> list[dict[str, Any]]:
+        pieces: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def walk(node: Any) -> None:
+            if isinstance(node, dict):
+                p_id = (
+                    node.get("PieceID")
+                    or node.get("PieceId")
+                    or node.get("LicensePlate")
+                    or node.get("PieceNumber")
+                )
+                if isinstance(p_id, str) and p_id and p_id not in seen:
+                    seen.add(p_id)
+                    pieces.append({
+                        "tracking_number": p_id,
+                        "status": "In Transit",
+                        "raw_status": "Part of multi-piece shipment",
+                        "history": [],
+                        "carrier": "DHL"
+                    })
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(payload_data)
+        return pieces
 
     def _pick_latest_event(self, events: list[dict[str, Any]]) -> dict[str, Any]:
         if not events:
