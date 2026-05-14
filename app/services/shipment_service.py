@@ -611,8 +611,17 @@ def track_and_save(
     # if the live lookup fails.
 
     if service is not None:
-        logger.info("Performing live carrier lookup for %s (%s)", tracking_number, carrier_name)
-        result = service.track(tracking_number)
+        api_target_tn = tracking_number
+        if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and master_tracking_number:
+            logger.info("DHL child piece %s tracking delegated to master %s.", tracking_number, master_tracking_number)
+            api_target_tn = master_tracking_number
+
+        logger.info("Performing live carrier lookup for %s (%s)", api_target_tn, carrier_name)
+        result = service.track(api_target_tn)
+
+        # Ensure the result is applied back to the child row
+        if api_target_tn != tracking_number and "error" not in result:
+            result["tracking_number"] = tracking_number
 
         if "error" in result and carrier_name != "DHL":
             # Fallback for child pieces or temporary API failures
