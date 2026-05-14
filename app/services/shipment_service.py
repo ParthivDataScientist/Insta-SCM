@@ -600,42 +600,11 @@ def track_and_save(
                 f"{supported_formats}",
             }
 
-    # --- NEW: DHL Child Piece Automation ---
-    # If this is a DHL child piece, we MUST have a master AWB to track it.
-    # We try to find the master AWB from the arguments or the database.
-    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number):
-        if not master_tracking_number:
-            # Try to resolve master from DB
-            existing_row = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
-            if existing_row and existing_row.master_tracking_number:
-                master_tracking_number = existing_row.master_tracking_number
-        
-        if master_tracking_number:
-            logger.info("Redirecting DHL child piece %s tracking to master AWB %s", tracking_number, master_tracking_number)
-            # Track the master instead
-            master_result = service.track(master_tracking_number)
-            
-            if "error" not in master_result:
-                # Find this piece in the children returned by the master track call
-                piece_data = None
-                # Check both child_parcels list and child_tracking_numbers
-                for child in master_result.get("child_parcels", []):
-                    if child.get("tracking_number") == tracking_number:
-                        piece_data = child
-                        break
-                
-                if piece_data:
-                    # Found it! Use the piece-specific data
-                    result = piece_data
-                    # Ensure master linkage is preserved
-                    result["master_tracking_number"] = master_tracking_number
-                    # Prevent standard tracking call for the child ID (which would fail)
-                    service = None 
-                else:
-                    logger.warning("Master %s tracked successfully but did not contain child piece %s", master_tracking_number, tracking_number)
-                    # We continue to standard tracking as a last resort (it will likely fail with the context error)
-        else:
-            logger.info("No master AWB found for DHL child piece %s. Direct tracking may fail.", tracking_number)
+    # Ensure we preserve the master tracking number for child piece linkage in the DB.
+    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and not master_tracking_number:
+        existing_row = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
+        if existing_row and existing_row.master_tracking_number:
+            master_tracking_number = existing_row.master_tracking_number
 
     # We used to have an early exit here that resolved child shipments from the master context 
     # BEFORE calling the API. This caused stale data during refreshes. 

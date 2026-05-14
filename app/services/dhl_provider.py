@@ -235,8 +235,6 @@ class DHLProvider:
         message = _text_or_empty(detail)
         lower_message = message.lower()
         if "object reference not set to an instance of an object" in lower_message:
-            if is_dhl_child_piece_id(normalized_awb):
-                return DHL_CHILD_PIECE_CONTEXT_ERROR
             return DHL_SOAP_INTERNAL_ERROR
         return f"DHL SOAP Error: {message or 'Unknown carrier error'}"
 
@@ -418,12 +416,30 @@ class DHLProvider:
 
             # Extract piece information if present (for Multi-Piece Shipments)
             child_parcels = []
-            for piece_node in payload_root.findall(".//PieceInfo"):
-                p_id = _text_or_empty(piece_node.findtext("PieceID"))
+            
+            # Search for piece nodes broadly (PieceInfo, PieceDetails, or even just Piece)
+            piece_nodes = (
+                payload_root.findall(".//PieceInfo") + 
+                payload_root.findall(".//PieceDetails") + 
+                payload_root.findall(".//Piece")
+            )
+            
+            for piece_node in piece_nodes:
+                # Piece IDs can be in PieceID, LicensePlate, or PieceNumber tags
+                p_id = (
+                    _text_or_empty(piece_node.findtext("PieceID")) or 
+                    _text_or_empty(piece_node.findtext("LicensePlate")) or
+                    _text_or_empty(piece_node.findtext("PieceNumber")) or
+                    _text_or_empty(piece_node.findtext("ID"))
+                )
+                
                 if p_id:
-                    # Piece-level status usually matches master summary in summary responses,
-                    # but we extract it to be sure. 
-                    p_desc = _text_or_empty(piece_node.findtext("LastDetailedStatus")) or current_status
+                    # Piece-level status usually matches master summary in summary responses
+                    p_desc = (
+                        _text_or_empty(piece_node.findtext("LastDetailedStatus")) or 
+                        _text_or_empty(piece_node.findtext("Description")) or 
+                        current_status
+                    )
                     p_bucket = self._to_status_bucket(p_desc)
                     child_parcels.append({
                         "tracking_number": p_id,
@@ -433,7 +449,7 @@ class DHLProvider:
                         "origin": oldest.get("location") or "Unknown",
                         "destination": "Unknown",
                         "eta": estimated_delivery or "Unknown",
-                        "history": history, # Pieces in summary view share history usually
+                        "history": history,
                     })
 
             return {
