@@ -455,6 +455,8 @@ class DHLProvider:
                         "destination": "Unknown",
                         "eta": estimated_delivery or "Unknown",
                         "history": history,
+                        "last_date": latest.get("date") if latest else None,
+                        "last_location": latest.get("location") if latest else None,
                     })
 
             return {

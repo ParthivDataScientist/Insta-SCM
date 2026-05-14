@@ -99,6 +99,7 @@ class ShipmentResponse(BaseModel):
     show_date: Optional[str] = None
     cs: Optional[str] = None
     no_of_box: Optional[str] = None
+    last_scan_date: Optional[str] = None
     history: List[dict] = []
     created_at: datetime
     updated_at: datetime

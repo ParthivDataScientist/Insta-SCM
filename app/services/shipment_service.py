@@ -721,6 +721,8 @@ def track_and_save(
             shipment.progress = result["progress"]
         if result.get("history"):
             shipment.history = result["history"]
+            if len(result["history"]) > 0 and result["history"][0].get("date"):
+                shipment.last_scan_date = result["history"][0]["date"]
             
         # MPS updates
         if master_tracking_number is not None:
@@ -761,6 +763,8 @@ def track_and_save(
                     child_shipment.destination = child_data.get("destination") or child_shipment.destination
                     child_shipment.eta = child_data.get("eta") or child_shipment.eta
                     child_shipment.last_scan_date = child_data.get("last_date") or child_shipment.last_scan_date
+                    if child_data.get("history") and len(child_data["history"]) > 0:
+                        child_shipment.last_scan_date = child_data["history"][0].get("date") or child_shipment.last_scan_date
                     child_shipment.history = child_data.get("history") or child_shipment.history
                     db.add(child_shipment)
                     logger.info("Propagated update from master %s to child row %s", tracking_number, child_tn)
