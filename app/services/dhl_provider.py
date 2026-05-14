@@ -103,11 +103,16 @@ class DHLProvider:
         )
 
         if summary.get("error") and all_checkpoint.get("error"):
+            # If both failed, return the summary error (unless it's just "not found")
             return {"carrier": "DHL", "error": summary["error"]}
 
+        # If one of them succeeded, we proceed with merged data
+        detailed_data = all_checkpoint.get("parsed", {})
+        summary_data = summary.get("parsed", {})
+        
         merged = self._merge_tracking_payloads(
-            detailed=all_checkpoint.get("parsed", {}),
-            summary=summary.get("parsed", {}),
+            detailed=detailed_data,
+            summary=summary_data,
         )
         if merged.get("error"):
             return {"carrier": "DHL", "error": merged["error"]}

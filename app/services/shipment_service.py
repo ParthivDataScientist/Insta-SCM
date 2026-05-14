@@ -1083,10 +1083,17 @@ def refresh_tracked_shipments(
     """
     statement = select(Shipment)
     if shipment_ids:
-        statement = statement.where(Shipment.id.in_(list(shipment_ids)))
+        # Fetch the tracking numbers of the requested shipments to find their children
+        requested_shipments = db.exec(select(Shipment).where(Shipment.id.in_(list(shipment_ids)))).all()
+        tracking_numbers = [s.tracking_number for s in requested_shipments if s.tracking_number]
+        
+        # Include both the requested shipments AND any shipments that have them as a master
+        statement = statement.where(
+            (Shipment.id.in_(list(shipment_ids))) | 
+            (Shipment.master_tracking_number.in_(tracking_numbers))
+        )
     # By default, refresh only top-level shipments (masters + standalone)
-    # to avoid expensive N+1 carrier calls for child records.
-    if not shipment_ids and not include_children:
+    elif not include_children:
         statement = statement.where(
             (Shipment.master_tracking_number.is_(None))
             | (Shipment.master_tracking_number == "")
