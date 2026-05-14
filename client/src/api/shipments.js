@@ -5,17 +5,17 @@ import apiClient from './apiClient';
  */
 const shipmentsService = {
     fetchShipments: async () => {
-        const response = await apiClient.get('/api/v1/shipments/');
+        const response = await apiClient.get('/api/v1/shipments/', { params: { _t: Date.now() } });
         return response.data;
     },
 
     fetchArchivedShipments: async () => {
-        const response = await apiClient.get('/api/v1/shipments/archived/');
+        const response = await apiClient.get('/api/v1/shipments/archived/', { params: { _t: Date.now() } });
         return response.data;
     },
 
     fetchStats: async () => {
-        const response = await apiClient.get('/api/v1/shipments/stats');
+        const response = await apiClient.get('/api/v1/shipments/stats', { params: { _t: Date.now() } });
         return response.data;
     },
 

@@ -70,6 +70,22 @@ class Settings(BaseSettings):
     DHL_WCF_SOAP_ACTION: str = "http://tempuri.org/IDHLService/PostTracking"
     DHL_WCF_SOAP_VERSION: Literal["1.1", "1.2"] = "1.1"
     DHL_WCF_TIMEOUT_SECONDS: int = 20
+    DHL_SHIPPER_ACCOUNT_NUMBER: str = ""
+    DHL_SHIPPER_COMPANY: str = ""
+    DHL_SHIPPER_NAME: str = ""
+    DHL_SHIPPER_ADDRESS1: str = ""
+    DHL_SHIPPER_ADDRESS2: str = ""
+    DHL_SHIPPER_ADDRESS3: str = ""
+    DHL_SHIPPER_CITY: str = ""
+    DHL_SHIPPER_POSTAL_CODE: str = ""
+    DHL_SHIPPER_COUNTRY_CODE: str = "IN"
+    DHL_SHIPPER_COUNTRY_NAME: str = "India"
+    DHL_SHIPPER_PHONE: str = ""
+    DHL_DEFAULT_PRODUCT_CODE: str = "P"
+    DHL_DEFAULT_NETWORK_TYPE_CODE: str = "AL"
+    DHL_DEFAULT_SPECIAL_SERVICE: str = ""
+    DHL_DEFAULT_DECLARED_CURRENCY: str = "USD"
+    DHL_DEFAULT_PICKUP_READY_TIME: str = "18:00"
     
     STORAGE_DIR: str = os.path.join(_ROOT_DIR, "storage")
     DHL_LABELS_SUBDIR: str = "labels"

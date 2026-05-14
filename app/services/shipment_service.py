@@ -598,38 +598,28 @@ def track_and_save(
             "error": f"Could not detect carrier for tracking number '{tracking_number}'.",
         }
 
-    if service is not None and master_tracking_number:
-        contextual_fallback = _resolve_child_fallback_result(
-            db=db,
-            tracking_number=tracking_number,
-            master_tracking_number=master_tracking_number,
-            allow_master_context=(carrier_name == "DHL"),
-        )
-        if contextual_fallback:
-            result = contextual_fallback
-            carrier_name = str(result.get("carrier") or carrier_name)
-            service = None
-            logger.info(
-                "Resolved child shipment %s from %s master context before live carrier lookup.",
-                tracking_number,
-                carrier_name,
-            )
+    # We used to have an early exit here that resolved child shipments from the master context 
+    # BEFORE calling the API. This caused stale data during refreshes. 
+    # Now we always attempt a live lookup first, and only use the master context as a fallback 
+    # if the live lookup fails.
 
     if service is not None:
+        logger.info("Performing live carrier lookup for %s (%s)", tracking_number, carrier_name)
         result = service.track(tracking_number)
 
         if "error" in result:
-            fallback = _resolve_child_fallback_result(
+            # Fallback for child pieces or temporary API failures
+            contextual_fallback = _resolve_child_fallback_result(
                 db=db,
                 tracking_number=tracking_number,
                 master_tracking_number=master_tracking_number,
                 allow_master_context=(carrier_name == "DHL"),
             )
-            if fallback:
-                result = fallback
+            if contextual_fallback:
+                result = contextual_fallback
                 carrier_name = str(result.get("carrier") or carrier_name)
                 logger.info(
-                    "Carrier lookup failed for %s (%s) but resolved from stored master/child data.",
+                    "Live lookup failed for %s (%s), but resolved from stored master/child context.",
                     tracking_number,
                     carrier_name,
                 )
@@ -1109,6 +1099,12 @@ def refresh_tracked_shipments(
             cs=shipment.cs,
             no_of_box=shipment.no_of_box,
             project_id=shipment.project_id,
+            master_tracking_number=shipment.master_tracking_number,
+            is_master=shipment.is_master,
+            booking_date=shipment.booking_date,
+            show_city=shipment.show_city,
+            cs_type=shipment.cs_type,
+            remarks=shipment.remarks,
         )
         if "error" in result:
             errors.append(f"{shipment.tracking_number}: {result['error']}")
