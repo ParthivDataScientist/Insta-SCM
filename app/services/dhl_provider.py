@@ -181,8 +181,6 @@ class DHLProvider:
             "origin": detailed.get("origin") or summary.get("origin") or "Unknown",
             "destination": detailed.get("destination") or summary.get("destination") or "Unknown",
             "progress": detailed.get("progress") if detailed.get("progress") is not None else summary.get("progress", 40),
-            "child_parcels": detailed.get("child_parcels") or summary.get("child_parcels") or [],
-            "is_master": detailed.get("is_master") or summary.get("is_master") or False,
         }
 
     def _build_headers(self, soap_action_override: str | None = None) -> dict[str, str]:
@@ -357,8 +355,6 @@ class DHLProvider:
             "origin": "Unknown",
             "destination": "Unknown",
             "progress": progress,
-            "child_parcels": self._extract_pieces_from_dict(payload_data),
-            "is_master": len(self._extract_pieces_from_dict(payload_data)) > 1,
         }
 
     def _parse_awb_info_payload(self, payload_root: ET.Element) -> dict[str, Any] | None:
@@ -418,16 +414,26 @@ class DHLProvider:
             if estimated_delivery:
                 estimated_delivery = self._normalize_datetime_string(estimated_delivery)[:10]
 
-            pieces = []
+            status_bucket = self._to_status_bucket(current_status, event_code=latest_event_code)
+
+            # Extract piece information if present (for Multi-Piece Shipments)
+            child_parcels = []
             for piece_node in payload_root.findall(".//PieceInfo"):
                 p_id = _text_or_empty(piece_node.findtext("PieceID"))
                 if p_id:
-                    pieces.append({
+                    # Piece-level status usually matches master summary in summary responses,
+                    # but we extract it to be sure. 
+                    p_desc = _text_or_empty(piece_node.findtext("LastDetailedStatus")) or current_status
+                    p_bucket = self._to_status_bucket(p_desc)
+                    child_parcels.append({
                         "tracking_number": p_id,
-                        "status": status_bucket,
-                        "raw_status": current_status,
-                        "history": [],
-                        "carrier": "DHL"
+                        "status": p_bucket,
+                        "raw_status": p_desc,
+                        "carrier": "DHL",
+                        "origin": oldest.get("location") or "Unknown",
+                        "destination": "Unknown",
+                        "eta": estimated_delivery or "Unknown",
+                        "history": history, # Pieces in summary view share history usually
                     })
 
             return {
@@ -445,8 +451,9 @@ class DHLProvider:
                     "In Transit": 40,
                     "Exception": 10,
                 }.get(status_bucket, 40),
-                "child_parcels": pieces,
-                "is_master": len(pieces) > 1,
+                "child_parcels": child_parcels,
+                "child_tracking_numbers": [p["tracking_number"] for p in child_parcels],
+                "is_master": len(child_parcels) > 0,
             }
 
         # Some PostTracking responses only return summary fields.
@@ -523,36 +530,6 @@ class DHLProvider:
 
         walk(payload_data)
         return events
-
-    def _extract_pieces_from_dict(self, payload_data: Any) -> list[dict[str, Any]]:
-        pieces: list[dict[str, Any]] = []
-        seen: set[str] = set()
-
-        def walk(node: Any) -> None:
-            if isinstance(node, dict):
-                p_id = (
-                    node.get("PieceID")
-                    or node.get("PieceId")
-                    or node.get("LicensePlate")
-                    or node.get("PieceNumber")
-                )
-                if isinstance(p_id, str) and p_id and p_id not in seen:
-                    seen.add(p_id)
-                    pieces.append({
-                        "tracking_number": p_id,
-                        "status": "In Transit",
-                        "raw_status": "Part of multi-piece shipment",
-                        "history": [],
-                        "carrier": "DHL"
-                    })
-                for value in node.values():
-                    walk(value)
-            elif isinstance(node, list):
-                for item in node:
-                    walk(item)
-
-        walk(payload_data)
-        return pieces
 
     def _pick_latest_event(self, events: list[dict[str, Any]]) -> dict[str, Any]:
         if not events:

@@ -17,6 +17,7 @@ from app.services.fedex import FedExService
 from app.services.dhl import DHLService
 from app.services.carrier_detection import detect_carrier
 from app.services.label_storage import save_label_pdf
+from app.services.dhl_validation import is_dhl_child_piece_id
 
 logger = logging.getLogger(__name__)
 STUCK_THRESHOLD_DAYS = 2
@@ -484,26 +485,23 @@ def _resolve_child_fallback_result(
             if child_tn != tn:
                 continue
 
-            child_status = parcel.get("status") or master.status or "In Transit"
+            has_explicit_child_status = bool(parcel.get("status") or parcel.get("raw_status"))
+            child_status = parcel.get("status") or "Pending"
             child_raw_status = parcel.get("raw_status") or child_status
-            child_last_date = parcel.get("last_date") or master.last_scan_date or ""
+            child_last_date = parcel.get("last_date") or ""
             child_last_location = parcel.get("last_location") or ""
             stored_child_history = parcel.get("history")
 
             child_history = list(stored_child_history) if isinstance(stored_child_history, list) else []
-            if not child_history:
-                if child_last_date or child_last_location:
-                    child_history.append(
-                        {
-                            "description": child_raw_status,
-                            "location": child_last_location,
-                            "status": child_status,
-                            "date": child_last_date,
-                        }
-                    )
-                elif master.history:
-                    # Fallback to full parent history when child-specific checkpoints are unavailable.
-                    child_history = list(master.history)
+            if not child_history and (child_last_date or child_last_location or has_explicit_child_status):
+                child_history.append(
+                    {
+                        "description": child_raw_status,
+                        "location": child_last_location,
+                        "status": child_status,
+                        "date": child_last_date,
+                    }
+                )
 
             return {
                 "carrier": master.carrier or "DHL",
@@ -521,21 +519,20 @@ def _resolve_child_fallback_result(
             }
 
         if allow_master_context and master_hint and master_tn == master_hint and tn != master_tn:
-            # Generic fallback when the child parcel isn't explicitly listed in the master's JSON data
-            # but we are certain it belongs to this master.
             return {
                 "carrier": master.carrier or "DHL",
-                "status": master.status or "In Transit",
+                "status": "Pending",
                 "origin": master.origin or "Unknown",
                 "destination": master.destination or "Unknown",
                 "eta": master.eta or "Unknown",
-                "progress": master.progress if master.progress is not None else _progress_from_status(master.status),
-                "history": list(master.history or []),
+                "progress": 0,
+                "history": [],
                 "master_tracking_number": master.tracking_number,
                 "is_master": False,
                 "child_parcels": [],
-                "raw_status": master.status or "In Transit",
-                "last_scan_date": master.last_scan_date or "",
+                "raw_status": "Awaiting child scan",
+                "current_status": "Awaiting child scan",
+                "last_scan_date": "",
             }
 
     return None
@@ -602,11 +599,43 @@ def track_and_save(
                 "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
                 f"{supported_formats}",
             }
-    else:
-        return {
-            "tracking_number": tracking_number,
-            "error": f"Could not detect carrier for tracking number '{tracking_number}'.",
-        }
+
+    # --- NEW: DHL Child Piece Automation ---
+    # If this is a DHL child piece, we MUST have a master AWB to track it.
+    # We try to find the master AWB from the arguments or the database.
+    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number):
+        if not master_tracking_number:
+            # Try to resolve master from DB
+            existing_row = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
+            if existing_row and existing_row.master_tracking_number:
+                master_tracking_number = existing_row.master_tracking_number
+        
+        if master_tracking_number:
+            logger.info("Redirecting DHL child piece %s tracking to master AWB %s", tracking_number, master_tracking_number)
+            # Track the master instead
+            master_result = service.track(master_tracking_number)
+            
+            if "error" not in master_result:
+                # Find this piece in the children returned by the master track call
+                piece_data = None
+                # Check both child_parcels list and child_tracking_numbers
+                for child in master_result.get("child_parcels", []):
+                    if child.get("tracking_number") == tracking_number:
+                        piece_data = child
+                        break
+                
+                if piece_data:
+                    # Found it! Use the piece-specific data
+                    result = piece_data
+                    # Ensure master linkage is preserved
+                    result["master_tracking_number"] = master_tracking_number
+                    # Prevent standard tracking call for the child ID (which would fail)
+                    service = None 
+                else:
+                    logger.warning("Master %s tracked successfully but did not contain child piece %s", master_tracking_number, tracking_number)
+                    # We continue to standard tracking as a last resort (it will likely fail with the context error)
+        else:
+            logger.info("No master AWB found for DHL child piece %s. Direct tracking may fail.", tracking_number)
 
     # We used to have an early exit here that resolved child shipments from the master context 
     # BEFORE calling the API. This caused stale data during refreshes. 
@@ -1068,6 +1097,8 @@ def preview_track(
     result["tracking_number"] = tracking_number
     result["carrier"] = carrier_name
     return result
+
+
 
 
 def refresh_tracked_shipments(
