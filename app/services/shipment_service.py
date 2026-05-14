@@ -740,6 +740,31 @@ def track_and_save(
 
         logger.info("Updated shipment record for %s", tracking_number)
 
+        # --- NEW: Propagate updates to separate child records if this is a master ---
+        if shipment.is_master and result.get("child_parcels"):
+            for child_data in result["child_parcels"]:
+                child_tn = child_data.get("tracking_number")
+                if not child_tn:
+                    continue
+                
+                # Find if this child exists as a separate row
+                child_shipment = db.exec(
+                    select(Shipment).where(Shipment.tracking_number == child_tn)
+                ).first()
+                
+                if child_shipment:
+                    # Update child row with data from master's response
+                    child_shipment.status = child_data.get("status", child_shipment.status)
+                    child_shipment.raw_status = child_data.get("raw_status", child_shipment.raw_status)
+                    child_shipment.lifecycle_state = _derive_lifecycle_state(child_shipment.status)
+                    child_shipment.origin = child_data.get("origin") or child_shipment.origin
+                    child_shipment.destination = child_data.get("destination") or child_shipment.destination
+                    child_shipment.eta = child_data.get("eta") or child_shipment.eta
+                    child_shipment.last_scan_date = child_data.get("last_date") or child_shipment.last_scan_date
+                    child_shipment.history = child_data.get("history") or child_shipment.history
+                    db.add(child_shipment)
+                    logger.info("Propagated update from master %s to child row %s", tracking_number, child_tn)
+
     db.add(shipment)
     db.commit()
     db.refresh(shipment)
