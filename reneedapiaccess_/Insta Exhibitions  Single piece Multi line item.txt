@@ -1,0 +1,141 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+	<soapenv:Header />
+	<soapenv:Body>
+		<tem:PostShipment_CSBV>
+			<tem:Shipmentpurpose>CSBV</tem:Shipmentpurpose>
+			<tem:ShipperAccNumber>531429677</tem:ShipperAccNumber>
+			<tem:ShippingPaymentType>S</tem:ShippingPaymentType>
+			<tem:BillingAccNumber>531429677</tem:BillingAccNumber>
+			<tem:ConsigneeCompName>Nilesh Rathod</tem:ConsigneeCompName>
+			<tem:ConsigneeAddLine1>RECEIVER ADDRESS LINE 1</tem:ConsigneeAddLine1>
+			<tem:ConsigneeAddLine2>RECEIVER ADDRESS LINE 2</tem:ConsigneeAddLine2>
+			<tem:ConsigneeAddLine3>Texas</tem:ConsigneeAddLine3>
+			<tem:ConsigneeCity>ADAMSVILLE</tem:ConsigneeCity>
+			<tem:ConsigneeDivCode>AL</tem:ConsigneeDivCode>
+			<tem:PostalCode>35005</tem:PostalCode>
+			<tem:ConsigneeCountryCode>US</tem:ConsigneeCountryCode>
+			<tem:ConsigneeCountryName>UNITED STATES OF AMERICA</tem:ConsigneeCountryName>
+			<tem:ConsigneeName>RECEIVER ATTENTION</tem:ConsigneeName>
+			<tem:ConsigneePh>8552980000</tem:ConsigneePh>
+			<tem:ConsigneeEmail>tech@ka.com</tem:ConsigneeEmail>
+			<tem:RegistrationNumber></tem:RegistrationNumber>
+                        <tem:RegistrationNumberTypeCode></tem:RegistrationNumberTypeCode>
+                        <tem:RegistrationNumberIssuerCountryCode></tem:RegistrationNumberIssuerCountryCode>
+			<tem:BusinessPartyTypeCode></tem:BusinessPartyTypeCode>
+			<tem:DutiableDeclaredvalue>5787.52</tem:DutiableDeclaredvalue>
+			<tem:DutiableDeclaredCurrency>INR</tem:DutiableDeclaredCurrency>
+			<tem:ShipNumberOfPieces>1</tem:ShipNumberOfPieces>
+			<tem:ShipCurrencyCode>INR</tem:ShipCurrencyCode>
+			<tem:ShipPieceWt>2.6</tem:ShipPieceWt>
+			<tem:ShipPieceDepth>1</tem:ShipPieceDepth>
+			<tem:ShipPieceWidth>1</tem:ShipPieceWidth>
+			<tem:ShipPieceHeight>1</tem:ShipPieceHeight>
+			<tem:ShipGlobalProductCode>P</tem:ShipGlobalProductCode>
+			<tem:ShipLocalProductCode>P</tem:ShipLocalProductCode>
+			<tem:ShipContents>Cinnamon Powder, Deggi Chilli Powder</tem:ShipContents>
+			<tem:ShipperId>537033265</tem:ShipperId>
+			<tem:ShipperCompName>GOGLOCAL PRIVATE LIMITED</tem:ShipperCompName>
+			<tem:ShipperAddress1>StarCoworking HMG house Plot No.33</tem:ShipperAddress1>
+			<tem:ShipperAddress2>MIDC Central Road Chakala Industrial</tem:ShipperAddress2>
+			<tem:ShipperAddress3>Mumbai</tem:ShipperAddress3>
+			<tem:ShipperCountryCode>IN</tem:ShipperCountryCode>
+			<tem:ShipperCountryName>INDIA</tem:ShipperCountryName>
+			<tem:ShipperCity>MUMBAI</tem:ShipperCity>
+			<tem:ShipperPostalCode>400093</tem:ShipperPostalCode>
+			<tem:ShipperPhoneNumber>9920000000</tem:ShipperPhoneNumber>
+			<tem:SiteId>goglocalpriIN</tem:SiteId>
+			<tem:Password>G^0pK^0iY#9qN@3n</tem:Password>
+			<tem:ShipperName>SHIPPER ATTENTION</tem:ShipperName>
+			<tem:ShipperRef>init-testing</tem:ShipperRef>
+			<tem:ShipperRegistrationNumber></tem:ShipperRegistrationNumber>
+			<tem:ShipperRegistrationNumberTypeCode></tem:ShipperRegistrationNumberTypeCode>
+			<tem:ShipperRegistrationNumberIssuerCountryCode></tem:ShipperRegistrationNumberIssuerCountryCode>
+			<tem:ShipperBusinessPartyTypeCode></tem:ShipperBusinessPartyTypeCode>
+			<tem:BillToCompanyName></tem:BillToCompanyName>
+			<tem:BillToContactName></tem:BillToContactName>
+			<tem:BillToAddressLine1></tem:BillToAddressLine1>
+			<tem:BillToCity></tem:BillToCity>
+			<tem:BillToPostcode></tem:BillToPostcode>
+			<tem:BillToSuburb></tem:BillToSuburb>
+			<tem:BillToState></tem:BillToState>
+			<tem:BillToCountryName></tem:BillToCountryName>
+			<tem:BillToCountryCode></tem:BillToCountryCode>
+			<tem:BillToPhoneNumber></tem:BillToPhoneNumber>
+			<tem:IECNo>AAACK4270B</tem:IECNo>
+			<tem:TermsOfTrade>DAP</tem:TermsOfTrade>
+			<tem:Usingecommerce>1</tem:Usingecommerce>
+			<tem:IsUnderMEISScheme>0,0</tem:IsUnderMEISScheme>
+			<tem:GSTIN>27AAACK4000B1ZY</tem:GSTIN>
+			<tem:GSTInvNo></tem:GSTInvNo>
+			<tem:GSTInvNoDate></tem:GSTInvNoDate>
+			<tem:NonGSTInvNo>1</tem:NonGSTInvNo>
+			<tem:NonGSTInvDate>2023-02-27</tem:NonGSTInvDate>
+			<tem:IsUsingIGST>No</tem:IsUsingIGST>
+			<tem:UsingBondorUT>Yes</tem:UsingBondorUT>
+			<tem:BankADCode>6390300</tem:BankADCode>
+			<tem:Exporter_CompanyName></tem:Exporter_CompanyName>
+			<tem:Exporter_AddressLine1></tem:Exporter_AddressLine1>
+			<tem:Exporter_AddressLine2></tem:Exporter_AddressLine2>
+			<tem:Exporter_AddressLine3></tem:Exporter_AddressLine3>
+			<tem:Exporter_City></tem:Exporter_City>
+			<tem:Exporter_DivisionCode></tem:Exporter_DivisionCode>
+			<tem:Exporter_PostalCode></tem:Exporter_PostalCode>
+			<tem:Exporter_CountryCode></tem:Exporter_CountryCode>
+			<tem:Exporter_CountryName></tem:Exporter_CountryName>
+			<tem:Exporter_PersonName></tem:Exporter_PersonName>
+			<tem:Exporter_PhoneNumber></tem:Exporter_PhoneNumber>
+			<tem:Exporter_Email></tem:Exporter_Email>
+			<tem:Exporter_RegistrationNumber></tem:Exporter_RegistrationNumber>
+			<tem:Exporter_RegistrationNumberTypeCode></tem:Exporter_RegistrationNumberTypeCode>
+			<tem:Exporter_RegistrationNumberIssuerCountryCode></tem:Exporter_RegistrationNumberIssuerCountryCode>
+			<tem:Exporter_BusinessPartyTypeCode></tem:Exporter_BusinessPartyTypeCode>
+			<tem:UseDHLInvoice>Y</tem:UseDHLInvoice>
+			<tem:SignatureName></tem:SignatureName>
+			<tem:SignatureTitle></tem:SignatureTitle>
+			<tem:LicenseNumber></tem:LicenseNumber>
+			<tem:ExpiryDate></tem:ExpiryDate>
+			<tem:ManufactureCountryCode>IN,IN</tem:ManufactureCountryCode>
+			<tem:ManufactureCountryName>INDIA,INDIA</tem:ManufactureCountryName>
+			<tem:SerialNumber>1,2</tem:SerialNumber>
+			<tem:FOBValue>2893.76,2893.76</tem:FOBValue>
+			<tem:Discount>0</tem:Discount>
+			<tem:Description>1Cinnamon Powder,1Deggi Chilli Powder</tem:Description>
+			<tem:Qty>1,1</tem:Qty>
+			<tem:Weight>1.3,1.3</tem:Weight>
+			<tem:HSCode>61091000,61091000</tem:HSCode>
+			<tem:CommodityCode></tem:CommodityCode>
+			<tem:CommodityType>Others,Others</tem:CommodityType>
+			<tem:InvoiceRatePerUnit>2893.76,2893.76</tem:InvoiceRatePerUnit>
+			<tem:ShipPieceUOM>PCS,PCS</tem:ShipPieceUOM>
+			<tem:ShipPieceCESS>0,0</tem:ShipPieceCESS>
+			<tem:ShipPieceIGSTPercentage></tem:ShipPieceIGSTPercentage>
+			<tem:ShipPieceIGST>0</tem:ShipPieceIGST>
+			<tem:ShipPieceTaxableValue>2893.76,2893.76</tem:ShipPieceTaxableValue>
+			<tem:FreightCharge></tem:FreightCharge>
+			<tem:InsuranceCharge></tem:InsuranceCharge>
+			<tem:TotalIGST>0.0</tem:TotalIGST>
+			<tem:CessCharge></tem:CessCharge>
+			<tem:ReverseCharge></tem:ReverseCharge>
+			<tem:PayerGSTVAT></tem:PayerGSTVAT>
+			<tem:IsResponseRequired>N</tem:IsResponseRequired>
+			<tem:LabelReq>N</tem:LabelReq>
+			<tem:SpecialService>DS</tem:SpecialService>
+			<tem:InsuredAmount>0.0</tem:InsuredAmount>
+			<tem:Invoicevalueinword></tem:Invoicevalueinword>
+			<tem:Placeofsupply></tem:Placeofsupply>
+			<tem:dateofsupply></tem:dateofsupply>
+			<tem:Shipperstatecode>27</tem:Shipperstatecode>
+			<tem:ShipperstateName>Maharashtra</tem:ShipperstateName>
+			<tem:isIndemnityClauseRead>YES</tem:isIndemnityClauseRead>
+			<tem:ACCOUNT_NO>032305004444</tem:ACCOUNT_NO>
+			<tem:NFEI_FLAG>NO</tem:NFEI_FLAG>
+			<tem:GOV_NONGOV_TYPE>P</tem:GOV_NONGOV_TYPE>
+			<tem:Destination_Duty_VAT_Charges></tem:Destination_Duty_VAT_Charges>
+			<tem:CustomerBarcodeCode></tem:CustomerBarcodeCode>
+			<tem:CustomerBarcodeText></tem:CustomerBarcodeText>
+			<tem:plt_signature></tem:plt_signature>
+			<tem:DutyAccountNumber></tem:DutyAccountNumber>
+			<tem:plt_signature_Base64></tem:plt_signature_Base64>
+		</tem:PostShipment_CSBV>
+	</soapenv:Body>
+</soapenv:Envelope>

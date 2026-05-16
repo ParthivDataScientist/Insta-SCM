@@ -57,6 +57,21 @@ def booking_payload(project_id=None):
             "show_date": "2026-05-14",
             "project_id": project_id,
         },
+        "commercial": {
+            "iec_no": "ABOPK6898D",
+            "gstin": "27AAACK4000B1ZY",
+            "bank_ad_code": "6390300",
+            "invoice_number": "INV-001",
+            "invoice_date": "2026-05-01",
+            "hs_code": "61091000",
+            "commodity_code": "6109100010",
+            "commodity_type": "Others",
+            "invoice_rate_per_unit": 2500,
+            "quantity": 1,
+            "uom": "PCS",
+            "shipper_state_code": "27",
+            "shipper_state_name": "Maharashtra",
+        },
     }
 
 
@@ -326,7 +341,7 @@ class TestShipmentBooking:
         )
         monkeypatch.setattr(
             "app.services.dhl_booking_provider.DHLBookingProvider.create_shipment",
-            lambda self, payload: {"awb": "1234567890", "label_base64": pdf_base64},
+            lambda self, payload, shipment_type="CSB_V": {"awb": "1234567890", "label_base64": pdf_base64},
         )
 
         resp = client.post("/api/v1/shipments/create", json=booking_payload(project["id"]))
@@ -385,7 +400,7 @@ class TestShipmentBooking:
         )
         monkeypatch.setattr(
             "app.services.dhl_booking_provider.DHLBookingProvider.create_shipment",
-            lambda self, payload: {"awb": "1234567890", "label_base64": pdf_base64},
+            lambda self, payload, shipment_type="CSB_V": {"awb": "1234567890", "label_base64": pdf_base64},
         )
         monkeypatch.setattr(
             "app.services.dhl_booking_provider.DHLBookingProvider.schedule_pickup",

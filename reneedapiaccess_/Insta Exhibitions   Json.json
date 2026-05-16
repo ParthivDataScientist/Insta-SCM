@@ -1,0 +1,950 @@
+{
+  "name": "Duavaa  Json",
+  "version": "1",
+  "items": [
+    {
+      "type": "folder",
+      "name": "BasicHttpsBinding_IDHLService",
+      "filename": "BasicHttpsBinding_IDHLService",
+      "seq": 1,
+      "examples": [],
+      "root": {
+        "meta": {
+          "name": "BasicHttpsBinding_IDHLService",
+          "seq": 1
+        }
+      },
+      "items": [
+        {
+          "type": "http",
+          "name": "AirwaybillDetails_Reweigh",
+          "filename": "AirwaybillDetails_Reweigh.bru",
+          "seq": 21,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/AirwaybillDetails_Reweigh",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <AirwaybillDetails_Reweigh xmlns=\"http://tempuri.org/\">\n      <awb>string</awb>\n      <ShipperAccNumber>string</ShipperAccNumber>\n    </AirwaybillDetails_Reweigh>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "GetIndemnityClause",
+          "filename": "GetIndemnityClause.bru",
+          "seq": 10,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/GetIndemnityClause",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <GetIndemnityClause xmlns=\"http://tempuri.org/\"/>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Hybrid_API",
+          "filename": "Hybrid_API.bru",
+          "seq": 20,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/Hybrid_API",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <Hybrid_API xmlns=\"http://tempuri.org/\">\n      <general/>\n      <mother/>\n      <Babies/>\n    </Hybrid_API>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostCapability",
+          "filename": "PostCapability.bru",
+          "seq": 4,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostCapability",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostCapability xmlns=\"http://tempuri.org/\">\n      <Address1>string</Address1>\n      <Address2>string</Address2>\n      <Address3>string</Address3>\n      <PostalCode>string</PostalCode>\n      <City>string</City>\n      <Division>string</Division>\n      <CountryCode>string</CountryCode>\n      <CountryName>string</CountryName>\n    </PostCapability>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostPickup",
+          "filename": "PostPickup.bru",
+          "seq": 5,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostPickup",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostPickup xmlns=\"http://tempuri.org/\">\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAdd1>string</ShipperAdd1>\n      <ShipperAdd2>string</ShipperAdd2>\n      <ShipperAdd3>string</ShipperAdd3>\n      <PackageLocation>string</PackageLocation>\n      <Shippercity>string</Shippercity>\n      <ShipperPostCode>string</ShipperPostCode>\n      <ShipperCountyCode>string</ShipperCountyCode>\n      <ShipperName>string</ShipperName>\n      <ShipperPhone>string</ShipperPhone>\n      <PickupClosingTimeHrs>100</PickupClosingTimeHrs>\n      <PickupClosingTimeMins>100</PickupClosingTimeMins>\n      <Pieces>string</Pieces>\n      <PickupWeight>string</PickupWeight>\n      <PickupContactName>string</PickupContactName>\n      <PickupContactPhone>string</PickupContactPhone>\n      <PickupDate>string</PickupDate>\n      <ReadyByTime>string</ReadyByTime>\n      <AccountNumber>string</AccountNumber>\n    </PostPickup>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostPickup_v6",
+          "filename": "PostPickup_v6.bru",
+          "seq": 6,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostPickup_v6",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostPickup_v6 xmlns=\"http://tempuri.org/\">\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAdd1>string</ShipperAdd1>\n      <ShipperAdd2>string</ShipperAdd2>\n      <PackageLocation>string</PackageLocation>\n      <Shippercity>string</Shippercity>\n      <ShipperPostCode>string</ShipperPostCode>\n      <ShipperCountyCode>string</ShipperCountyCode>\n      <ShipperName>string</ShipperName>\n      <ShipperPhone>string</ShipperPhone>\n      <PickupClosingTimeHrs>100</PickupClosingTimeHrs>\n      <PickupClosingTimeMins>100</PickupClosingTimeMins>\n      <Pieces>string</Pieces>\n      <PickupWeight>string</PickupWeight>\n      <PickupContactName>string</PickupContactName>\n      <PickupContactPhone>string</PickupContactPhone>\n      <PickupDate>string</PickupDate>\n      <ReadyByTime>string</ReadyByTime>\n      <AccountNumber>string</AccountNumber>\n    </PostPickup_v6>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostQuote",
+          "filename": "PostQuote.bru",
+          "seq": 3,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc?wsdl",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostQuote",
+                "enabled": true
+              }
+            ],
+            "params": [
+              {
+                "name": "wsdl",
+                "value": "",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "xml",
+              "xml": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n<soapenv:Header/>\n<soapenv:Body>\n<tem:PostQuote_RAS>\n<!--Optional:-->\n<tem:ShipperPostCode>133010</tem:ShipperPostCode>\n<!--Optional:-->\n<tem:ReceiverCountryCode>CO</tem:ReceiverCountryCode>\n<!--Optional:-->\n<tem:PostCode>050030</tem:PostCode>\n<!--Optional:-->\n<tem:fromCity>AMBALA REACH</tem:fromCity>\n<!--Optional:-->\n<tem:IsDutiable>Y</tem:IsDutiable>\n<!--Optional:-->\n<tem:PickupHours>14</tem:PickupHours>\n<!--Optional:-->\n<tem:PickupMinutes>30</tem:PickupMinutes>\n<!--Optional:-->\n<tem:DeclaredCurrency>INR</tem:DeclaredCurrency>\n<!--Optional:-->\n<tem:DeclaredValue>1093.66</tem:DeclaredValue>\n<!--Optional:-->\n<tem:NetworkTypeCode>P</tem:NetworkTypeCode>\n<!--Optional:-->\n<tem:GlobalProductCode>P</tem:GlobalProductCode>\n<!--Optional:-->\n<tem:LocalProductCode>P</tem:LocalProductCode>\n<!--Optional:-->\n<tem:toCity>Envigado</tem:toCity>\n<!--Optional:-->\n<tem:PaymentAccountNumber>531170634</tem:PaymentAccountNumber>\n<!--Optional:-->\n<tem:pieces>1</tem:pieces>\n<!--Optional:-->\n<tem:ShipPieceWt>1.5</tem:ShipPieceWt>\n<!--Optional:-->\n<tem:ShipPieceDepth>22</tem:ShipPieceDepth>\n<!--Optional:-->\n<tem:ShipPieceWidth>22</tem:ShipPieceWidth>\n<!--Optional:-->\n<tem:ShipPieceHeight>22</tem:ShipPieceHeight>\n</tem:PostQuote_RAS>\n</soapenv:Body>\n</soapenv:Envelope>",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "basic",
+              "basic": {
+                "username": "instaexhibiIN",
+                "password": "N$6uP#4cT#3lD@1q"
+              }
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostQuotePos_V6",
+          "filename": "PostQuotePos_V6.bru",
+          "seq": 1,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostQuotePos_V6",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostQuotePos_V6 xmlns=\"http://tempuri.org/\">\n      <ShipperPostCode>string</ShipperPostCode>\n      <ReceiverCountryCode>string</ReceiverCountryCode>\n      <PostCode>string</PostCode>\n      <fromCity>string</fromCity>\n      <IsDutiable>string</IsDutiable>\n      <PickupHours>string</PickupHours>\n      <PickupMinutes>string</PickupMinutes>\n      <DeclaredCurrency>string</DeclaredCurrency>\n      <DeclaredValue>string</DeclaredValue>\n      <GlobalProductCode>string</GlobalProductCode>\n      <LocalProductCode>string</LocalProductCode>\n      <NetworkTypeCode>string</NetworkTypeCode>\n      <toCity>string</toCity>\n      <PaymentAccountNumber>string</PaymentAccountNumber>\n      <pieces>100</pieces>\n      <ShipPieceWt>string</ShipPieceWt>\n      <ShipPieceDepth>string</ShipPieceDepth>\n      <ShipPieceWidth>string</ShipPieceWidth>\n      <ShipPieceHeight>string</ShipPieceHeight>\n      <SpecialService>string</SpecialService>\n    </PostQuotePos_V6>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostQuote_RAS",
+          "filename": "PostQuote_RAS.bru",
+          "seq": 2,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc?wsdl",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostQuote_RAS",
+                "enabled": true
+              }
+            ],
+            "params": [
+              {
+                "name": "wsdl",
+                "value": "",
+                "type": "query",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "mode": "xml",
+              "xml": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n<soapenv:Header/>\n<soapenv:Body>\n<tem:PostQuote_RAS>\n<!--Optional:-->\n<tem:ShipperPostCode>133010</tem:ShipperPostCode>\n<!--Optional:-->\n<tem:ReceiverCountryCode>CO</tem:ReceiverCountryCode>\n<!--Optional:-->\n<tem:PostCode>050030</tem:PostCode>\n<!--Optional:-->\n<tem:fromCity>AMBALA REACH</tem:fromCity>\n<!--Optional:-->\n<tem:IsDutiable>Y</tem:IsDutiable>\n<!--Optional:-->\n<tem:PickupHours>14</tem:PickupHours>\n<!--Optional:-->\n<tem:PickupMinutes>30</tem:PickupMinutes>\n<!--Optional:-->\n<tem:DeclaredCurrency>INR</tem:DeclaredCurrency>\n<!--Optional:-->\n<tem:DeclaredValue>1093.66</tem:DeclaredValue>\n<!--Optional:-->\n<tem:NetworkTypeCode>P</tem:NetworkTypeCode>\n<!--Optional:-->\n<tem:GlobalProductCode>P</tem:GlobalProductCode>\n<!--Optional:-->\n<tem:LocalProductCode>P</tem:LocalProductCode>\n<!--Optional:-->\n<tem:toCity>Envigado</tem:toCity>\n<!--Optional:-->\n<tem:PaymentAccountNumber>538805906</tem:PaymentAccountNumber>\n<!--Optional:-->\n<tem:pieces>1</tem:pieces>\n<!--Optional:-->\n<tem:ShipPieceWt>1.5</tem:ShipPieceWt>\n<!--Optional:-->\n<tem:ShipPieceDepth>22</tem:ShipPieceDepth>\n<!--Optional:-->\n<tem:ShipPieceWidth>22</tem:ShipPieceWidth>\n<!--Optional:-->\n<tem:ShipPieceHeight>22</tem:ShipPieceHeight>\n</tem:PostQuote_RAS>\n</soapenv:Body>\n</soapenv:Envelope>",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "basic",
+              "basic": {
+                "username": "instaexhibiIN",
+                "password": "N$6uP#4cT#3lD@1q"
+              }
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostShipmentCash_CSBIV_Cargo",
+          "filename": "PostShipmentCash_CSBIV_Cargo.bru",
+          "seq": 16,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostShipmentCash_CSBIV_Cargo",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n                            <soapenv:Header/>\n                            <soapenv:Body>\n                                <tem:PostShipment_CSBIV_Cargo>\n                                     <tem:Shipmentpurpose>CSBIV</tem:Shipmentpurpose>\n                                     <tem:ShipperAccNumber>531686537</tem:ShipperAccNumber>\n                                     <tem:ShippingPaymentType>S</tem:ShippingPaymentType>\n                                     <tem:BillingAccNumber>531686537</tem:BillingAccNumber>\n                                     <tem:DutyPaymentType>R</tem:DutyPaymentType>\n                                     <tem:DutyAccNumber>941091109</tem:DutyAccNumber>\n                                     <tem:ConsigneeCompName>ABERCROMBIE AND FITCH</tem:ConsigneeCompName>\n                                     <tem:ConsigneeAddLine1>ABERCROMBIE AND FITCH  6301</tem:ConsigneeAddLine1>\n                                     <tem:ConsigneeAddLine2>FITCH PATH</tem:ConsigneeAddLine2>\n                                     <tem:ConsigneeAddLine3></tem:ConsigneeAddLine3>\n                                     <tem:ConsigneeCity>NEW ALBANY</tem:ConsigneeCity>\n                                     <tem:ConsigneeDivCode>OH</tem:ConsigneeDivCode>\n                                     <tem:PostalCode>43054</tem:PostalCode>\n                                     <tem:ConsigneeCountryCode>US</tem:ConsigneeCountryCode>\n                                     <tem:ConsigneeCountryName>USA</tem:ConsigneeCountryName>\n                                     <tem:ConsigneeName>SAMPLE LIBRARY</tem:ConsigneeName>\n                                     <tem:ConsigneePh>6147654274</tem:ConsigneePh>\n                                     <tem:ConsigneeEmail></tem:ConsigneeEmail>\n                                     <tem:RegistrationNumber></tem:RegistrationNumber>\n                                     <tem:RegistrationNumberTypeCode></tem:RegistrationNumberTypeCode>\n                                     <tem:RegistrationNumberIssuerCountryCode></tem:RegistrationNumberIssuerCountryCode>\n                                     <tem:BusinessPartyTypeCode></tem:BusinessPartyTypeCode>\n                                     <tem:DutiableDeclaredvalue>28</tem:DutiableDeclaredvalue>                                     \n                                     <tem:DutiableDeclaredCurrency>USD</tem:DutiableDeclaredCurrency>                                     \n                                     <tem:ShipNumberOfPieces>1</tem:ShipNumberOfPieces>                                     \n                                     <tem:ShipCurrencyCode>USD</tem:ShipCurrencyCode>                                     \n                                     <tem:ShipPieceWt>2</tem:ShipPieceWt>                                     \n                                     <tem:ShipPieceDepth>1</tem:ShipPieceDepth>                                     \n                                     <tem:ShipPieceWidth>1</tem:ShipPieceWidth>                                     \n                                     <tem:ShipPieceHeight>1</tem:ShipPieceHeight>                                     \n                                     <tem:ShipGlobalProductCode>P</tem:ShipGlobalProductCode>                                     \n                                     <tem:ShipLocalProductCode>P</tem:ShipLocalProductCode>                                     \n                                     <tem:ShipContents>100% COTTON WOVEN LADIES DRESS</tem:ShipContents>                                     \n                                     <tem:ShipperId>SAHU GLOBAL PVT. LTD.</tem:ShipperId>                                     \n                                     <tem:ShipperCompName>SAHU GLOBAL PVT. LTD.</tem:ShipperCompName>                                     \n                                     <tem:ShipperAddress1>A-204 SECTOR 63</tem:ShipperAddress1>                                     \n                                     <tem:ShipperAddress2>SECTOR 63</tem:ShipperAddress2>                                     \n                                     <tem:ShipperAddress3>MID- INSAHGLO 204 NOI</tem:ShipperAddress3>                                     \n                                     <tem:ShipperCountryCode>IN</tem:ShipperCountryCode>                                     \n                                     <tem:ShipperCountryName>INDIA</tem:ShipperCountryName>                                     \n                                     <tem:ShipperCity>NOIDA</tem:ShipperCity>                                     \n                                     <tem:ShipperPostalCode>201301</tem:ShipperPostalCode>                                     \n                                     <tem:ShipperPhoneNumber>9811906572</tem:ShipperPhoneNumber>                                     \n                                     <tem:SiteId>sahuglobalpIN</tem:SiteId>                                     \n                                     <tem:Password>Y#2sT$2lW@9fD!2m</tem:Password>                                     \n                                     <tem:ShipperName>SHAMSHER BAHADUR GAUTAM,SAHEBA</tem:ShipperName>                                     \n                                     <tem:ShipperRef>INV/35927</tem:ShipperRef>                                     \n                                     <tem:ShipperRegistrationNumber></tem:ShipperRegistrationNumber>                                     \n                                     <tem:ShipperRegistrationNumberTypeCode></tem:ShipperRegistrationNumberTypeCode>                                     \n                                     <tem:ShipperRegistrationNumberIssuerCountryCode></tem:ShipperRegistrationNumberIssuerCountryCode>                                     \n                                     <tem:ShipperBusinessPartyTypeCode></tem:ShipperBusinessPartyTypeCode>                                     \n                                     <tem:BillToCompanyName></tem:BillToCompanyName>                                     \n                                     <tem:BillToContactName></tem:BillToContactName>                                     \n                                     <tem:BillToAddressLine1></tem:BillToAddressLine1>                                     \n                                     <tem:BillToCity></tem:BillToCity>                                     \n                                     <tem:BillToPostcode></tem:BillToPostcode>                                     \n                                     <tem:BillToSuburb></tem:BillToSuburb>                                     \n                                     <tem:BillToState></tem:BillToState>                                     \n                                     <tem:BillToCountryName></tem:BillToCountryName>                                     \n                                     <tem:BillToCountryCode></tem:BillToCountryCode>                                     \n                                     <tem:BillToPhoneNumber></tem:BillToPhoneNumber>  \n                                     <tem:TermsOfTrade>DAP</tem:TermsOfTrade>\n                                     <tem:GSTIN>09ABCCS8788H2ZK</tem:GSTIN>                                     \n                                     <tem:GSTInvNo></tem:GSTInvNo>                                     \n                                     <tem:GSTInvNoDate></tem:GSTInvNoDate>                                     \n                                     <tem:NonGSTInvNo>INV/35927</tem:NonGSTInvNo>                                     \n                                     <tem:NonGSTInvDate>2025-12-29</tem:NonGSTInvDate>                                     \n                                     <tem:IsUsingIGST>NA</tem:IsUsingIGST>                                     \n                                     <tem:UsingBondorUT>NA</tem:UsingBondorUT>                                     \n                                     <tem:Exporter_CompanyName></tem:Exporter_CompanyName>                                     \n                                     <tem:Exporter_AddressLine1></tem:Exporter_AddressLine1>                                     \n                                     <tem:Exporter_AddressLine2></tem:Exporter_AddressLine2>                                     \n                                     <tem:Exporter_AddressLine3></tem:Exporter_AddressLine3>                                     \n                                     <tem:Exporter_City></tem:Exporter_City>                                     \n                                     <tem:Exporter_DivisionCode></tem:Exporter_DivisionCode>                                     \n                                     <tem:Exporter_PostalCode></tem:Exporter_PostalCode>                                     \n                                     <tem:Exporter_CountryCode></tem:Exporter_CountryCode>                                     \n                                     <tem:Exporter_CountryName></tem:Exporter_CountryName>                                     \n                                     <tem:Exporter_PersonName></tem:Exporter_PersonName>                                     \n                                     <tem:Exporter_PhoneNumber></tem:Exporter_PhoneNumber>                                     \n                                     <tem:Exporter_Email></tem:Exporter_Email>                                     \n                                     <tem:Exporter_RegistrationNumber></tem:Exporter_RegistrationNumber>                                     \n                                     <tem:Exporter_RegistrationNumberTypeCode></tem:Exporter_RegistrationNumberTypeCode>                                     \n                                     <tem:Exporter_RegistrationNumberIssuerCountryCode></tem:Exporter_RegistrationNumberIssuerCountryCode>                                     \n                                     <tem:Exporter_BusinessPartyTypeCode></tem:Exporter_BusinessPartyTypeCode>                                     \n                                     <tem:UseDHLInvoice>Y</tem:UseDHLInvoice>                                     \n                                     <tem:SignatureName></tem:SignatureName>                                     \n                                     <tem:SignatureTitle></tem:SignatureTitle>                                     \n                                     <tem:LicenseNumber></tem:LicenseNumber>                                     \n                                     <tem:ExpiryDate></tem:ExpiryDate>                                     \n                                     <tem:ManufactureCountryCode>IN,IN,IN,IN,IN,IN,IN,IN,IN</tem:ManufactureCountryCode>                                     \n                                     <tem:ManufactureCountryName>INDIA,INDIA,INDIA,INDIA,INDIA,INDIA,INDIA,INDIA,INDIA</tem:ManufactureCountryName>                                     \n                                     <tem:SerialNumber>1,2,3,4,5,6,7,8,9</tem:SerialNumber>                                     \n                                     <tem:Description>1COTTON WOVEN LADIES DRESS 100% ,1COTTON WOVEN LADIES DRESS 100% ,1COTTON WOVEN LADIES DRESS 100% ,1COTTON WOVEN LADIES DRESS 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1COTTON WOVEN LADIES DRESS 100% </tem:Description>                                     \n                                     <tem:Qty>1,1,1,1,1,1,1,1,1</tem:Qty>                                     \n                                     <tem:Weight>0.3,0.3,0.3,0.3,0.1,0.1,0.2,0.2,0.2</tem:Weight>                                     \n                                     <tem:HSCode>62044290,62044290,62044290,62044290,62114390,62114390,62114390,62114390,62044290</tem:HSCode>                                     \n                                     <tem:CommodityCode>6204423050,6204423050,6204423050,6204423050,6211421056,6211421056,6211421056,6211421056,6204423050</tem:CommodityCode>                                     \n                                     <tem:InvoiceRatePerUnit>4,4,4,4,2,2,2,2,4</tem:InvoiceRatePerUnit>                                     \n                                     <tem:ShipPieceUOM>PCS,PCS,PCS,PCS,PCS,PCS,PCS,PCS,PCS</tem:ShipPieceUOM>                                     \n                                     <tem:ShipPieceIGST></tem:ShipPieceIGST>                                     \n                                     <tem:FreightCharge></tem:FreightCharge>                                     \n                                     <tem:InsuranceCharge></tem:InsuranceCharge>                                     \n                                     <tem:TotalIGST>0</tem:TotalIGST>                                     \n                                     <tem:PayerGSTVAT></tem:PayerGSTVAT>                                     \n                                     <tem:AddDeclText1></tem:AddDeclText1>                                     \n                                     <tem:IsResponseRequired>N</tem:IsResponseRequired>                                     \n                                     <tem:LabelReq>N</tem:LabelReq>                                     \n                                     <tem:SpecialService>DS</tem:SpecialService>  \n                                     <tem:InsuredAmount>0</tem:InsuredAmount>                                     \n                                     <tem:isIndemnityClauseRead>YES</tem:isIndemnityClauseRead>                                     \n                                     <tem:DistanceInKM></tem:DistanceInKM>                                     \n                                     <tem:Destination_Duty_VAT_Charges></tem:Destination_Duty_VAT_Charges>                                     \n                                     <tem:CustomerBarcodeCode></tem:CustomerBarcodeCode>                                     \n                                     <tem:CustomerBarcodeText></tem:CustomerBarcodeText>\n                                     <tem:ReasonForExport>Sample</tem:ReasonForExport>\n                                 </tem:PostShipment_CSBIV_Cargo>\n                             </soapenv:Body>\n                        </soapenv:Envelope>",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostShipmentCash_CSBV",
+          "filename": "PostShipmentCash_CSBV.bru",
+          "seq": 15,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostShipmentCash_CSBV",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostShipmentCash_CSBV xmlns=\"http://tempuri.org/\">\n      <ShipmentPurpose>string</ShipmentPurpose>\n      <ShipperAccNumber>string</ShipperAccNumber>\n      <ShippingPaymentType>string</ShippingPaymentType>\n      <BillingAccNumber>string</BillingAccNumber>\n      <ConsigneeCompName>string</ConsigneeCompName>\n      <ConsigneeAddLine1>string</ConsigneeAddLine1>\n      <ConsigneeAddLine2>string</ConsigneeAddLine2>\n      <ConsigneeAddLine3>string</ConsigneeAddLine3>\n      <ConsigneeCity>string</ConsigneeCity>\n      <ConsigneeDivCode>string</ConsigneeDivCode>\n      <PostalCode>string</PostalCode>\n      <ConsigneeCountryCode>string</ConsigneeCountryCode>\n      <ConsigneeCountryName>string</ConsigneeCountryName>\n      <ConsigneeName>string</ConsigneeName>\n      <ConsigneePh>string</ConsigneePh>\n      <ConsigneeEmail>string</ConsigneeEmail>\n      <RegistrationNumber>string</RegistrationNumber>\n      <RegistrationNumberTypeCode>string</RegistrationNumberTypeCode>\n      <RegistrationNumberIssuerCountryCode>string</RegistrationNumberIssuerCountryCode>\n      <BusinessPartyTypeCode>string</BusinessPartyTypeCode>\n      <DutiableDeclaredvalue>string</DutiableDeclaredvalue>\n      <DutiableDeclaredCurrency>string</DutiableDeclaredCurrency>\n      <ShipNumberOfPieces>string</ShipNumberOfPieces>\n      <ShipCurrencyCode>string</ShipCurrencyCode>\n      <ShipPieceWt>string</ShipPieceWt>\n      <ShipPieceDepth>string</ShipPieceDepth>\n      <ShipPieceWidth>string</ShipPieceWidth>\n      <ShipPieceHeight>string</ShipPieceHeight>\n      <ShipGlobalProductCode>string</ShipGlobalProductCode>\n      <ShipLocalProductCode>string</ShipLocalProductCode>\n      <ShipContents>string</ShipContents>\n      <ShipperId>string</ShipperId>\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAddress1>string</ShipperAddress1>\n      <ShipperAddress2>string</ShipperAddress2>\n      <ShipperAddress3>string</ShipperAddress3>\n      <ShipperCountryCode>string</ShipperCountryCode>\n      <ShipperCountryName>string</ShipperCountryName>\n      <ShipperCity>string</ShipperCity>\n      <ShipperPostalCode>string</ShipperPostalCode>\n      <ShipperPhoneNumber>string</ShipperPhoneNumber>\n      <ShipmentValue>string</ShipmentValue>\n      <shipmentCharge>string</shipmentCharge>\n      <SiteId>string</SiteId>\n      <Password>string</Password>\n      <ShipperName>string</ShipperName>\n      <ShipperRef>string</ShipperRef>\n      <ShipperRegistrationNumber>string</ShipperRegistrationNumber>\n      <ShipperRegistrationNumberTypeCode>string</ShipperRegistrationNumberTypeCode>\n      <ShipperRegistrationNumberIssuerCountryCode>string</ShipperRegistrationNumberIssuerCountryCode>\n      <ShipperBusinessPartyTypeCode>string</ShipperBusinessPartyTypeCode>\n      <BillToCompanyName>string</BillToCompanyName>\n      <BillToContactName>string</BillToContactName>\n      <BillToAddressLine1>string</BillToAddressLine1>\n      <BillToCity>string</BillToCity>\n      <BillToPostcode>string</BillToPostcode>\n      <BillToSuburb>string</BillToSuburb>\n      <BillToState>string</BillToState>\n      <BillToCountryName>string</BillToCountryName>\n      <BillToCountryCode>string</BillToCountryCode>\n      <BillToPhoneNumber>string</BillToPhoneNumber>\n      <IECNo>string</IECNo>\n      <TermsOfTrade>string</TermsOfTrade>\n      <Usingecommerce>string</Usingecommerce>\n      <IsUnderMEISScheme>string</IsUnderMEISScheme>\n      <GSTIN>string</GSTIN>\n      <GSTInvNo>string</GSTInvNo>\n      <GSTInvNoDate>string</GSTInvNoDate>\n      <NonGSTInvNo>string</NonGSTInvNo>\n      <NonGSTInvDate>string</NonGSTInvDate>\n      <IsUsingIGST>string</IsUsingIGST>\n      <UsingBondorUT>string</UsingBondorUT>\n      <BankADCode>string</BankADCode>\n      <Exporter_CompanyName>string</Exporter_CompanyName>\n      <Exporter_AddressLine1>string</Exporter_AddressLine1>\n      <Exporter_AddressLine2>string</Exporter_AddressLine2>\n      <Exporter_AddressLine3>string</Exporter_AddressLine3>\n      <Exporter_City>string</Exporter_City>\n      <Exporter_DivisionCode>string</Exporter_DivisionCode>\n      <Exporter_PostalCode>string</Exporter_PostalCode>\n      <Exporter_CountryCode>string</Exporter_CountryCode>\n      <Exporter_CountryName>string</Exporter_CountryName>\n      <Exporter_PersonName>string</Exporter_PersonName>\n      <Exporter_PhoneNumber>string</Exporter_PhoneNumber>\n      <Exporter_Email>string</Exporter_Email>\n      <Exporter_RegistrationNumber>string</Exporter_RegistrationNumber>\n      <Exporter_RegistrationNumberTypeCode>string</Exporter_RegistrationNumberTypeCode>\n      <Exporter_RegistrationNumberIssuerCountryCode>string</Exporter_RegistrationNumberIssuerCountryCode>\n      <Exporter_BusinessPartyTypeCode>string</Exporter_BusinessPartyTypeCode>\n      <UseDHLInvoice>string</UseDHLInvoice>\n      <SignatureName>string</SignatureName>\n      <SignatureTitle>string</SignatureTitle>\n      <LicenseNumber>string</LicenseNumber>\n      <ExpiryDate>string</ExpiryDate>\n      <ManufactureCountryCode>string</ManufactureCountryCode>\n      <ManufactureCountryName>string</ManufactureCountryName>\n      <SerialNumber>string</SerialNumber>\n      <FOBValue>string</FOBValue>\n      <Discount>string</Discount>\n      <Description>string</Description>\n      <Qty>string</Qty>\n      <Weight>string</Weight>\n      <HSCode>string</HSCode>\n      <CommodityCode>string</CommodityCode>\n      <CommodityType>string</CommodityType>\n      <InvoiceRatePerUnit>string</InvoiceRatePerUnit>\n      <ShipPieceUOM>string</ShipPieceUOM>\n      <ShipPieceCESS>string</ShipPieceCESS>\n      <ShipPieceIGSTPercentage>string</ShipPieceIGSTPercentage>\n      <ShipPieceIGST>string</ShipPieceIGST>\n      <ShipPieceTaxableValue>string</ShipPieceTaxableValue>\n      <FreightCharge>string</FreightCharge>\n      <InsuranceCharge>string</InsuranceCharge>\n      <TotalIGST>string</TotalIGST>\n      <CessCharge>string</CessCharge>\n      <ReverseCharge>string</ReverseCharge>\n      <PayerGSTVAT>string</PayerGSTVAT>\n      <IsResponseRequired>string</IsResponseRequired>\n      <LabelReq>string</LabelReq>\n      <SpecialService>string</SpecialService>\n      <InsuredAmount>string</InsuredAmount>\n      <PaymentMethod>string</PaymentMethod>\n      <isIndemnityClauseRead>string</isIndemnityClauseRead>\n      <ReasonForTransport>string</ReasonForTransport>\n      <DistanceInKM>string</DistanceInKM>\n      <Invoicevalueinword>string</Invoicevalueinword>\n      <Placeofsupply>string</Placeofsupply>\n      <dateofsupply>string</dateofsupply>\n      <Shipperstatecode>string</Shipperstatecode>\n      <ShipperstateName>string</ShipperstateName>\n      <ACCOUNT_NO>string</ACCOUNT_NO>\n      <NFEI_FLAG>string</NFEI_FLAG>\n      <GOV_NONGOV_TYPE>string</GOV_NONGOV_TYPE>\n      <Destination_Duty_VAT_Charges>string</Destination_Duty_VAT_Charges>\n      <WebsiteOrEcomOperatorName>string</WebsiteOrEcomOperatorName>\n      <PaymentorTxnID>string</PaymentorTxnID>\n      <OrderNumber>string</OrderNumber>\n      <OrderDate>string</OrderDate>\n      <SKU_Number>string</SKU_Number>\n      <JewelleryType>string</JewelleryType>\n    </PostShipmentCash_CSBV>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostshipmentCash_DOX",
+          "filename": "PostshipmentCash_DOX.bru",
+          "seq": 18,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostshipmentCash_DOX",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostshipmentCash_DOX xmlns=\"http://tempuri.org/\">\n      <Shipmentpurpose>string</Shipmentpurpose>\n      <ShipperAccNumber>string</ShipperAccNumber>\n      <ShippingPaymentType>string</ShippingPaymentType>\n      <BillingAccNumber>string</BillingAccNumber>\n      <ConsigneeCompName>string</ConsigneeCompName>\n      <ConsigneeAddLine1>string</ConsigneeAddLine1>\n      <ConsigneeAddLine2>string</ConsigneeAddLine2>\n      <ConsigneeAddLine3>string</ConsigneeAddLine3>\n      <ConsigneeCity>string</ConsigneeCity>\n      <ConsigneeDivCode>string</ConsigneeDivCode>\n      <PostalCode>string</PostalCode>\n      <ConsigneeCountryCode>string</ConsigneeCountryCode>\n      <ConsigneeCountryName>string</ConsigneeCountryName>\n      <ConsigneeName>string</ConsigneeName>\n      <ConsigneePh>string</ConsigneePh>\n      <ConsigneeEmail>string</ConsigneeEmail>\n      <ShipNumberOfPieces>string</ShipNumberOfPieces>\n      <ShipPieceWt>string</ShipPieceWt>\n      <ShipPieceDepth>string</ShipPieceDepth>\n      <ShipPieceWidth>string</ShipPieceWidth>\n      <ShipPieceHeight>string</ShipPieceHeight>\n      <ShipGlobalProductCode>string</ShipGlobalProductCode>\n      <ShipLocalProductCode>string</ShipLocalProductCode>\n      <ShipContents>string</ShipContents>\n      <ShipmentCharges>string</ShipmentCharges>\n      <ShipperId>string</ShipperId>\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAddress1>string</ShipperAddress1>\n      <ShipperAddress2>string</ShipperAddress2>\n      <ShipperAddress3>string</ShipperAddress3>\n      <ShipperCountryCode>string</ShipperCountryCode>\n      <ShipperCountryName>string</ShipperCountryName>\n      <ShipperCity>string</ShipperCity>\n      <ShipperPostalCode>string</ShipperPostalCode>\n      <ShipperPhoneNumber>string</ShipperPhoneNumber>\n      <SiteId>string</SiteId>\n      <Password>string</Password>\n      <ShipperName>string</ShipperName>\n      <ShipperRef>string</ShipperRef>\n      <IsResponseRequired>string</IsResponseRequired>\n      <LabelReq>string</LabelReq>\n      <SpecialService>string</SpecialService>\n      <isIndemnityClauseRead>string</isIndemnityClauseRead>\n      <PaymentMethod>string</PaymentMethod>\n    </PostshipmentCash_DOX>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostShipment_CSBIV_Cargo",
+          "filename": "PostShipment_CSBIV_Cargo.bru",
+          "seq": 13,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostShipment_CSBIV_Cargo",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n                            <soapenv:Header/>\n                            <soapenv:Body>\n                                <tem:PostShipment_CSBIV_Cargo>\n                                     <tem:Shipmentpurpose>CSBIV</tem:Shipmentpurpose>\n                                     <tem:ShipperAccNumber>950650795</tem:ShipperAccNumber>\n                                     <tem:ShippingPaymentType>S</tem:ShippingPaymentType>\n                                     <tem:BillingAccNumber>950650795</tem:BillingAccNumber>\n                                     <tem:DutyPaymentType>R</tem:DutyPaymentType>\n                                     <tem:DutyAccNumber>941091109</tem:DutyAccNumber>\n                                     <tem:ConsigneeCompName>ABERCROMBIE AND FITCH</tem:ConsigneeCompName>\n                                     <tem:ConsigneeAddLine1>ABERCROMBIE AND FITCH  6301</tem:ConsigneeAddLine1>\n                                     <tem:ConsigneeAddLine2>FITCH PATH</tem:ConsigneeAddLine2>\n                                     <tem:ConsigneeAddLine3></tem:ConsigneeAddLine3>\n                                     <tem:ConsigneeCity>CHENNAI</tem:ConsigneeCity>\n                                     <tem:ConsigneeDivCode></tem:ConsigneeDivCode>\n                                     <tem:PostalCode>600032</tem:PostalCode>\n                                     <tem:ConsigneeCountryCode>IN</tem:ConsigneeCountryCode>\n                                     <tem:ConsigneeCountryName>INDIA</tem:ConsigneeCountryName>\n                                     <tem:ConsigneeName>SAMPLE LIBRARY</tem:ConsigneeName>\n                                     <tem:ConsigneePh>6147654274</tem:ConsigneePh>\n                                     <tem:ConsigneeEmail></tem:ConsigneeEmail>\n                                     <tem:RegistrationNumber></tem:RegistrationNumber>\n                                     <tem:RegistrationNumberTypeCode></tem:RegistrationNumberTypeCode>\n                                     <tem:RegistrationNumberIssuerCountryCode></tem:RegistrationNumberIssuerCountryCode>\n                                     <tem:BusinessPartyTypeCode></tem:BusinessPartyTypeCode>\n                                     <tem:DutiableDeclaredvalue>28</tem:DutiableDeclaredvalue>                                     \n                                     <tem:DutiableDeclaredCurrency>USD</tem:DutiableDeclaredCurrency>                                     \n                                     <tem:ShipNumberOfPieces>1</tem:ShipNumberOfPieces>                                     \n                                     <tem:ShipCurrencyCode>USD</tem:ShipCurrencyCode>                                     \n                                     <tem:ShipPieceWt>2</tem:ShipPieceWt>                                     \n                                     <tem:ShipPieceDepth>1</tem:ShipPieceDepth>                                     \n                                     <tem:ShipPieceWidth>1</tem:ShipPieceWidth>                                     \n                                     <tem:ShipPieceHeight>1</tem:ShipPieceHeight>                                     \n                                     <tem:ShipGlobalProductCode>P</tem:ShipGlobalProductCode>                                     \n                                     <tem:ShipLocalProductCode>P</tem:ShipLocalProductCode>                                     \n                                     <tem:ShipContents>100% COTTON WOVEN LADIES DRESS</tem:ShipContents>                                     \n                                     <tem:ShipperId>SAHU GLOBAL PVT. LTD.</tem:ShipperId>                                     \n                                     <tem:ShipperCompName>SAHU GLOBAL PVT. LTD.</tem:ShipperCompName>                                     \n                                     <tem:ShipperAddress1>A-204 SECTOR 63</tem:ShipperAddress1>                                     \n                                     <tem:ShipperAddress2>SECTOR 63</tem:ShipperAddress2>                                     \n                                     <tem:ShipperAddress3>MID- INSAHGLO 204 NOI</tem:ShipperAddress3>                                     \n                                     <tem:ShipperCountryCode>US</tem:ShipperCountryCode>                                     \n                                     <tem:ShipperCountryName>USA</tem:ShipperCountryName>                                     \n                                     <tem:ShipperCity>NEW YORK</tem:ShipperCity>                                     \n                                     <tem:ShipperPostalCode>10018</tem:ShipperPostalCode>                                     \n                                     <tem:ShipperPhoneNumber>9811906572</tem:ShipperPhoneNumber>                                     \n                                     <tem:SiteId>sahuglobalpIN</tem:SiteId>                                     \n                                     <tem:Password>Y#2sT$2lW@9fD!2m</tem:Password>                                     \n                                     <tem:ShipperName>SHAMSHER BAHADUR GAUTAM,SAHEBA</tem:ShipperName>                                     \n                                     <tem:ShipperRef>INV/35927</tem:ShipperRef>                                     \n                                     <tem:ShipperRegistrationNumber></tem:ShipperRegistrationNumber>                                     \n                                     <tem:ShipperRegistrationNumberTypeCode></tem:ShipperRegistrationNumberTypeCode>                                     \n                                     <tem:ShipperRegistrationNumberIssuerCountryCode></tem:ShipperRegistrationNumberIssuerCountryCode>                                     \n                                     <tem:ShipperBusinessPartyTypeCode></tem:ShipperBusinessPartyTypeCode>                                     \n                                     <tem:BillToCompanyName></tem:BillToCompanyName>                                     \n                                     <tem:BillToContactName></tem:BillToContactName>                                     \n                                     <tem:BillToAddressLine1></tem:BillToAddressLine1>                                     \n                                     <tem:BillToCity></tem:BillToCity>                                     \n                                     <tem:BillToPostcode></tem:BillToPostcode>                                     \n                                     <tem:BillToSuburb></tem:BillToSuburb>                                     \n                                     <tem:BillToState></tem:BillToState>                                     \n                                     <tem:BillToCountryName></tem:BillToCountryName>                                     \n                                     <tem:BillToCountryCode></tem:BillToCountryCode>                                     \n                                     <tem:BillToPhoneNumber></tem:BillToPhoneNumber>  \n                                     <tem:TermsOfTrade>DAP</tem:TermsOfTrade>\n                                     <tem:GSTIN>09ABCCS8788H2ZK</tem:GSTIN>                                     \n                                     <tem:GSTInvNo></tem:GSTInvNo>                                     \n                                     <tem:GSTInvNoDate></tem:GSTInvNoDate>                                     \n                                     <tem:NonGSTInvNo>INV/35927</tem:NonGSTInvNo>                                     \n                                     <tem:NonGSTInvDate>2025-12-29</tem:NonGSTInvDate>                                     \n                                     <tem:IsUsingIGST>NA</tem:IsUsingIGST>                                     \n                                     <tem:UsingBondorUT>NA</tem:UsingBondorUT>                                     \n                                     <tem:Exporter_CompanyName></tem:Exporter_CompanyName>                                     \n                                     <tem:Exporter_AddressLine1></tem:Exporter_AddressLine1>                                     \n                                     <tem:Exporter_AddressLine2></tem:Exporter_AddressLine2>                                     \n                                     <tem:Exporter_AddressLine3></tem:Exporter_AddressLine3>                                     \n                                     <tem:Exporter_City></tem:Exporter_City>                                     \n                                     <tem:Exporter_DivisionCode></tem:Exporter_DivisionCode>                                     \n                                     <tem:Exporter_PostalCode></tem:Exporter_PostalCode>                                     \n                                     <tem:Exporter_CountryCode></tem:Exporter_CountryCode>                                     \n                                     <tem:Exporter_CountryName></tem:Exporter_CountryName>                                     \n                                     <tem:Exporter_PersonName></tem:Exporter_PersonName>                                     \n                                     <tem:Exporter_PhoneNumber></tem:Exporter_PhoneNumber>                                     \n                                     <tem:Exporter_Email></tem:Exporter_Email>                                     \n                                     <tem:Exporter_RegistrationNumber></tem:Exporter_RegistrationNumber>                                     \n                                     <tem:Exporter_RegistrationNumberTypeCode></tem:Exporter_RegistrationNumberTypeCode>                                     \n                                     <tem:Exporter_RegistrationNumberIssuerCountryCode></tem:Exporter_RegistrationNumberIssuerCountryCode>                                     \n                                     <tem:Exporter_BusinessPartyTypeCode></tem:Exporter_BusinessPartyTypeCode>                                     \n                                     <tem:UseDHLInvoice>Y</tem:UseDHLInvoice>                                     \n                                     <tem:SignatureName></tem:SignatureName>                                     \n                                     <tem:SignatureTitle></tem:SignatureTitle>                                     \n                                     <tem:LicenseNumber></tem:LicenseNumber>                                     \n                                     <tem:ExpiryDate></tem:ExpiryDate>                                     \n                                     <tem:ManufactureCountryCode>IN,IN,IN,IN,IN,IN,IN,IN,IN</tem:ManufactureCountryCode>                                     \n                                     <tem:ManufactureCountryName>INDIA,INDIA,INDIA,INDIA,INDIA,INDIA,INDIA,INDIA,INDIA</tem:ManufactureCountryName>                                     \n                                     <tem:SerialNumber>1,2,3,4,5,6,7,8,9</tem:SerialNumber>                                     \n                                     <tem:Description>1COTTON WOVEN LADIES DRESS 100% ,1COTTON WOVEN LADIES DRESS 100% ,1COTTON WOVEN LADIES DRESS 100% ,1COTTON WOVEN LADIES DRESS 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1POLYESTER WOVEN LADIES TOP 100% ,1COTTON WOVEN LADIES DRESS 100% </tem:Description>                                     \n                                     <tem:Qty>1,1,1,1,1,1,1,1,1</tem:Qty>                                     \n                                     <tem:Weight>0.3,0.3,0.3,0.3,0.1,0.1,0.2,0.2,0.2</tem:Weight>                                     \n                                     <tem:HSCode>62044290,62044290,62044290,62044290,62114390,62114390,62114390,62114390,62044290</tem:HSCode>                                     \n                                     <tem:CommodityCode>6204423050,6204423050,6204423050,6204423050,6211421056,6211421056,6211421056,6211421056,6204423050</tem:CommodityCode>                                     \n                                     <tem:InvoiceRatePerUnit>4,4,4,4,2,2,2,2,4</tem:InvoiceRatePerUnit>                                     \n                                     <tem:ShipPieceUOM>PCS,PCS,PCS,PCS,PCS,PCS,PCS,PCS,PCS</tem:ShipPieceUOM>                                     \n                                     <tem:ShipPieceIGST></tem:ShipPieceIGST>                                     \n                                     <tem:FreightCharge></tem:FreightCharge>                                     \n                                     <tem:InsuranceCharge></tem:InsuranceCharge>                                     \n                                     <tem:TotalIGST>0</tem:TotalIGST>                                     \n                                     <tem:PayerGSTVAT></tem:PayerGSTVAT>                                     \n                                     <tem:AddDeclText1></tem:AddDeclText1>                                     \n                                     <tem:IsResponseRequired>N</tem:IsResponseRequired>                                     \n                                     <tem:LabelReq>N</tem:LabelReq>                                     \n                                     <tem:SpecialService>DS</tem:SpecialService>  \n                                     <tem:InsuredAmount>0</tem:InsuredAmount>                                     \n                                     <tem:isIndemnityClauseRead>YES</tem:isIndemnityClauseRead>                                     \n                                     <tem:DistanceInKM></tem:DistanceInKM>                                     \n                                     <tem:Destination_Duty_VAT_Charges></tem:Destination_Duty_VAT_Charges>                                     \n                                     <tem:CustomerBarcodeCode></tem:CustomerBarcodeCode>                                     \n                                     <tem:CustomerBarcodeText></tem:CustomerBarcodeText>\n                                     <tem:ReasonForExport>Sample</tem:ReasonForExport>\n                                 </tem:PostShipment_CSBIV_Cargo>\n                             </soapenv:Body>\n                        </soapenv:Envelope>",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostShipment_CSBV",
+          "filename": "PostShipment_CSBV.bru",
+          "seq": 14,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostShipment_CSBV",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\" xmlns:dhl=\"http://schemas.datacontract.org/2004/07/DHLWCFService.App_Code\">\n   <soapenv:Header/>\n   <soapenv:Body>\n      <tem:PostShipment_CSBV>\n         <!--Optional:-->\n         <tem:Shipmentpurpose>CSBV</tem:Shipmentpurpose>\n         <!--Optional:-->\n         <tem:ShipperAccNumber>538805906</tem:ShipperAccNumber>\n         <!--Optional:-->\n         <tem:ShippingPaymentType>S</tem:ShippingPaymentType>\n         <!--Optional:-->\n         <tem:BillingAccNumber>538805906</tem:BillingAccNumber>\n         <!--Optional:-->\n         <tem:ConsigneeCompName>RCVR</tem:ConsigneeCompName>\n         <!--Optional:-->\n         <tem:ConsigneeAddLine1>RCVR</tem:ConsigneeAddLine1>\n         <!--Optional:-->\n         <tem:ConsigneeAddLine2>RCVR</tem:ConsigneeAddLine2>\n         <!--Optional:-->\n         <tem:ConsigneeAddLine3>RCVR</tem:ConsigneeAddLine3>\n         <!--Optional:-->\n         <tem:ConsigneeCity>NEW YORK</tem:ConsigneeCity>\n         <!--Optional:-->\n         <tem:ConsigneeDivCode>NY</tem:ConsigneeDivCode>\n         <!--Optional:-->\n         <tem:PostalCode>10012</tem:PostalCode>\n         <!--Optional:-->\n         <tem:ConsigneeCountryCode>US</tem:ConsigneeCountryCode>\n         <!--Optional:-->\n         <tem:ConsigneeCountryName>UNITED STATES</tem:ConsigneeCountryName>\n         <!--Optional:-->\n         <tem:ConsigneeName>RCVR</tem:ConsigneeName>\n         <!--Optional:-->\n         <tem:ConsigneePh>2015550123</tem:ConsigneePh>\n         <!--Optional:-->\n         <tem:ConsigneeEmail>RCVR@TEST.COM</tem:ConsigneeEmail>\n         <!--Optional:-->\n         <tem:RegistrationNumber></tem:RegistrationNumber>\n         <!--Optional:-->\n         <tem:RegistrationNumberTypeCode></tem:RegistrationNumberTypeCode>\n         <!--Optional:-->\n         <tem:RegistrationNumberIssuerCountryCode></tem:RegistrationNumberIssuerCountryCode>\n         <!--Optional:-->\n         <tem:BusinessPartyTypeCode></tem:BusinessPartyTypeCode>\n         <!--Optional:-->\n         <tem:DutiableDeclaredvalue>1100</tem:DutiableDeclaredvalue>\n         <!--Optional:-->\n         <tem:DutiableDeclaredCurrency>INR</tem:DutiableDeclaredCurrency>\n         <!--Optional:-->\n         <tem:ShipNumberOfPieces>1</tem:ShipNumberOfPieces>\n         <!--Optional:-->\n         <tem:ShipCurrencyCode>INR</tem:ShipCurrencyCode>\n         <!--Optional:-->\n         <tem:ShipPieceWt>5</tem:ShipPieceWt>\n         <!--Optional:-->\n         <tem:ShipPieceDepth>1</tem:ShipPieceDepth>\n         <!--Optional:-->\n         <tem:ShipPieceWidth>1</tem:ShipPieceWidth>\n         <!--Optional:-->\n         <tem:ShipPieceHeight>1</tem:ShipPieceHeight>\n         <!--Optional:-->\n         <tem:ShipGlobalProductCode>P</tem:ShipGlobalProductCode>\n         <!--Optional:-->\n         <tem:ShipLocalProductCode>P</tem:ShipLocalProductCode>\n         <!--Optional:-->\n         <tem:ShipContents>Comic Books for Kids</tem:ShipContents>\n         <!--Optional:-->\n         <tem:ShipperId>test</tem:ShipperId>\n         <!--Optional:-->\n         <tem:ShipperCompName>SHIPPER</tem:ShipperCompName>\n         <!--Optional:-->\n         <tem:ShipperAddress1>SHIPPER</tem:ShipperAddress1>\n         <!--Optional:-->\n         <tem:ShipperAddress2>SHIPPER</tem:ShipperAddress2>\n         <!--Optional:-->\n         <tem:ShipperAddress3>SHIPPER</tem:ShipperAddress3>\n         <!--Optional:-->\n         <tem:ShipperCountryCode>IN</tem:ShipperCountryCode>\n         <!--Optional:-->\n         <tem:ShipperCountryName>INDIA</tem:ShipperCountryName>\n         <!--Optional:-->\n         <tem:ShipperCity>NOIDA</tem:ShipperCity>\n         <!--Optional:-->\n         <tem:ShipperPostalCode>201304</tem:ShipperPostalCode>\n         <!--Optional:-->\n         <tem:ShipperPhoneNumber>9810766049</tem:ShipperPhoneNumber>\n         <!--Optional:-->\n         <tem:SiteId>v62_3NrvswKQs8</tem:SiteId>\n         <!--Optional:-->\n         <tem:Password>qLeo2eb6t9</tem:Password>\n         <!--Optional:-->\n         <tem:ShipperName>SHIPPER</tem:ShipperName>\n         <!--Optional:-->\n         <tem:ShipperRef>REF123</tem:ShipperRef>\n         <!--Optional:-->\n         <tem:ShipperRegistrationNumber></tem:ShipperRegistrationNumber>\n         <!--Optional:-->\n         <tem:ShipperRegistrationNumberTypeCode></tem:ShipperRegistrationNumberTypeCode>\n         <!--Optional:-->\n         <tem:ShipperRegistrationNumberIssuerCountryCode></tem:ShipperRegistrationNumberIssuerCountryCode>\n         <!--Optional:-->\n         <tem:ShipperBusinessPartyTypeCode></tem:ShipperBusinessPartyTypeCode>\n         <!--Optional:-->\n         <tem:BillToCompanyName></tem:BillToCompanyName>\n         <!--Optional:-->\n         <tem:BillToContactName></tem:BillToContactName>\n         <!--Optional:-->\n         <tem:BillToAddressLine1></tem:BillToAddressLine1>\n         <!--Optional:-->\n         <tem:BillToCity></tem:BillToCity>\n         <!--Optional:-->\n         <tem:BillToPostcode></tem:BillToPostcode>\n         <!--Optional:-->\n         <tem:BillToSuburb></tem:BillToSuburb>\n         <!--Optional:-->\n         <tem:BillToState></tem:BillToState>\n         <!--Optional:-->\n         <tem:BillToCountryName></tem:BillToCountryName>\n         <!--Optional:-->\n         <tem:BillToCountryCode></tem:BillToCountryCode>\n         <!--Optional:-->\n         <tem:BillToPhoneNumber></tem:BillToPhoneNumber>\n         <!--Optional:-->\n         <tem:IECNo>BBXPS1172E</tem:IECNo>\n         <!--Optional:-->\n         <tem:TermsOfTrade>DDP</tem:TermsOfTrade>\n         <!--Optional:-->\n         <tem:Usingecommerce>1</tem:Usingecommerce>\n         <!--Optional:-->\n         <tem:IsUnderMEISScheme>0</tem:IsUnderMEISScheme>\n         <!--Optional:-->\n         <tem:GSTIN>09BBXPS1172E1ZA</tem:GSTIN>\n         <!--Optional:-->\n         <tem:GSTInvNo></tem:GSTInvNo>\n         <!--Optional:-->\n         <tem:GSTInvNoDate></tem:GSTInvNoDate>\n         <!--Optional:-->\n         <tem:NonGSTInvNo>INV TEST 123</tem:NonGSTInvNo>\n         <!--Optional:-->\n         <tem:NonGSTInvDate>2025-03-10</tem:NonGSTInvDate>\n         <!--Optional:-->\n         <tem:IsUsingIGST>No</tem:IsUsingIGST>\n         <!--Optional:-->\n         <tem:UsingBondorUT>Yes</tem:UsingBondorUT>\n         <!--Optional:-->\n         <tem:BankADCode>05100052900009</tem:BankADCode>\n         <!--Optional:-->\n         <tem:Exporter_CompanyName></tem:Exporter_CompanyName>\n         <!--Optional:-->\n         <tem:Exporter_AddressLine1></tem:Exporter_AddressLine1>\n         <!--Optional:-->\n         <tem:Exporter_AddressLine2></tem:Exporter_AddressLine2>\n         <!--Optional:-->\n         <tem:Exporter_AddressLine3></tem:Exporter_AddressLine3>\n         <!--Optional:-->\n         <tem:Exporter_City></tem:Exporter_City>\n         <!--Optional:-->\n         <tem:Exporter_DivisionCode></tem:Exporter_DivisionCode>\n         <!--Optional:-->\n         <tem:Exporter_PostalCode></tem:Exporter_PostalCode>\n         <!--Optional:-->\n         <tem:Exporter_CountryCode></tem:Exporter_CountryCode>\n         <!--Optional:-->\n         <tem:Exporter_CountryName></tem:Exporter_CountryName>\n         <!--Optional:-->\n         <tem:Exporter_PersonName></tem:Exporter_PersonName>\n         <!--Optional:-->\n         <tem:Exporter_PhoneNumber></tem:Exporter_PhoneNumber>\n         <!--Optional:-->\n         <tem:Exporter_Email></tem:Exporter_Email>\n         <!--Optional:-->\n         <tem:Exporter_RegistrationNumber></tem:Exporter_RegistrationNumber>\n         <!--Optional:-->\n         <tem:Exporter_RegistrationNumberTypeCode></tem:Exporter_RegistrationNumberTypeCode>\n         <!--Optional:-->\n         <tem:Exporter_RegistrationNumberIssuerCountryCode></tem:Exporter_RegistrationNumberIssuerCountryCode>\n         <!--Optional:-->\n         <tem:Exporter_BusinessPartyTypeCode></tem:Exporter_BusinessPartyTypeCode>\n         <!--Optional:-->\n         <tem:UseDHLInvoice>Y</tem:UseDHLInvoice>\n         <!--Optional:-->\n         <tem:SignatureName>Authorized Signatory</tem:SignatureName>\n         <!--Optional:-->\n         <tem:SignatureTitle>DATE:29-05-2025</tem:SignatureTitle>\n         <!--Optional:-->\n         <tem:LicenseNumber></tem:LicenseNumber>\n         <!--Optional:-->\n         <tem:ExpiryDate></tem:ExpiryDate>\n         <!--Optional:-->\n         <tem:ManufactureCountryCode>IN</tem:ManufactureCountryCode>\n         <!--Optional:-->\n         <tem:ManufactureCountryName>INDIA</tem:ManufactureCountryName>\n         <!--Optional:-->\n         <tem:SerialNumber>1</tem:SerialNumber>\n         <!--Optional:-->\n         <tem:FOBValue>900</tem:FOBValue>\n         <!--Optional:-->\n         <tem:Discount>100</tem:Discount>\n         <!--Optional:-->\n         <tem:Description>1gold earpiece made of 18 carat gold</tem:Description>\n         <!--Optional:-->\n         <tem:Qty>1</tem:Qty>\n         <!--Optional:-->\n         <tem:Weight>1</tem:Weight>\n         <!--Optional:-->\n         <tem:HSCode>61091000</tem:HSCode>\n         <!--Optional:-->\n         <tem:CommodityCode>6109100000</tem:CommodityCode>\n         <!--Optional:-->\n         <tem:CommodityType>Others</tem:CommodityType>\n         <!--Optional:-->\n         <tem:InvoiceRatePerUnit>1000</tem:InvoiceRatePerUnit>\n         <!--Optional:-->\n         <tem:ShipPieceUOM>PCS</tem:ShipPieceUOM>\n         <!--Optional:-->\n         <tem:ShipPieceCESS>0</tem:ShipPieceCESS>\n         <!--Optional:-->\n         <tem:ShipPieceIGSTPercentage></tem:ShipPieceIGSTPercentage>\n         <!--Optional:-->\n         <tem:ShipPieceIGST>0</tem:ShipPieceIGST>\n         <!--Optional:-->\n         <tem:ShipPieceTaxableValue>5000</tem:ShipPieceTaxableValue>\n         <!--Optional:-->\n         <tem:FreightCharge>200</tem:FreightCharge>\n         <!--Optional:-->\n         <tem:InsuranceCharge>0</tem:InsuranceCharge>\n         <!--Optional:-->\n         <tem:TotalIGST>0.0</tem:TotalIGST>\n         <!--Optional:-->\n         <tem:CessCharge></tem:CessCharge>\n         <!--Optional:-->\n         <tem:ReverseCharge>0</tem:ReverseCharge>\n         <!--Optional:-->\n         <tem:PayerGSTVAT></tem:PayerGSTVAT>\n         <!--Optional:-->\n         <tem:IsResponseRequired>N</tem:IsResponseRequired>\n         <!--Optional:-->\n         <tem:LabelReq>Y</tem:LabelReq>\n         <!--Optional:-->\n         <tem:SpecialService>DD</tem:SpecialService>\n         <!--Optional:-->\n         <tem:InsuredAmount>0.0</tem:InsuredAmount>\n         <!--Optional:-->\n         <tem:Invoicevalueinword></tem:Invoicevalueinword>\n         <!--Optional:-->\n         <tem:Placeofsupply></tem:Placeofsupply>\n         <!--Optional:-->\n         <tem:dateofsupply></tem:dateofsupply>\n         <!--Optional:-->\n         <tem:Shipperstatecode>09</tem:Shipperstatecode>\n         <!--Optional:-->\n         <tem:ShipperstateName>Uttar Pradesh</tem:ShipperstateName>\n         <!--Optional:-->\n         <tem:isIndemnityClauseRead>YES</tem:isIndemnityClauseRead>\n         <!--Optional:-->\n         <tem:ACCOUNT_NO>50200046756911</tem:ACCOUNT_NO>\n         <!--Optional:-->\n         <tem:NFEI_FLAG>NO</tem:NFEI_FLAG>\n         <!--Optional:-->\n         <tem:GOV_NONGOV_TYPE>P</tem:GOV_NONGOV_TYPE>\n         <!--Optional:-->\n         <tem:Destination_Duty_VAT_Charges></tem:Destination_Duty_VAT_Charges>\n         <!--Optional:-->\n         <tem:CustomerBarcodeCode></tem:CustomerBarcodeCode>\n         <!--Optional:-->\n         <tem:CustomerBarcodeText></tem:CustomerBarcodeText>\n         <!--Optional:-->\n         <tem:plt_signature></tem:plt_signature>\n         <!--Optional:-->\n         <tem:DutyAccountNumber></tem:DutyAccountNumber>\n         <!--Optional:-->\n         <tem:plt_signature_Base64></tem:plt_signature_Base64>\n         <!--Optional:-->\n         <tem:WebsiteOrEcomOperatorName></tem:WebsiteOrEcomOperatorName>\n         <!--Optional:-->\n         <tem:PaymentorTxnID></tem:PaymentorTxnID>\n         <!--Optional:-->\n         <tem:OrderNumber></tem:OrderNumber>\n         <!--Optional:-->\n         <tem:OrderDate></tem:OrderDate>\n         <!--Optional:-->\n         <tem:SKU_Number></tem:SKU_Number>\n         <!--Optional:-->\n         <tem:JewelleryType></tem:JewelleryType>\n         <!--Optional:-->\n         <tem:GnJ_Reimport_Availed></tem:GnJ_Reimport_Availed>\n         <!--Optional:-->\n         <tem:AdditionalDataElements>\n            <!--Optional:-->\n            <dhl:JewelleryPurity></dhl:JewelleryPurity>\n            <!--Optional:-->\n            <dhl:JewelleryWeight></dhl:JewelleryWeight>\n            <!--Optional:-->\n            <dhl:IsJewelleryStudded></dhl:IsJewelleryStudded>\n            <!--Optional:-->\n            <dhl:NameofStuddedStone></dhl:NameofStuddedStone>\n            <!--Optional:-->\n            <dhl:JewelleryCertificateInfo></dhl:JewelleryCertificateInfo>\n            <!--Optional:-->\n            <dhl:DiamondCut></dhl:DiamondCut>\n            <!--Optional:-->\n            <dhl:DiamondColor></dhl:DiamondColor>\n            <!--Optional:-->\n            <dhl:DiamondClarity></dhl:DiamondClarity>\n            <!--Optional:-->\n            <dhl:DiamondCarat></dhl:DiamondCarat>\n            <!--Optional:-->\n            <dhl:DiamondNoOfStones></dhl:DiamondNoOfStones>\n            <!--Optional:-->\n            <dhl:NameOfTheStone></dhl:NameOfTheStone>\n            <!--Optional:-->\n            <dhl:NaturalSynthetic></dhl:NaturalSynthetic>\n            <!--Optional:-->\n            <dhl:NoOfStones></dhl:NoOfStones>\n            <!--Optional:-->\n            <dhl:StoneCountry></dhl:StoneCountry>\n         </tem:AdditionalDataElements>\n      </tem:PostShipment_CSBV>\n   </soapenv:Body>\n</soapenv:Envelope>",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "basic",
+              "basic": {
+                "username": "instaexhibiIN",
+                "password": "N$6uP#4cT#3lD@1q"
+              }
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "Postshipment_DOX",
+          "filename": "Postshipment_DOX.bru",
+          "seq": 17,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/Postshipment_DOX",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <Postshipment_DOX xmlns=\"http://tempuri.org/\">\n      <Shipmentpurpose>CSBIV</Shipmentpurpose>\n      <ShipperAccNumber>950650795</ShipperAccNumber>\n      <ShippingPaymentType>R</ShippingPaymentType>\n      <BillingAccNumber>950650795</BillingAccNumber>\n      <ConsigneeCompName>string</ConsigneeCompName>\n      <ConsigneeAddLine1>string</ConsigneeAddLine1>\n      <ConsigneeAddLine2>string</ConsigneeAddLine2>\n      <ConsigneeAddLine3>string</ConsigneeAddLine3>\n      <ConsigneeCity>CHENNAI</ConsigneeCity>\n      <ConsigneeDivCode></ConsigneeDivCode>\n      <PostalCode>600032</PostalCode>\n      <ConsigneeCountryCode>IN</ConsigneeCountryCode>\n      <ConsigneeCountryName>INDIA</ConsigneeCountryName>\n      <ConsigneeName>string</ConsigneeName>\n      <ConsigneePh>string</ConsigneePh>\n      <ConsigneeEmail>string</ConsigneeEmail>\n      <ShipNumberOfPieces>1</ShipNumberOfPieces>\n      <ShipPieceWt>10</ShipPieceWt>\n      <ShipPieceDepth>10</ShipPieceDepth>\n      <ShipPieceWidth>10</ShipPieceWidth>\n      <ShipPieceHeight>1</ShipPieceHeight>\n      <ShipGlobalProductCode>P</ShipGlobalProductCode>\n      <ShipLocalProductCode>P</ShipLocalProductCode>\n      <ShipContents>DOC</ShipContents>\n      <ShipperId>string</ShipperId>\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAddress1>string</ShipperAddress1>\n      <ShipperAddress2>string</ShipperAddress2>\n      <ShipperAddress3>string</ShipperAddress3>\n      <ShipperCountryCode>US</ShipperCountryCode>\n      <ShipperCountryName>USA</ShipperCountryName>\n      <ShipperCity>NEW YORK</ShipperCity>\n      <ShipperPostalCode>10018</ShipperPostalCode>\n      <ShipperPhoneNumber>99999999999</ShipperPhoneNumber>\n      <SiteId>Cbazaa</SiteId>\n      <Password>SqSxuOHx</Password>\n      <ShipperName>string</ShipperName>\n      <ShipperRef>string</ShipperRef>\n      <IsResponseRequired>string</IsResponseRequired>\n      <LabelReq>string</LabelReq>\n      <SpecialService>string</SpecialService>\n      <isIndemnityClauseRead>string</isIndemnityClauseRead>\n    </Postshipment_DOX>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostShipment_Hybrid",
+          "filename": "PostShipment_Hybrid.bru",
+          "seq": 19,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostShipment_Hybrid",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostShipment_Hybrid xmlns=\"http://tempuri.org/\">\n      <Shipmentpurpose>string</Shipmentpurpose>\n      <ShipperAccNumber>string</ShipperAccNumber>\n      <ShippingPaymentType>string</ShippingPaymentType>\n      <BillingAccNumber>string</BillingAccNumber>\n      <ConsigneeCompName>string</ConsigneeCompName>\n      <ConsigneeAddLine1>string</ConsigneeAddLine1>\n      <ConsigneeAddLine2>string</ConsigneeAddLine2>\n      <ConsigneeAddLine3>string</ConsigneeAddLine3>\n      <ConsigneeCity>string</ConsigneeCity>\n      <ConsigneeDivCode>string</ConsigneeDivCode>\n      <PostalCode>string</PostalCode>\n      <ConsigneeCountryCode>string</ConsigneeCountryCode>\n      <ConsigneeCountryName>string</ConsigneeCountryName>\n      <ConsigneeName>string</ConsigneeName>\n      <ConsigneePh>string</ConsigneePh>\n      <ConsigneeEmail>string</ConsigneeEmail>\n      <RegistrationNumber>string</RegistrationNumber>\n      <RegistrationNumberTypeCode>string</RegistrationNumberTypeCode>\n      <RegistrationNumberIssuerCountryCode>string</RegistrationNumberIssuerCountryCode>\n      <BusinessPartyTypeCode>string</BusinessPartyTypeCode>\n      <DutiableDeclaredvalue>string</DutiableDeclaredvalue>\n      <DutiableDeclaredCurrency>string</DutiableDeclaredCurrency>\n      <ShipNumberOfPieces>string</ShipNumberOfPieces>\n      <ShipCurrencyCode>string</ShipCurrencyCode>\n      <ShipPieceWt>string</ShipPieceWt>\n      <ShipPieceDepth>string</ShipPieceDepth>\n      <ShipPieceWidth>string</ShipPieceWidth>\n      <ShipPieceHeight>string</ShipPieceHeight>\n      <ShipGlobalProductCode>string</ShipGlobalProductCode>\n      <ShipLocalProductCode>string</ShipLocalProductCode>\n      <ShipContents>string</ShipContents>\n      <ShipperId>string</ShipperId>\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAddress1>string</ShipperAddress1>\n      <ShipperAddress2>string</ShipperAddress2>\n      <ShipperAddress3>string</ShipperAddress3>\n      <ShipperCountryCode>string</ShipperCountryCode>\n      <ShipperCountryName>string</ShipperCountryName>\n      <ShipperCity>string</ShipperCity>\n      <ShipperPostalCode>string</ShipperPostalCode>\n      <ShipperPhoneNumber>string</ShipperPhoneNumber>\n      <SiteId>string</SiteId>\n      <Password>string</Password>\n      <ShipperName>string</ShipperName>\n      <ShipperRef>string</ShipperRef>\n      <ShipperRegistrationNumber>string</ShipperRegistrationNumber>\n      <ShipperRegistrationNumberTypeCode>string</ShipperRegistrationNumberTypeCode>\n      <ShipperRegistrationNumberIssuerCountryCode>string</ShipperRegistrationNumberIssuerCountryCode>\n      <ShipperBusinessPartyTypeCode>string</ShipperBusinessPartyTypeCode>\n      <IECNo>string</IECNo>\n      <TermsOfTrade>string</TermsOfTrade>\n      <Usingecommerce>string</Usingecommerce>\n      <IsUnderMEISScheme>string</IsUnderMEISScheme>\n      <GSTIN>string</GSTIN>\n      <GSTInvNo>string</GSTInvNo>\n      <GSTInvNoDate>string</GSTInvNoDate>\n      <NonGSTInvNo>string</NonGSTInvNo>\n      <NonGSTInvDate>string</NonGSTInvDate>\n      <IsUsingIGST>string</IsUsingIGST>\n      <UsingBondorUT>string</UsingBondorUT>\n      <BankADCode>string</BankADCode>\n      <UseDHLInvoice>string</UseDHLInvoice>\n      <ManufactureCountryCode>string</ManufactureCountryCode>\n      <ManufactureCountryName>string</ManufactureCountryName>\n      <SerialNumber>string</SerialNumber>\n      <Discount>string</Discount>\n      <Description>string</Description>\n      <Qty>string</Qty>\n      <Weight>string</Weight>\n      <HSCode>string</HSCode>\n      <CommodityCode>string</CommodityCode>\n      <InvoiceRatePerUnit>string</InvoiceRatePerUnit>\n      <ShipPieceUOM>string</ShipPieceUOM>\n      <ShipPieceIGSTPercentage>string</ShipPieceIGSTPercentage>\n      <ShipPieceIGST>string</ShipPieceIGST>\n      <ShipPieceTaxableValue>string</ShipPieceTaxableValue>\n      <FreightCharge>string</FreightCharge>\n      <InsuranceCharge>string</InsuranceCharge>\n      <TotalIGST>string</TotalIGST>\n      <PayerGSTVAT>string</PayerGSTVAT>\n      <IsResponseRequired>string</IsResponseRequired>\n      <LabelReq>string</LabelReq>\n      <SpecialService>string</SpecialService>\n      <InsuredAmount>string</InsuredAmount>\n      <Invoicevalueinword>string</Invoicevalueinword>\n      <Placeofsupply>string</Placeofsupply>\n      <dateofsupply>string</dateofsupply>\n      <Shipperstatecode>string</Shipperstatecode>\n      <ShipperstateName>string</ShipperstateName>\n      <isIndemnityClauseRead>string</isIndemnityClauseRead>\n      <DutyAccountNumber>string</DutyAccountNumber>\n      <plt_signature>string</plt_signature>\n    </PostShipment_Hybrid>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostShipment_V6",
+          "filename": "PostShipment_V6.bru",
+          "seq": 7,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostShipment_V6",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostShipment_V6 xmlns=\"http://tempuri.org/\">\n      <ShippingPaymentType>string</ShippingPaymentType>\n      <ShipperAccNumber>string</ShipperAccNumber>\n      <BillingAccNumber>string</BillingAccNumber>\n      <DutyPaymentType>string</DutyPaymentType>\n      <DutyAccNumber>string</DutyAccNumber>\n      <ConsigneeCompName>string</ConsigneeCompName>\n      <ConsigneeAddLine1>string</ConsigneeAddLine1>\n      <ConsigneeAddLine2>string</ConsigneeAddLine2>\n      <ConsigneeAddLine3>string</ConsigneeAddLine3>\n      <ConsigneeCity>string</ConsigneeCity>\n      <ConsigneeDivCode>string</ConsigneeDivCode>\n      <PostalCode>string</PostalCode>\n      <ConsigneeCountryCode>string</ConsigneeCountryCode>\n      <ConsigneeCountryName>string</ConsigneeCountryName>\n      <ConsigneeName>string</ConsigneeName>\n      <ConsigneePh>string</ConsigneePh>\n      <DutiableDeclaredvalue>string</DutiableDeclaredvalue>\n      <DutiableDeclaredCurrency>string</DutiableDeclaredCurrency>\n      <ShipNumberOfPieces>string</ShipNumberOfPieces>\n      <ShipCurrencyCode>string</ShipCurrencyCode>\n      <ShipPieceWt>string</ShipPieceWt>\n      <ShipPieceDepth>string</ShipPieceDepth>\n      <ShipPieceWidth>string</ShipPieceWidth>\n      <ShipPieceHeight>string</ShipPieceHeight>\n      <ShipGlobalProductCode>string</ShipGlobalProductCode>\n      <ShipLocalProductCode>string</ShipLocalProductCode>\n      <ShipContents>string</ShipContents>\n      <ShipperId>string</ShipperId>\n      <ShipperCompName>string</ShipperCompName>\n      <ShipperAddress1>string</ShipperAddress1>\n      <ShipperAddress2>string</ShipperAddress2>\n      <ShipperAddress3>string</ShipperAddress3>\n      <ShipperCountryCode>string</ShipperCountryCode>\n      <ShipperCountryName>string</ShipperCountryName>\n      <ShipperCity>string</ShipperCity>\n      <ShipperPostalCode>string</ShipperPostalCode>\n      <ShipperPhoneNumber>string</ShipperPhoneNumber>\n      <SiteId>string</SiteId>\n      <Password>string</Password>\n      <ShipperName>string</ShipperName>\n      <ShipperRef>string</ShipperRef>\n      <IsResponseRequired>string</IsResponseRequired>\n      <LabelReq>string</LabelReq>\n      <ConsigneeEmail>string</ConsigneeEmail>\n      <TermsOfTrade>string</TermsOfTrade>\n    </PostShipment_V6>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostTracking",
+          "filename": "PostTracking.bru",
+          "seq": 8,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "https://api.india.express.dhl.com/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostTracking",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<req:CancelPURequest\n\txmlns:req=\"http://www.dhl.com\"\n\txmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.dhl.com cancel-pickup-global-req.xsd\" schemaVersion=\"3.0\" >\n\t<Request>\n\t\t<ServiceHeader>\n\t\t\t<MessageTime>\n2025-08-11T15:00:35+05:30</MessageTime>\n\t\t\t<MessageReference>1234567890123456789012345678901</MessageReference>\n\t\t\t<SiteID>ViswaLab</SiteID>\n\t\t\t<Password>UuvKoWjp3Y</Password>\n\t\t</ServiceHeader>\n\t</Request>\n\t<RegionCode>EU</RegionCode>\n\t<ConfirmationNumber>PRG250811135898</ConfirmationNumber>\n\t<RequestorName>Reception</RequestorName>\n\t<CountryCode>NL</CountryCode>\n\t<OriginSvcArea>PNQ</OriginSvcArea>\n\t<Reason>007</Reason>\n\t<PickupDate>2025-08-11</PickupDate>\n\t<CancelTime>15:00</CancelTime>\n</req:CancelPURequest>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostTrackingReference",
+          "filename": "PostTrackingReference.bru",
+          "seq": 9,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostTrackingReference",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostTrackingReference xmlns=\"http://tempuri.org/\">\n      <ShipperAccno>string</ShipperAccno>\n      <ReferenceID>string</ReferenceID>\n      <ShipmentDateFrom>string</ShipmentDateFrom>\n      <ShipmentDateTo>string</ShipmentDateTo>\n    </PostTrackingReference>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostTrackingReference_AllCheckpoint",
+          "filename": "PostTrackingReference_AllCheckpoint.bru",
+          "seq": 12,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostTrackingReference_AllCheckpoint",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostTrackingReference_AllCheckpoint xmlns=\"http://tempuri.org/\">\n      <ShipperAccno>string</ShipperAccno>\n      <ReferenceID>string</ReferenceID>\n      <ShipmentDateFrom>string</ShipmentDateFrom>\n      <ShipmentDateTo>string</ShipmentDateTo>\n    </PostTrackingReference_AllCheckpoint>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        },
+        {
+          "type": "http",
+          "name": "PostTracking_AllCheckpoint",
+          "filename": "PostTracking_AllCheckpoint.bru",
+          "seq": 11,
+          "settings": {},
+          "tags": [],
+          "examples": [],
+          "request": {
+            "url": "{{BasicHttpsBinding_IDHLServiceBaseUrl}}/DHLWCFService_V6/DHLService.svc",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "name": "SOAPAction",
+                "value": "http://tempuri.org/IDHLService/PostTracking_AllCheckpoint",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "xml",
+              "xml": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <wsse:Security soap:mustUnderstand=\"1\" xmlns:wsse=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"/>\n  </soap:Header>\n  <soap:Body>\n    <PostTracking_AllCheckpoint xmlns=\"http://tempuri.org/\">\n      <awbnumber>string</awbnumber>\n    </PostTracking_AllCheckpoint>\n  </soap:Body>\n</soap:Envelope>\n",
+              "formUrlEncoded": [],
+              "multipartForm": [],
+              "file": []
+            },
+            "script": {},
+            "vars": {},
+            "assertions": [],
+            "tests": "",
+            "docs": "",
+            "auth": {
+              "mode": "none"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "environments": [],
+  "root": {
+    "request": {
+      "auth": {
+        "mode": "none"
+      },
+      "vars": {
+        "req": [
+          {
+            "name": "BasicHttpBinding_IDHLServiceBaseUrl",
+            "value": "http://dhlindiaplugin.com",
+            "enabled": true,
+            "local": false,
+            "uid": "Wt9ZGT4s3nWUUR7F9VlYy"
+          },
+          {
+            "name": "BasicHttpsBinding_IDHLServiceBaseUrl",
+            "value": "https://mumdhlweb002v.mumdhlkyc.com",
+            "enabled": true,
+            "local": false,
+            "uid": "ynuDFWEoClN0kKoCy2p3H"
+          }
+        ]
+      }
+    },
+    "meta": {
+      "name": "Service1"
+    }
+  },
+  "brunoConfig": {
+    "version": "1",
+    "name": "Duavaa  Json",
+    "type": "collection",
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "size": 0.17793846130371094,
+    "filesCount": 50
+  },
+  "exportedAt": "2026-02-23T09:42:53.920Z",
+  "exportedUsing": "Bruno/3.0.2"
+}

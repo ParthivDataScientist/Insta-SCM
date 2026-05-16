@@ -21,6 +21,9 @@ def save_label_pdf(*, awb: str, label_base64: str) -> tuple[str, str]:
     if not token:
         raise ValueError("Missing DHL label payload")
 
+    if token.startswith("http://") or token.startswith("https://"):
+        return "", token
+
     if "," in token and token.lower().startswith("data:"):
         token = token.split(",", 1)[1].strip()
 

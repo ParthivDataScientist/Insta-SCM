@@ -4,6 +4,7 @@ Encapsulates all business logic for tracking and managing shipments.
 Endpoints should call these functions instead of containing business logic directly.
 """
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
@@ -21,6 +22,24 @@ from app.services.label_storage import save_label_pdf
 logger = logging.getLogger(__name__)
 STUCK_THRESHOLD_DAYS = 2
 STUCK_THRESHOLD_SECONDS = STUCK_THRESHOLD_DAYS * 24 * 60 * 60
+DEFAULT_DHL_SHIPPER = {
+    "company": "Insta Exhibition",
+    "name": "Insta Exhibition",
+    "address1": "1001, 10th Floor, Kohinoor Continental",
+    "address2": "J.B Nagar, Andheri-Kurla Road",
+    "address3": "",
+    "city": "Mumbai",
+    "postal_code": "400059",
+    "country_code": "IN",
+    "country_name": "INDIA",
+    "phone": "7977572486",
+    "state_code": "27",
+    "state_name": "Maharashtra",
+}
+DHL_SHIPMENT_TYPE_NORMAL = "NORMAL"
+DHL_SHIPMENT_TYPE_CSB_IV_CARGO = "CSB_IV_CARGO"
+DHL_SHIPMENT_TYPE_CSB_V = "CSB_V"
+DHL_ADDRESS_LINE_MAX_LENGTH = 45
 
 
 def _parse_event_datetime(raw_value: str) -> Optional[datetime]:
@@ -58,6 +77,41 @@ def _parse_event_datetime(raw_value: str) -> Optional[datetime]:
 
 def _normalize_location(value: Optional[str]) -> str:
     return " ".join(str(value or "").strip().lower().split())
+
+
+def _dhl_address_lines(*values: Optional[str], max_length: int = DHL_ADDRESS_LINE_MAX_LENGTH) -> tuple[str, str, str]:
+    raw_parts: list[str] = []
+    for value in values:
+        text = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+        if not text:
+            continue
+        if not any(text == part or text in part for part in raw_parts):
+            raw_parts.append(text)
+
+    words = " ".join(raw_parts).split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        if len(word) > max_length:
+            if current:
+                lines.append(current)
+                current = ""
+            lines.extend(word[index : index + max_length] for index in range(0, len(word), max_length))
+            continue
+        candidate = f"{current} {word}".strip()
+        if len(candidate) <= max_length:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+
+    lines = lines[:3]
+    while len(lines) < 3:
+        lines.append("")
+    return lines[0], lines[1], lines[2]
 
 
 def _is_delivered_status(status: str) -> bool:
@@ -223,37 +277,82 @@ def _append_history_event(
 
 
 def _dhl_shipper_defaults() -> dict[str, str]:
+    def setting_or_default(name: str) -> str:
+        value = str(getattr(settings, f"DHL_SHIPPER_{name.upper()}", "") or "").strip()
+        return value or DEFAULT_DHL_SHIPPER[name]
+
+    address1, address2, address3 = _dhl_address_lines(
+        setting_or_default("address1"),
+        str(settings.DHL_SHIPPER_ADDRESS2 or "").strip() or DEFAULT_DHL_SHIPPER["address2"],
+        str(settings.DHL_SHIPPER_ADDRESS3 or "").strip() or DEFAULT_DHL_SHIPPER["address3"],
+    )
+
     return {
-        "company": settings.DHL_SHIPPER_COMPANY,
-        "name": settings.DHL_SHIPPER_NAME,
-        "address1": settings.DHL_SHIPPER_ADDRESS1,
-        "address2": settings.DHL_SHIPPER_ADDRESS2,
-        "address3": settings.DHL_SHIPPER_ADDRESS3,
-        "city": settings.DHL_SHIPPER_CITY,
-        "postal_code": settings.DHL_SHIPPER_POSTAL_CODE,
-        "country_code": settings.DHL_SHIPPER_COUNTRY_CODE,
-        "country_name": settings.DHL_SHIPPER_COUNTRY_NAME,
-        "phone": settings.DHL_SHIPPER_PHONE,
+        "company": setting_or_default("company"),
+        "name": setting_or_default("name"),
+        "address1": address1,
+        "address2": address2,
+        "address3": address3,
+        "city": setting_or_default("city"),
+        "postal_code": setting_or_default("postal_code"),
+        "country_code": setting_or_default("country_code"),
+        "country_name": setting_or_default("country_name"),
+        "phone": setting_or_default("phone"),
+        "state_code": str(settings.DHL_SHIPPER_STATE_CODE or "").strip() or DEFAULT_DHL_SHIPPER["state_code"],
+        "state_name": str(settings.DHL_SHIPPER_STATE_NAME or "").strip() or DEFAULT_DHL_SHIPPER["state_name"],
     }
 
 
 def _validate_dhl_booking_configuration() -> Optional[str]:
+    shipper = _dhl_shipper_defaults()
     required = {
         "DHL_WCF_ENDPOINT": settings.DHL_WCF_ENDPOINT,
         "DHL_WCF_PASSWORD": settings.DHL_WCF_PASSWORD,
         "DHL_SHIPPER_ACCOUNT_NUMBER": settings.DHL_SHIPPER_ACCOUNT_NUMBER,
-        "DHL_SHIPPER_COMPANY": settings.DHL_SHIPPER_COMPANY,
-        "DHL_SHIPPER_NAME": settings.DHL_SHIPPER_NAME,
-        "DHL_SHIPPER_ADDRESS1": settings.DHL_SHIPPER_ADDRESS1,
-        "DHL_SHIPPER_CITY": settings.DHL_SHIPPER_CITY,
-        "DHL_SHIPPER_POSTAL_CODE": settings.DHL_SHIPPER_POSTAL_CODE,
-        "DHL_SHIPPER_COUNTRY_CODE": settings.DHL_SHIPPER_COUNTRY_CODE,
-        "DHL_SHIPPER_COUNTRY_NAME": settings.DHL_SHIPPER_COUNTRY_NAME,
-        "DHL_SHIPPER_PHONE": settings.DHL_SHIPPER_PHONE,
+        "DHL_SHIPPER_COMPANY": shipper["company"],
+        "DHL_SHIPPER_NAME": shipper["name"],
+        "DHL_SHIPPER_ADDRESS1": shipper["address1"],
+        "DHL_SHIPPER_ADDRESS2": shipper["address2"],
+        "DHL_SHIPPER_CITY": shipper["city"],
+        "DHL_SHIPPER_POSTAL_CODE": shipper["postal_code"],
+        "DHL_SHIPPER_COUNTRY_CODE": shipper["country_code"],
+        "DHL_SHIPPER_COUNTRY_NAME": shipper["country_name"],
+        "DHL_SHIPPER_PHONE": shipper["phone"],
     }
     missing = [key for key, value in required.items() if not str(value or "").strip()]
     if missing:
         return "Missing DHL booking configuration: " + ", ".join(sorted(missing))
+    return None
+
+
+def _validate_csbv_commercial_payload(payload: dict) -> Optional[str]:
+    shipment_type = _resolve_dhl_shipment_type(payload)
+    if shipment_type == DHL_SHIPMENT_TYPE_NORMAL:
+        return None
+
+    receiver = payload.get("receiver") or {}
+    commercial = payload.get("commercial") or {}
+    required = {
+        "commercial.invoice_number": commercial.get("invoice_number"),
+        "commercial.invoice_date": commercial.get("invoice_date"),
+        "commercial.gstin": commercial.get("gstin"),
+        "commercial.hs_code": commercial.get("hs_code"),
+    }
+    if shipment_type == DHL_SHIPMENT_TYPE_CSB_V:
+        required["commercial.iec_no"] = commercial.get("iec_no")
+        required["commercial.bank_ad_code"] = commercial.get("bank_ad_code")
+    if str(receiver.get("country_code") or "").strip().upper() == "US":
+        required["commercial.commodity_code"] = commercial.get("commodity_code")
+    missing = [key for key, value in required.items() if not str(value or "").strip()]
+    if missing:
+        return "Missing DHL commercial fields: " + ", ".join(missing)
+    hs_code = str(commercial.get("hs_code") or "").strip()
+    if not re.fullmatch(r"\d{8}", hs_code):
+        return "commercial.hs_code must be a valid 8-digit export HS code"
+    if str(receiver.get("country_code") or "").strip().upper() == "US":
+        commodity_code = str(commercial.get("commodity_code") or "").strip()
+        if not re.fullmatch(r"\d{10}", commodity_code):
+            return "commercial.commodity_code must be a valid 10-digit import HS code for USA-bound shipments"
     return None
 
 
@@ -293,11 +392,84 @@ def _build_dhl_rate_payload(payload: dict) -> dict[str, str | int]:
     }
 
 
+def _repeat_piece_value(value, pieces: int) -> str:
+    token = str(value).strip()
+    if pieces <= 1:
+        return token
+    return ",".join([token] * pieces)
+
+
+def _today_ymd() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _build_goods_description(description: str, piece_number: int = 1) -> str:
+    text = str(description or "").strip()
+    if not text:
+        return str(piece_number)
+    prefix = str(max(1, int(piece_number)))
+    if text.startswith(prefix):
+        return text[:75]
+    return f"{prefix}{text}"[:75]
+
+
+def _dhl_numeric_flag(value, default: str = "0") -> str:
+    token = str(value or "").strip().upper()
+    if token in {"1", "Y", "YES", "TRUE"}:
+        return "1"
+    if token in {"0", "N", "NO", "FALSE"}:
+        return "0"
+    return default
+
+
+def _dhl_yes_no(value, default: str = "No") -> str:
+    token = str(value or "").strip().upper()
+    if token in {"1", "Y", "YES", "TRUE"}:
+        return "Yes"
+    if token in {"0", "N", "NO", "FALSE"}:
+        return "No"
+    return default
+
+
+def _resolve_dhl_shipment_type(payload: dict) -> str:
+    shipment = payload.get("shipment") or {}
+    raw_value = str(shipment.get("shipment_type") or DHL_SHIPMENT_TYPE_CSB_V).strip().upper()
+    normalized = raw_value.replace("-", "_").replace(" ", "_")
+    aliases = {
+        "NORMAL": DHL_SHIPMENT_TYPE_NORMAL,
+        "STANDARD": DHL_SHIPMENT_TYPE_NORMAL,
+        "POSTSHIPMENT_V6": DHL_SHIPMENT_TYPE_NORMAL,
+        "CSB4": DHL_SHIPMENT_TYPE_CSB_IV_CARGO,
+        "CSB_4": DHL_SHIPMENT_TYPE_CSB_IV_CARGO,
+        "CSBIV": DHL_SHIPMENT_TYPE_CSB_IV_CARGO,
+        "CSB_IV": DHL_SHIPMENT_TYPE_CSB_IV_CARGO,
+        "CSB_IV_CARGO": DHL_SHIPMENT_TYPE_CSB_IV_CARGO,
+        "CSB4_CARGO": DHL_SHIPMENT_TYPE_CSB_IV_CARGO,
+        "CSB5": DHL_SHIPMENT_TYPE_CSB_V,
+        "CSB_5": DHL_SHIPMENT_TYPE_CSB_V,
+        "CSBV": DHL_SHIPMENT_TYPE_CSB_V,
+        "CSB_V": DHL_SHIPMENT_TYPE_CSB_V,
+    }
+    return aliases.get(normalized, DHL_SHIPMENT_TYPE_CSB_V)
+
+
 def _build_dhl_shipment_payload(payload: dict) -> dict[str, str]:
+    shipment_type = _resolve_dhl_shipment_type(payload)
+    if shipment_type == DHL_SHIPMENT_TYPE_NORMAL:
+        return _build_dhl_normal_shipment_payload(payload)
+    return _build_dhl_commercial_shipment_payload(payload, shipment_type)
+
+
+def _build_dhl_normal_shipment_payload(payload: dict) -> dict[str, str]:
     receiver = payload["receiver"]
     package = payload["package"]
     shipment = payload["shipment"]
     shipper = _dhl_shipper_defaults()
+    consignee_address1, consignee_address2, consignee_address3 = _dhl_address_lines(
+        receiver["address_line1"],
+        receiver.get("address_line2"),
+        receiver.get("address_line3"),
+    )
     global_code, local_code = _resolve_dhl_product_codes(
         receiver_country=receiver["country_code"],
         requested_global=shipment.get("service_type"),
@@ -319,9 +491,9 @@ def _build_dhl_shipment_payload(payload: dict) -> dict[str, str]:
         "DutyPaymentType": duty_payment_type,
         "DutyAccNumber": duty_account_number,
         "ConsigneeCompName": receiver.get("company_name") or receiver["name"],
-        "ConsigneeAddLine1": receiver["address_line1"],
-        "ConsigneeAddLine2": receiver.get("address_line2") or "",
-        "ConsigneeAddLine3": receiver.get("address_line3") or "",
+        "ConsigneeAddLine1": consignee_address1,
+        "ConsigneeAddLine2": consignee_address2,
+        "ConsigneeAddLine3": consignee_address3,
         "ConsigneeCity": receiver["city"],
         "ConsigneeDivCode": receiver.get("state_code") or "",
         "PostalCode": receiver["postal_code"],
@@ -340,7 +512,7 @@ def _build_dhl_shipment_payload(payload: dict) -> dict[str, str]:
         "ShipGlobalProductCode": global_code,
         "ShipLocalProductCode": local_code,
         "ShipContents": shipment["description"],
-        "ShipperId": settings.DHL_SHIPPER_ID or settings.DHL_WCF_USERNAME,
+        "ShipperId": settings.DHL_SHIPPER_ID or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
         "ShipperCompName": shipper["company"],
         "ShipperAddress1": shipper["address1"],
         "ShipperAddress2": shipper["address2"],
@@ -359,6 +531,199 @@ def _build_dhl_shipment_payload(payload: dict) -> dict[str, str]:
         "ConsigneeEmail": receiver.get("email") or "",
         "TermsOfTrade": shipment.get("terms_of_trade") or settings.DHL_DEFAULT_TERMS_OF_TRADE,
     }
+
+
+def _build_dhl_commercial_shipment_payload(payload: dict, shipment_type: str) -> dict[str, str]:
+    receiver = payload["receiver"]
+    package = payload["package"]
+    shipment = payload["shipment"]
+    commercial = payload.get("commercial") or {}
+    shipper = _dhl_shipper_defaults()
+    consignee_address1, consignee_address2, consignee_address3 = _dhl_address_lines(
+        receiver["address_line1"],
+        receiver.get("address_line2"),
+        receiver.get("address_line3"),
+    )
+    global_code, local_code = _resolve_dhl_product_codes(
+        receiver_country=receiver["country_code"],
+        requested_global=shipment.get("service_type"),
+        requested_local=shipment.get("local_product_code"),
+        shipper_country=shipper["country_code"],
+    )
+
+    pieces = max(1, int(package["pieces"]))
+    quantity = max(1, int(commercial.get("quantity") or 1))
+    declared_value = float(package["declared_value"] or 0)
+    invoice_rate = commercial.get("invoice_rate_per_unit")
+    invoice_rate = float(invoice_rate) if invoice_rate is not None else declared_value / quantity if quantity else declared_value
+    taxable_value = commercial.get("taxable_value")
+    taxable_value = float(taxable_value) if taxable_value is not None else invoice_rate * quantity
+    igst_amount = float(commercial.get("igst_amount") or 0)
+    invoice_date = commercial.get("invoice_date") or _today_ymd()
+    supply_date = commercial.get("date_of_supply") or _today_ymd()
+    invoice_number = commercial.get("invoice_number") or shipment.get("shipper_reference") or f"INV-{_today_ymd()}"
+    state_code = commercial.get("shipper_state_code") or shipper.get("state_code") or DEFAULT_DHL_SHIPPER["state_code"]
+    state_name = commercial.get("shipper_state_name") or shipper.get("state_name") or DEFAULT_DHL_SHIPPER["state_name"]
+    special_service = commercial.get("special_service") or settings.DHL_DEFAULT_SPECIAL_SERVICE or "DS"
+    is_csb4 = shipment_type == DHL_SHIPMENT_TYPE_CSB_IV_CARGO
+    shipment_purpose = "CSBIV" if is_csb4 else "CSBV"
+    is_using_igst = _dhl_yes_no(commercial.get("is_using_igst"), default="No")
+    using_bond_or_ut = _dhl_yes_no(commercial.get("using_bond_or_ut"), default="Yes")
+    if not is_csb4 and is_using_igst == "No" and using_bond_or_ut == "No":
+        using_bond_or_ut = "Yes"
+
+    fields = {
+        "Shipmentpurpose": shipment_purpose,
+        "ShipperAccNumber": settings.DHL_SHIPPER_ACCOUNT_NUMBER,
+        "ShippingPaymentType": shipment.get("shipping_payment_type") or settings.DHL_DEFAULT_SHIPPING_PAYMENT_TYPE,
+        "BillingAccNumber": settings.DHL_BILLING_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
+        "ConsigneeCompName": receiver.get("company_name") or receiver["name"],
+        "ConsigneeAddLine1": consignee_address1,
+        "ConsigneeAddLine2": consignee_address2,
+        "ConsigneeAddLine3": consignee_address3,
+        "ConsigneeCity": receiver["city"],
+        "ConsigneeDivCode": receiver.get("state_code") or "",
+        "PostalCode": receiver["postal_code"],
+        "ConsigneeCountryCode": receiver["country_code"],
+        "ConsigneeCountryName": receiver.get("country_name") or receiver["country_code"],
+        "ConsigneeName": receiver["name"],
+        "ConsigneePh": receiver["phone"],
+        "ConsigneeEmail": receiver.get("email") or "",
+        "RegistrationNumber": "",
+        "RegistrationNumberTypeCode": "",
+        "RegistrationNumberIssuerCountryCode": "",
+        "BusinessPartyTypeCode": "",
+        "DutiableDeclaredvalue": str(package["declared_value"]),
+        "DutiableDeclaredCurrency": package["declared_currency"],
+        "ShipNumberOfPieces": str(package["pieces"]),
+        "ShipCurrencyCode": settings.DHL_DEFAULT_SHIP_CURRENCY,
+        "ShipPieceWt": _repeat_piece_value(package["weight_kg"], pieces),
+        "ShipPieceDepth": _repeat_piece_value(package["length_cm"], pieces),
+        "ShipPieceWidth": _repeat_piece_value(package["width_cm"], pieces),
+        "ShipPieceHeight": _repeat_piece_value(package["height_cm"], pieces),
+        "ShipGlobalProductCode": global_code,
+        "ShipLocalProductCode": local_code,
+        "ShipContents": shipment["description"],
+        "ShipperId": settings.DHL_SHIPPER_ID or settings.DHL_SHIPPER_ACCOUNT_NUMBER,
+        "ShipperCompName": shipper["company"],
+        "ShipperAddress1": shipper["address1"],
+        "ShipperAddress2": shipper["address2"],
+        "ShipperAddress3": shipper["address3"],
+        "ShipperCountryCode": shipper["country_code"],
+        "ShipperCountryName": shipper["country_name"],
+        "ShipperCity": shipper["city"],
+        "ShipperPostalCode": shipper["postal_code"],
+        "ShipperPhoneNumber": shipper["phone"],
+        "SiteId": settings.DHL_SITE_ID or settings.DHL_WCF_USERNAME,
+        "Password": settings.DHL_WCF_PASSWORD,
+        "ShipperName": shipper["name"],
+        "ShipperRef": shipment.get("shipper_reference") or invoice_number,
+        "ShipperRegistrationNumber": "",
+        "ShipperRegistrationNumberTypeCode": "",
+        "ShipperRegistrationNumberIssuerCountryCode": "",
+        "ShipperBusinessPartyTypeCode": "",
+        "BillToCompanyName": "",
+        "BillToContactName": "",
+        "BillToAddressLine1": "",
+        "BillToCity": "",
+        "BillToPostcode": "",
+        "BillToSuburb": "",
+        "BillToState": "",
+        "BillToCountryName": "",
+        "BillToCountryCode": "",
+        "BillToPhoneNumber": "",
+        "IECNo": commercial.get("iec_no") or "",
+        "TermsOfTrade": shipment.get("terms_of_trade") or settings.DHL_DEFAULT_TERMS_OF_TRADE,
+        "Usingecommerce": _dhl_numeric_flag(commercial.get("using_ecommerce"), default="0"),
+        "IsUnderMEISScheme": _dhl_numeric_flag(commercial.get("is_under_meis_scheme"), default="0"),
+        "GSTIN": commercial.get("gstin") or "",
+        "GSTInvNo": "" if is_csb4 else invoice_number,
+        "GSTInvNoDate": "" if is_csb4 else invoice_date,
+        "NonGSTInvNo": invoice_number if is_csb4 else "",
+        "NonGSTInvDate": invoice_date if is_csb4 else "",
+        "IsUsingIGST": "NA" if is_csb4 else is_using_igst,
+        "UsingBondorUT": "NA" if is_csb4 else using_bond_or_ut,
+        "BankADCode": commercial.get("bank_ad_code") or "",
+        "Exporter_CompanyName": "",
+        "Exporter_AddressLine1": "",
+        "Exporter_AddressLine2": "",
+        "Exporter_AddressLine3": "",
+        "Exporter_City": "",
+        "Exporter_DivisionCode": "",
+        "Exporter_PostalCode": "",
+        "Exporter_CountryCode": "",
+        "Exporter_CountryName": "",
+        "Exporter_PersonName": "",
+        "Exporter_PhoneNumber": "",
+        "Exporter_Email": "",
+        "Exporter_RegistrationNumber": "",
+        "Exporter_RegistrationNumberTypeCode": "",
+        "Exporter_RegistrationNumberIssuerCountryCode": "",
+        "Exporter_BusinessPartyTypeCode": "",
+        "UseDHLInvoice": commercial.get("use_dhl_invoice") or "Y",
+        "SignatureName": "",
+        "SignatureTitle": "",
+        "LicenseNumber": "",
+        "ExpiryDate": "",
+        "ManufactureCountryCode": commercial.get("manufacture_country_code") or "IN",
+        "ManufactureCountryName": commercial.get("manufacture_country_name") or "INDIA",
+        "SerialNumber": "1",
+        "FOBValue": str(round(invoice_rate * quantity, 2)),
+        "Discount": "0",
+        "Description": _build_goods_description(shipment["description"]),
+        "Qty": str(quantity),
+        "Weight": str(package["weight_kg"]),
+        "HSCode": commercial.get("hs_code") or "",
+        "CommodityCode": commercial.get("commodity_code") or "",
+        "CommodityType": commercial.get("commodity_type") or "Others",
+        "InvoiceRatePerUnit": str(round(invoice_rate, 2)),
+        "ShipPieceUOM": commercial.get("uom") or "PCS",
+        "ShipPieceCESS": str(commercial.get("cess_amount") or 0),
+        "ShipPieceIGSTPercentage": "" if commercial.get("igst_percentage") is None else str(commercial.get("igst_percentage")),
+        "ShipPieceIGST": str(igst_amount),
+        "ShipPieceTaxableValue": str(round(taxable_value, 2)),
+        "FreightCharge": "",
+        "InsuranceCharge": "",
+        "TotalIGST": str(igst_amount),
+        "CessCharge": "",
+        "ReverseCharge": "",
+        "PayerGSTVAT": "",
+        "IsResponseRequired": "Y",
+        "LabelReq": "Y",
+        "SpecialService": special_service,
+        "InsuredAmount": "0.0",
+        "Invoicevalueinword": "",
+        "Placeofsupply": commercial.get("place_of_supply") or shipper["city"],
+        "dateofsupply": supply_date,
+        "Shipperstatecode": state_code,
+        "ShipperstateName": state_name,
+        "isIndemnityClauseRead": "YES",
+        "ACCOUNT_NO": "",
+        "NFEI_FLAG": "NO",
+        "GOV_NONGOV_TYPE": "P",
+        "Destination_Duty_VAT_Charges": "",
+        "CustomerBarcodeCode": "",
+        "CustomerBarcodeText": "",
+        "plt_signature": "",
+        "DutyAccountNumber": settings.DHL_DUTY_ACCOUNT_NUMBER or "",
+        "plt_signature_Base64": "",
+    }
+    if is_csb4:
+        duty_payment_type = shipment.get("duty_payment_type") or settings.DHL_DEFAULT_DUTY_PAYMENT_TYPE
+        fields.update(
+            {
+                "DutyPaymentType": duty_payment_type,
+                "DutyAccNumber": (
+                    settings.DHL_DUTY_ACCOUNT_NUMBER or settings.DHL_SHIPPER_ACCOUNT_NUMBER
+                    if duty_payment_type == "T"
+                    else ""
+                ),
+                "AddDeclText1": "",
+                "DistanceInKM": "",
+                "ReasonForExport": commercial.get("reason_for_export") or "Sample",
+            }
+        )
+    return fields
 
 
 def _resolve_dhl_product_codes(
@@ -780,10 +1145,14 @@ def create_shipment(payload: dict, db: Session) -> dict:
     config_error = _validate_dhl_booking_configuration()
     if config_error:
         return {"error": config_error}
+    commercial_error = _validate_csbv_commercial_payload(payload)
+    if commercial_error:
+        return {"error": commercial_error}
 
     provider = DHLBookingProvider()
+    shipment_type = _resolve_dhl_shipment_type(payload)
     shipment_payload = _build_dhl_shipment_payload(payload)
-    result = provider.create_shipment(shipment_payload)
+    result = provider.create_shipment(shipment_payload, shipment_type=shipment_type)
     if "error" in result:
         logger.warning("DHL shipment creation failed: %s", result["error"])
         return {"error": result["error"]}

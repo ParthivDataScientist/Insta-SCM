@@ -49,10 +49,13 @@ class DHLBookingProvider:
     ACTION_POST_QUOTE = "http://tempuri.org/IDHLService/PostQuotePos_V6"
     ACTION_POST_QUOTE_LEGACY = "http://tempuri.org/IDHLService/PostQuote"
     ACTION_POST_SHIPMENT = "http://tempuri.org/IDHLService/PostShipment_V6"
+    ACTION_POST_SHIPMENT_CSBIV_CARGO = "http://tempuri.org/IDHLService/PostShipment_CSBIV_Cargo"
+    ACTION_POST_SHIPMENT_CSBV = "http://tempuri.org/IDHLService/PostShipment_CSBV"
     ACTION_POST_PICKUP = "http://tempuri.org/IDHLService/PostPickup_v6"
 
     def __init__(self) -> None:
-        self.endpoint = settings.DHL_WCF_ENDPOINT
+        endpoint = settings.DHL_WCF_ENDPOINT or settings.DHL_WCF_WSDL_URL
+        self.endpoint = endpoint.split("?", 1)[0]
         self.soap_version = settings.DHL_WCF_SOAP_VERSION
         self.timeout_seconds = settings.DHL_WCF_TIMEOUT_SECONDS
         self.transport_username = settings.DHL_WCF_USERNAME
@@ -86,12 +89,31 @@ class DHLBookingProvider:
             return parsed
         return parsed
 
-    def create_shipment(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def create_shipment(self, payload: dict[str, Any], shipment_type: str = "CSB_V") -> dict[str, Any]:
+        operation_map = {
+            "NORMAL": (
+                "PostShipment_V6",
+                self.ACTION_POST_SHIPMENT,
+                "PostShipment_V6Result",
+            ),
+            "CSB_IV_CARGO": (
+                "PostShipment_CSBIV_Cargo",
+                self.ACTION_POST_SHIPMENT_CSBIV_CARGO,
+                "PostShipment_CSBIV_CargoResult",
+            ),
+            "CSB_V": (
+                "PostShipment_CSBV",
+                self.ACTION_POST_SHIPMENT_CSBV,
+                "PostShipment_CSBVResult",
+            ),
+        }
+        operation, action, result_node = operation_map.get(shipment_type, operation_map["CSB_V"])
         raw = self._invoke(
-            operation="PostShipment_V6",
-            action=self.ACTION_POST_SHIPMENT,
-            result_node="PostShipment_V6Result",
+            operation=operation,
+            action=action,
+            result_node=result_node,
             fields=payload,
+            include_empty_fields=True,
         )
         if raw.get("error"):
             return raw
@@ -121,8 +143,13 @@ class DHLBookingProvider:
         action: str,
         result_node: str,
         fields: dict[str, Any],
+        include_empty_fields: bool = False,
     ) -> dict[str, Any]:
-        envelope = self._build_envelope(operation=operation, fields=fields)
+        envelope = self._build_envelope(
+            operation=operation,
+            fields=fields,
+            include_empty_fields=include_empty_fields,
+        )
         headers = self._build_headers(action=action)
 
         logger.info("dhl_booking_request operation=%s body=%s", operation, _redact_xml_for_log(envelope))
@@ -169,11 +196,17 @@ class DHLBookingProvider:
             headers["Authorization"] = f"Basic {token}"
         return headers
 
-    def _build_envelope(self, *, operation: str, fields: dict[str, Any]) -> str:
+    def _build_envelope(
+        self,
+        *,
+        operation: str,
+        fields: dict[str, Any],
+        include_empty_fields: bool = False,
+    ) -> str:
         nodes: list[str] = []
         for name, value in fields.items():
             text = _text(value)
-            if text == "":
+            if text == "" and not include_empty_fields:
                 continue
             nodes.append(f"<tem:{name}>{html.escape(text)}</tem:{name}>")
 
@@ -302,14 +335,21 @@ class DHLBookingProvider:
         }
 
     def _parse_quote_text(self, payload: str) -> dict[str, Any]:
-        amount = self._extract_number(payload)
-        if amount is None:
-            return {"error": f"Unable to parse DHL rate payload: {payload}"}
+        payload_text = _text(payload)
+        if "<" in payload_text and ">" in payload_text:
+            xmlish = self._parse_quote_xmlish_text(payload_text)
+            if "error" not in xmlish:
+                return xmlish
+            return {"error": f"Unable to parse DHL rate payload: {payload_text}"}
 
-        currency_match = re.search(r"\b([A-Z]{3})\b", payload)
+        amount = self._extract_number(payload_text)
+        if amount is None:
+            return {"error": f"Unable to parse DHL rate payload: {payload_text}"}
+
+        currency_match = re.search(r"\b([A-Z]{3})\b", payload_text)
         delivery_match = re.search(
             r"(delivery[^,;]+|transit[^,;]+|\d+\s*(day|days|hour|hours))",
-            payload,
+            payload_text,
             flags=re.IGNORECASE,
         )
         return {
@@ -317,6 +357,49 @@ class DHLBookingProvider:
             "currency": currency_match.group(1) if currency_match else self._default_quote_currency(),
             "delivery_time": delivery_match.group(1) if delivery_match else None,
         }
+
+    def _parse_quote_xmlish_text(self, payload: str) -> dict[str, Any]:
+        amount_text = self._find_xmlish_text(
+            payload,
+            [
+                "TotalAmount",
+                "ShippingCharge",
+                "ChargeValue",
+                "QuotedCharge",
+                "QuoteAmount",
+                "Amount",
+            ],
+        )
+        tax_text = self._find_xmlish_text(payload, ["TotalTaxAmount", "TaxAmount", "Tax"])
+        currency = self._find_xmlish_text(
+            payload,
+            ["CurrencyCode", "Currency", "ChargeCurrency", "QuotedCurrency"],
+        )
+        delivery = self._find_xmlish_text(
+            payload,
+            ["DeliveryDate", "DeliveryDateTime", "EstimatedDeliveryDate", "TransitDays", "DeliveryTime"],
+        )
+
+        amount = self._extract_number(amount_text)
+        tax_amount = self._extract_number(tax_text)
+        if amount is None:
+            return {"error": "Unable to parse DHL rate amount"}
+        if tax_amount is not None and "totalamount" not in payload.lower():
+            amount += tax_amount
+
+        return {
+            "price": amount,
+            "currency": currency or self._default_quote_currency(),
+            "delivery_time": delivery or None,
+        }
+
+    def _find_xmlish_text(self, payload: str, names: list[str]) -> str:
+        for name in names:
+            pattern = rf"<(?:[^:<>]+:)?{re.escape(name)}(?:\s[^>]*)?>(.*?)</(?:[^:<>]+:)?{re.escape(name)}>"
+            match = re.search(pattern, payload, flags=re.IGNORECASE | re.DOTALL)
+            if match:
+                return html.unescape(_text(match.group(1)))
+        return ""
 
     def _default_quote_currency(self) -> str:
         shipper_country = _text(settings.DHL_SHIPPER_COUNTRY_CODE).upper()
@@ -327,6 +410,9 @@ class DHLBookingProvider:
     def _parse_create_payload(self, payload: str) -> dict[str, Any]:
         root = self._parse_payload_root(payload)
         if root is None:
+            text = _text(payload)
+            if self._looks_like_error_text(text):
+                return {"error": text}
             return {"error": f"Unable to parse DHL shipment payload: {payload}"}
 
         condition_data = self._find_first_text(root, ["ConditionData"])
@@ -340,30 +426,64 @@ class DHLBookingProvider:
         awb = self._find_first_text(
             root,
             [
+                "ShipmentIdentificationNumber",
                 "AirwayBillNumber",
                 "AWBNumber",
+                "AWBNo",
+                "AWB",
                 "WayBillNumber",
                 "ShipmentNumber",
                 "TrackingNumber",
+                "ID",
             ],
         )
         label = self._find_first_text(
             root,
             [
+                "GraphicImage",
                 "LabelImage",
                 "LabelPDF",
                 "LabelData",
                 "ShipmentLabel",
                 "Label",
+                "AWBLabel",
+                "OutputImage",
+                "LabelContent",
+                "PDFLabel",
+                "PDFPath",
+                "PDFLabelPath",
             ],
         )
 
+        if not awb or not label:
+            import os
+            debug_path = os.path.join(settings.STORAGE_DIR, "dhl_payload_debug.xml")
+            with open(debug_path, "w", encoding="utf-8") as f:
+                f.write(payload)
+
         if not awb:
-            return {"error": "DHL shipment creation response did not contain an AWB"}
+            logger.error("dhl_awb_missing_payload payload=%s", payload)
+            return {"error": f"DHL response did not contain an AWB. Full XML payload saved to {debug_path}"}
         if not label:
-            return {"error": "DHL shipment creation response did not contain a label"}
+            logger.error("dhl_label_missing_payload payload=%s", payload)
+            return {"error": f"DHL response did not contain a label. Full XML payload saved to {debug_path}"}
 
         return {"awb": awb, "label_base64": label, "raw_payload": payload}
+
+    def _looks_like_error_text(self, text: str) -> bool:
+        lower = _text(text).lower()
+        return any(
+            token in lower
+            for token in (
+                "error",
+                "exception",
+                "invalid",
+                "failed",
+                "object reference",
+                "contact to support",
+                "not acceptable",
+            )
+        )
 
     def _parse_pickup_payload(self, payload: str) -> dict[str, Any]:
         root = self._parse_payload_root(payload)

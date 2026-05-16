@@ -1088,7 +1088,7 @@ def list_archived_shipments(
     return [_serialize_shipment(db, shipment) for shipment in shipments]
 
 
-@router.patch("/{shipment_id}/archive", response_model=ShipmentResponse)
+@router.patch("/{shipment_id:int}/archive", response_model=ShipmentResponse)
 def archive_shipment(
     shipment_id: int,
     db: Session = Depends(get_session),
@@ -1102,7 +1102,7 @@ def archive_shipment(
     return _serialize_shipment(db, updated)
 
 
-@router.get("/mps/{shipment_id}", response_model=MPSDetailResponse)
+@router.get("/mps/{shipment_id:int}", response_model=MPSDetailResponse)
 def get_mps_detail(
     shipment_id: int,
     db: Session = Depends(get_session),
@@ -1123,7 +1123,7 @@ def get_mps_detail(
     return MPSDetailResponse.from_shipment(shipment)
 
 
-@router.get("/{shipment_id}", response_model=ShipmentResponse)
+@router.get("/{shipment_id:int}", response_model=ShipmentResponse)
 def get_shipment(shipment_id: int, db: Session = Depends(get_session)):
     shipment = db.get(Shipment, shipment_id)
     if not shipment:
@@ -1148,7 +1148,7 @@ def list_project_shipments(
 # Delete
 # ---------------------------------------------------------------------------
 
-@router.delete("/{shipment_id}", status_code=200)
+@router.delete("/{shipment_id:int}", status_code=200)
 def delete_shipment(
     shipment_id: int,
     db: Session = Depends(get_session),

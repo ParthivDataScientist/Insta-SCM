@@ -6,7 +6,7 @@ These are separate from the SQLModel `Shipment` table model so that:
   2. Breaking DB changes don't cascade into API consumers.
   3. We can expose derived / computed fields (e.g. child_tracking_numbers).
 """
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
@@ -278,6 +278,7 @@ class ShipmentPackageInput(BaseModel):
 
 class ShipmentBookingInput(BaseModel):
     description: str = Field(min_length=2, max_length=120)
+    shipment_type: Literal["NORMAL", "CSB_IV_CARGO", "CSB_V"] = "CSB_V"
     service_type: str = Field(default="P", min_length=1, max_length=10)
     local_product_code: Optional[str] = Field(default=None, max_length=20)
     terms_of_trade: Optional[str] = Field(default=None, max_length=20)
@@ -290,10 +291,51 @@ class ShipmentBookingInput(BaseModel):
     project_id: Optional[int] = None
 
 
+class ShipmentCommercialInput(BaseModel):
+    iec_no: Optional[str] = Field(default=None, max_length=20)
+    gstin: Optional[str] = Field(default=None, max_length=20)
+    bank_ad_code: Optional[str] = Field(default=None, max_length=20)
+    invoice_number: Optional[str] = Field(default=None, max_length=40)
+    invoice_date: Optional[str] = Field(default=None, max_length=20)
+    use_dhl_invoice: str = Field(default="Y", max_length=1)
+    using_ecommerce: str = Field(default="0", max_length=5)
+    is_under_meis_scheme: str = Field(default="0", max_length=20)
+    is_using_igst: str = Field(default="No", max_length=5)
+    using_bond_or_ut: str = Field(default="Yes", max_length=5)
+    manufacture_country_code: str = Field(default="IN", min_length=2, max_length=2)
+    manufacture_country_name: str = Field(default="INDIA", max_length=80)
+    hs_code: Optional[str] = Field(default=None, max_length=20)
+    commodity_code: Optional[str] = Field(default=None, max_length=20)
+    commodity_type: str = Field(default="Others", max_length=80)
+    invoice_rate_per_unit: Optional[float] = Field(default=None, ge=0)
+    quantity: int = Field(default=1, ge=1, le=999999)
+    uom: str = Field(default="PCS", max_length=10)
+    cess_amount: float = Field(default=0, ge=0)
+    igst_amount: float = Field(default=0, ge=0)
+    igst_percentage: Optional[float] = Field(default=None, ge=0, le=100)
+    taxable_value: Optional[float] = Field(default=None, ge=0)
+    special_service: str = Field(default="DS", max_length=80)
+    place_of_supply: Optional[str] = Field(default=None, max_length=80)
+    date_of_supply: Optional[str] = Field(default=None, max_length=20)
+    shipper_state_code: Optional[str] = Field(default=None, max_length=20)
+    shipper_state_name: Optional[str] = Field(default=None, max_length=80)
+
+    @field_validator("manufacture_country_code")
+    @classmethod
+    def normalize_manufacture_country_code(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("use_dhl_invoice")
+    @classmethod
+    def normalize_use_dhl_invoice(cls, value: str) -> str:
+        return value.strip().upper() or "Y"
+
+
 class ShipmentBookingRequest(BaseModel):
     receiver: ShipmentReceiverInput
     package: ShipmentPackageInput
     shipment: ShipmentBookingInput
+    commercial: Optional[ShipmentCommercialInput] = None
 
 
 class ShipmentRateResponse(BaseModel):
