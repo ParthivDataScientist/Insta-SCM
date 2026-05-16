@@ -103,11 +103,16 @@ class DHLProvider:
         )
 
         if summary.get("error") and all_checkpoint.get("error"):
+            # If both failed, return the summary error (unless it's just "not found")
             return {"carrier": "DHL", "error": summary["error"]}
 
+        # If one of them succeeded, we proceed with merged data
+        detailed_data = all_checkpoint.get("parsed", {})
+        summary_data = summary.get("parsed", {})
+        
         merged = self._merge_tracking_payloads(
-            detailed=all_checkpoint.get("parsed", {}),
-            summary=summary.get("parsed", {}),
+            detailed=detailed_data,
+            summary=summary_data,
         )
         if merged.get("error"):
             return {"carrier": "DHL", "error": merged["error"]}
@@ -235,8 +240,6 @@ class DHLProvider:
         message = _text_or_empty(detail)
         lower_message = message.lower()
         if "object reference not set to an instance of an object" in lower_message:
-            if is_dhl_child_piece_id(normalized_awb):
-                return DHL_CHILD_PIECE_CONTEXT_ERROR
             return DHL_SOAP_INTERNAL_ERROR
         return f"DHL SOAP Error: {message or 'Unknown carrier error'}"
 
@@ -415,6 +418,47 @@ class DHLProvider:
                 estimated_delivery = self._normalize_datetime_string(estimated_delivery)[:10]
 
             status_bucket = self._to_status_bucket(current_status, event_code=latest_event_code)
+
+            # Extract piece information if present (for Multi-Piece Shipments)
+            child_parcels = []
+            
+            # Search for piece nodes broadly (PieceInfo, PieceDetails, or even just Piece)
+            piece_nodes = (
+                payload_root.findall(".//PieceInfo") + 
+                payload_root.findall(".//PieceDetails") + 
+                payload_root.findall(".//Piece")
+            )
+            
+            for piece_node in piece_nodes:
+                # Piece IDs can be in PieceID, LicensePlate, or PieceNumber tags
+                p_id = (
+                    _text_or_empty(piece_node.findtext("PieceID")) or 
+                    _text_or_empty(piece_node.findtext("LicensePlate")) or
+                    _text_or_empty(piece_node.findtext("PieceNumber")) or
+                    _text_or_empty(piece_node.findtext("ID"))
+                )
+                
+                if p_id:
+                    # Piece-level status usually matches master summary in summary responses
+                    p_desc = (
+                        _text_or_empty(piece_node.findtext("LastDetailedStatus")) or 
+                        _text_or_empty(piece_node.findtext("Description")) or 
+                        current_status
+                    )
+                    p_bucket = self._to_status_bucket(p_desc)
+                    child_parcels.append({
+                        "tracking_number": p_id,
+                        "status": p_bucket,
+                        "raw_status": p_desc,
+                        "carrier": "DHL",
+                        "origin": oldest.get("location") or "Unknown",
+                        "destination": "Unknown",
+                        "eta": estimated_delivery or "Unknown",
+                        "history": history,
+                        "last_date": latest.get("date") if latest else None,
+                        "last_location": latest.get("location") if latest else None,
+                    })
+
             return {
                 "current_status": current_status,
                 "estimated_delivery": estimated_delivery,
@@ -430,6 +474,9 @@ class DHLProvider:
                     "In Transit": 40,
                     "Exception": 10,
                 }.get(status_bucket, 40),
+                "child_parcels": child_parcels,
+                "child_tracking_numbers": [p["tracking_number"] for p in child_parcels],
+                "is_master": len(child_parcels) > 0,
             }
 
         # Some PostTracking responses only return summary fields.

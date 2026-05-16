@@ -18,6 +18,7 @@ from app.services.fedex import FedExService
 from app.services.dhl import DHLService
 from app.services.carrier_detection import detect_carrier
 from app.services.label_storage import save_label_pdf
+from app.services.dhl_validation import is_dhl_child_piece_id
 
 logger = logging.getLogger(__name__)
 STUCK_THRESHOLD_DAYS = 2
@@ -813,7 +814,6 @@ def _resolve_child_fallback_result(
     db: Session,
     tracking_number: str,
     master_tracking_number: Optional[str] = None,
-    allow_master_context: bool = False,
 ) -> Optional[dict]:
     """
     Resolve a child package from already saved master shipment data when the
@@ -963,50 +963,52 @@ def track_and_save(
                 "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
                 f"{supported_formats}",
             }
-    else:
-        return {
-            "tracking_number": tracking_number,
-            "error": f"Could not detect carrier for tracking number '{tracking_number}'.",
-        }
 
-    if service is not None and master_tracking_number:
-        contextual_fallback = _resolve_child_fallback_result(
-            db=db,
-            tracking_number=tracking_number,
-            master_tracking_number=master_tracking_number,
-            allow_master_context=(carrier_name == "DHL"),
-        )
-        if contextual_fallback:
-            result = contextual_fallback
-            carrier_name = str(result.get("carrier") or carrier_name)
-            service = None
-            logger.info(
-                "Resolved child shipment %s from %s master context before live carrier lookup.",
-                tracking_number,
-                carrier_name,
-            )
+    # Ensure we preserve the master tracking number for child piece linkage in the DB.
+    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and not master_tracking_number:
+        existing_row = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
+        if existing_row and existing_row.master_tracking_number:
+            master_tracking_number = existing_row.master_tracking_number
+
+    # We used to have an early exit here that resolved child shipments from the master context 
+    # BEFORE calling the API. This caused stale data during refreshes. 
+    # Now we always attempt a live lookup first, and only use the master context as a fallback 
+    # if the live lookup fails.
 
     if service is not None:
-        result = service.track(tracking_number)
+        api_target_tn = tracking_number
+        if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and master_tracking_number:
+            logger.info("DHL child piece %s tracking delegated to master %s.", tracking_number, master_tracking_number)
+            api_target_tn = master_tracking_number
 
-        if "error" in result:
-            fallback = _resolve_child_fallback_result(
+        logger.info("Performing live carrier lookup for %s (%s)", api_target_tn, carrier_name)
+        result = service.track(api_target_tn)
+
+        # Ensure the result is applied back to the child row
+        if api_target_tn != tracking_number and "error" not in result:
+            result["tracking_number"] = tracking_number
+
+        if "error" in result and carrier_name != "DHL":
+            # Fallback for child pieces or temporary API failures
+            contextual_fallback = _resolve_child_fallback_result(
                 db=db,
                 tracking_number=tracking_number,
                 master_tracking_number=master_tracking_number,
-                allow_master_context=(carrier_name == "DHL"),
             )
-            if fallback:
-                result = fallback
+            if contextual_fallback:
+                result = contextual_fallback
                 carrier_name = str(result.get("carrier") or carrier_name)
                 logger.info(
-                    "Carrier lookup failed for %s (%s) but resolved from stored master/child data.",
+                    "Live lookup failed for %s (%s), but resolved from stored master/child context.",
                     tracking_number,
                     carrier_name,
                 )
             else:
                 logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
                 return {"tracking_number": tracking_number, "error": result["error"]}
+        elif "error" in result:
+            logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
+            return {"tracking_number": tracking_number, "error": result["error"]}
 
     result = _apply_stuck_exception_policy(result)
 
@@ -1094,6 +1096,8 @@ def track_and_save(
             shipment.progress = result["progress"]
         if result.get("history"):
             shipment.history = result["history"]
+            if len(result["history"]) > 0 and result["history"][0].get("date"):
+                shipment.last_scan_date = result["history"][0]["date"]
             
         # MPS updates
         if master_tracking_number is not None:
@@ -1112,6 +1116,8 @@ def track_and_save(
             shipment.awb = tracking_number
 
         logger.info("Updated shipment record for %s", tracking_number)
+
+
 
     db.add(shipment)
     db.commit()
@@ -1445,6 +1451,8 @@ def preview_track(
     return result
 
 
+
+
 def refresh_tracked_shipments(
     db: Session,
     shipment_ids: Optional[Sequence[int]] = None,
@@ -1458,10 +1466,17 @@ def refresh_tracked_shipments(
     """
     statement = select(Shipment)
     if shipment_ids:
-        statement = statement.where(Shipment.id.in_(list(shipment_ids)))
+        # Fetch the tracking numbers of the requested shipments to find their children
+        requested_shipments = db.exec(select(Shipment).where(Shipment.id.in_(list(shipment_ids)))).all()
+        tracking_numbers = [s.tracking_number for s in requested_shipments if s.tracking_number]
+        
+        # Include both the requested shipments AND any shipments that have them as a master
+        statement = statement.where(
+            (Shipment.id.in_(list(shipment_ids))) | 
+            (Shipment.master_tracking_number.in_(tracking_numbers))
+        )
     # By default, refresh only top-level shipments (masters + standalone)
-    # to avoid expensive N+1 carrier calls for child records.
-    if not shipment_ids and not include_children:
+    elif not include_children:
         statement = statement.where(
             (Shipment.master_tracking_number.is_(None))
             | (Shipment.master_tracking_number == "")
@@ -1484,6 +1499,12 @@ def refresh_tracked_shipments(
             cs=shipment.cs,
             no_of_box=shipment.no_of_box,
             project_id=shipment.project_id,
+            master_tracking_number=shipment.master_tracking_number,
+            is_master=shipment.is_master,
+            booking_date=shipment.booking_date,
+            show_city=shipment.show_city,
+            cs_type=shipment.cs_type,
+            remarks=shipment.remarks,
         )
         if "error" in result:
             errors.append(f"{shipment.tracking_number}: {result['error']}")
