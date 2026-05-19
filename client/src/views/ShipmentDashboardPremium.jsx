@@ -356,22 +356,22 @@ export default function ShipmentDashboardPremium() {
                         </div>
 
                         <div className="design-dashboard__table-shell shipping-table-panel">
-                            {loading && shipments.length === 0 ? (
-                                <div className="loading-row design-dashboard__loading">Loading shipments...</div>
-                            ) : (
-                                <ShipmentTable
-                                    shipments={filteredShipments}
-                                    loading={loading}
-                                    onSelectShipment={(s) => {
-                                        setSelectedShipment(s);
-                                        setShowTrack(false);
-                                    }}
-                                    onDeleteShipment={handleDelete}
-                                    onArchiveShipment={handleArchive}
-                                    selectedIds={selectedIds}
-                                    onSelectionChange={setSelectedIds}
-                                />
-                            )}
+                            <ShipmentTable
+                                shipments={filteredShipments}
+                                loading={loading}
+                                error={error}
+                                onRetry={() => loadData(false)}
+                                onImportShipments={importExcelPrompt}
+                                onBookShipment={() => navigate('/shipments/new')}
+                                onSelectShipment={(s) => {
+                                    setSelectedShipment(s);
+                                    setShowTrack(false);
+                                }}
+                                onDeleteShipment={handleDelete}
+                                onArchiveShipment={handleArchive}
+                                selectedIds={selectedIds}
+                                onSelectionChange={setSelectedIds}
+                            />
                         </div>
                     </div>
 

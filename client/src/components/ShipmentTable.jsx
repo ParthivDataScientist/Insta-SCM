@@ -1,14 +1,18 @@
 ﻿import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Archive,
     Check,
     ChevronDown,
     ChevronRight,
+    Copy,
+    Eye,
     Filter,
     Loader,
     MoreHorizontal,
     Package,
     Search,
     SlidersHorizontal,
+    ArrowUpDown,
     Trash2,
     X,
 } from 'lucide-react';
@@ -35,13 +39,26 @@ const normalizeTrackingKey = (value) => normalizeToken(value).toUpperCase();
 
 const displayValue = (value) => {
     const token = normalizeToken(value);
-    return token ? token : '-';
+    return token ? token : '—';
 };
 
 const shortLocation = (value) => {
     const token = normalizeToken(value);
-    if (!token) return '-';
+    if (!token) return '—';
     return token.split(',')[0].trim();
+};
+
+const shipmentDisplayName = (shipment) => (
+    normalizeToken(shipment?.items && shipment.items !== 'Package' ? shipment.items : '')
+    || normalizeToken(shipment?.recipient)
+    || normalizeToken(shipment?.project_client_name)
+    || 'Shipment'
+);
+
+const copyToClipboard = async (value) => {
+    const token = normalizeToken(value);
+    if (!token || !navigator?.clipboard) return;
+    await navigator.clipboard.writeText(token);
 };
 
 const parseTrackingTokens = (value) => {
@@ -337,8 +354,31 @@ const formatLastUpdateLine = (shipment) => {
 const shortRouteLabel = (shipment) => {
     const from = shortLocation(shipment?.origin);
     const to = shortLocation(shipment?.destination);
-    if (from === '-' && to === '-') return '-';
+    if (from === '—' && to === '—') return '—';
     return `${from} → ${to}`;
+};
+
+const getSortValue = (group, key) => {
+    const master = group?.master || {};
+    const statusMeta = getCurrentStatusMeta(master);
+    switch (key) {
+        case 'tracking':
+            return `${shipmentDisplayName(master)} ${master.tracking_number || ''}`.toLowerCase();
+        case 'status':
+            return normalizeToken(master.status).toLowerCase();
+        case 'current':
+            return `${statusMeta.headline || ''} ${statusMeta.location || ''}`.toLowerCase();
+        case 'eta':
+            return parseComparableDate(master.eta)?.getTime() || 0;
+        case 'showDate':
+            return parseComparableDate(master.show_date)?.getTime() || 0;
+        case 'carrier':
+            return normalizeToken(master.carrier).toLowerCase();
+        case 'route':
+            return shortRouteLabel(master).toLowerCase();
+        default:
+            return '';
+    }
 };
 
 const buildPositionalGroups = (rows = []) => {
@@ -468,7 +508,7 @@ const FilterPopover = ({ title, className = '', isActive, onClear, children }) =
     useOnClickOutside(ref, () => setIsOpen(false));
 
     return (
-        <th className={`filter-th design-table__th design-table__th--left ${className}`} ref={ref}>
+        <th className={`filter-th design-table__th design-table__th--left ${className} ${isActive ? 'is-filtered' : ''}`} ref={ref}>
             <button type="button" className="th-content shipment-table__filter-trigger" onClick={() => setIsOpen((prev) => !prev)}>
                 <span>{title}</span>
                 <span className={`filter-icon-wrapper ${isActive ? 'active' : ''}`}>
@@ -500,9 +540,106 @@ const FilterPopover = ({ title, className = '', isActive, onClear, children }) =
     );
 };
 
+const SortHeader = ({ title, className = '', sortKey, sortConfig, onSort }) => {
+    const isActive = sortConfig?.key === sortKey;
+    const directionLabel = isActive ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'not sorted';
+    return (
+        <th className={`design-table__th design-table__th--left ${className}`}>
+            <button
+                type="button"
+                className={`shipment-table__sort-header ${isActive ? 'is-active' : ''}`}
+                onClick={() => onSort(sortKey)}
+                title={`Sort ${title} (${directionLabel})`}
+            >
+                <span>{title}</span>
+                <ArrowUpDown size={13} />
+            </button>
+        </th>
+    );
+};
+
+const RowActionMenu = ({ shipment, onView, onMove, onDelete, canMove = true, align = 'right' }) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    useOnClickOutside(ref, () => setOpen(false));
+
+    const trackingNumber = shipment?.__displayTracking || shipment?.tracking_number;
+
+    const runAction = async (action) => {
+        await action();
+        setOpen(false);
+    };
+
+    return (
+        <div className={`shipment-row-menu shipment-row-menu--${align}`} ref={ref}>
+            <button
+                type="button"
+                className="shipment-row-menu__trigger"
+                aria-label="More shipment actions"
+                aria-expanded={open}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setOpen((current) => !current);
+                }}
+            >
+                <MoreHorizontal size={16} />
+            </button>
+            {open ? (
+                <div className="shipment-row-menu__content" onClick={(event) => event.stopPropagation()}>
+                    <button type="button" onClick={() => runAction(onView)}>
+                        <Eye size={14} /> View Details
+                    </button>
+                    {canMove ? (
+                        <button type="button" onClick={() => runAction(onMove)}>
+                            <Archive size={14} /> {shipment?.is_archived ? 'Restore Shipment' : 'Move Shipment'}
+                        </button>
+                    ) : null}
+                    <button type="button" onClick={() => runAction(() => copyToClipboard(trackingNumber))}>
+                        <Copy size={14} /> Copy Tracking ID
+                    </button>
+                    <button type="button" className="is-danger" onClick={() => runAction(onDelete)}>
+                        <Trash2 size={14} /> Delete
+                    </button>
+                </div>
+            ) : null}
+        </div>
+    );
+};
+
+const ShipmentTableSkeleton = () => (
+    <>
+        {Array.from({ length: 7 }).map((_, rowIndex) => (
+            <tr className="design-table__row shipping-row shipment-skeleton-row" key={`shipment-skeleton-${rowIndex}`}>
+                <td className="design-table__td shipping-col-check"><span className="shipment-skeleton-box shipment-skeleton-check" /></td>
+                <td className="design-table__td shipping-col-id">
+                    <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
+                    <div className="shipment-skeleton-line shipment-skeleton-line--small" />
+                </td>
+                <td className="design-table__td shipping-col-status"><div className="shipment-skeleton-pill" /></td>
+                <td className="design-table__td shipping-col-current">
+                    <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
+                    <div className="shipment-skeleton-line shipment-skeleton-line--medium" />
+                </td>
+                <td className="design-table__td shipping-col-eta"><div className="shipment-skeleton-line shipment-skeleton-line--medium" /></td>
+                <td className="design-table__td shipping-col-show-date"><div className="shipment-skeleton-line shipment-skeleton-line--medium" /></td>
+                <td className="design-table__td shipping-col-carrier"><div className="shipment-skeleton-line shipment-skeleton-line--small" /></td>
+                <td className="design-table__td shipping-col-route">
+                    <div className="shipment-skeleton-line shipment-skeleton-line--medium" />
+                    <div className="shipment-skeleton-line shipment-skeleton-line--small" />
+                </td>
+                <td className="design-table__td shipping-col-actions"><div className="shipment-skeleton-actions" /></td>
+            </tr>
+        ))}
+    </>
+);
+
 const ShipmentTable = ({
     shipments,
     loading,
+    error = '',
+    onRetry,
+    onImportShipments,
+    onBookShipment,
     onSelectShipment,
     onDeleteShipment,
     onArchiveShipment,
@@ -517,6 +654,7 @@ const ShipmentTable = ({
     const [expandedRows, setExpandedRows] = useState(() => new Set());
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [mobileActionTarget, setMobileActionTarget] = useState(null);
+    const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
 
     const groupedShipments = useMemo(() => (
         buildPositionalGroups(shipments).map((group, index) => {
@@ -568,8 +706,21 @@ const ShipmentTable = ({
         })
     ), [groupedShipments, exhibitionFilter, statusFilter, carrierFilter, idSearch]);
 
+    const sortedGroups = useMemo(() => {
+        if (!sortConfig.key) return filteredGroups;
+        const direction = sortConfig.direction === 'desc' ? -1 : 1;
+        return [...filteredGroups].sort((left, right) => {
+            const a = getSortValue(left, sortConfig.key);
+            const b = getSortValue(right, sortConfig.key);
+            if (typeof a === 'number' || typeof b === 'number') {
+                return ((a || 0) - (b || 0)) * direction;
+            }
+            return String(a).localeCompare(String(b)) * direction;
+        });
+    }, [filteredGroups, sortConfig]);
+
     useEffect(() => {
-        const validKeys = new Set(filteredGroups.map((group) => group.masterKey));
+        const validKeys = new Set(sortedGroups.map((group) => group.masterKey));
         setExpandedRows((prev) => {
             let changed = false;
             const next = new Set();
@@ -582,7 +733,7 @@ const ShipmentTable = ({
             });
             return changed ? next : prev;
         });
-    }, [filteredGroups]);
+    }, [sortedGroups]);
 
     const toggleArrayItem = (array, setArray, item) => {
         if (array.includes(item)) {
@@ -592,11 +743,20 @@ const ShipmentTable = ({
         }
     };
 
-    const visibleMasterIds = filteredGroups
+    const visibleMasterIds = sortedGroups
         .map((group) => group.master.id)
         .filter((id) => id != null);
     const allVisibleSelected = visibleMasterIds.length > 0 && visibleMasterIds.every((id) => selectedIds.includes(id));
     const hasFilters = Boolean(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length);
+    const tableHasRows = sortedGroups.length > 0;
+    const showSkeletonRows = loading && !tableHasRows;
+
+    const handleSort = (key) => {
+        setSortConfig((current) => {
+            if (current.key !== key) return { key, direction: 'asc' };
+            return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+        });
+    };
 
     const handleSelectAll = () => {
         if (allVisibleSelected) {
@@ -639,22 +799,31 @@ const ShipmentTable = ({
 
     return (
         <div className="shipment-table-shell">
-            {hasFilters ? (
+            {(hasFilters || selectedIds.length > 0) ? (
                 <div className="shipment-table-toolbar">
-                    <button
-                        type="button"
-                        className="btn-outline-sm shipment-table-toolbar__clear"
-                        onClick={clearAllFilters}
-                    >
-                        Clear All Filters
-                    </button>
+                    {selectedIds.length > 0 ? (
+                        <div className="shipment-table-toolbar__selection">
+                            <strong>{selectedIds.length}</strong> shipments selected
+                        </div>
+                    ) : <span />}
+                    {hasFilters ? (
+                        <button
+                            type="button"
+                            className="btn-outline-sm shipment-table-toolbar__clear"
+                            onClick={clearAllFilters}
+                        >
+                            Clear All Filters
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
 
-            {loading ? (
-                <div className="shipment-table-loading">
-                    <Loader size={32} className="animate-spin shipment-table-loading__icon" />
-                    Loading shipments...
+            {error ? (
+                <div className="shipment-table-state shipment-table-state--error">
+                    <Package size={36} className="shipment-table-empty__icon" />
+                    <h3>Unable to load shipments</h3>
+                    <p>Please refresh or try again.</p>
+                    {onRetry ? <button type="button" className="shipment-state-btn" onClick={onRetry}>Retry</button> : null}
                 </div>
             ) : (
                 <>
@@ -681,10 +850,17 @@ const ShipmentTable = ({
                         </div>
 
                         <div className="shipment-mobile-list">
-                            {filteredGroups.map(({ master, childRows, masterKey }) => (
+                            {showSkeletonRows ? Array.from({ length: 4 }).map((_, index) => (
+                                <article className="shipment-mobile-card shipment-mobile-card--skeleton" key={`mobile-skeleton-${index}`}>
+                                    <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
+                                    <div className="shipment-skeleton-line shipment-skeleton-line--medium" />
+                                    <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
+                                </article>
+                            )) : sortedGroups.map(({ master, childRows, masterKey }) => (
                                 <article
                                     key={`mobile-${masterKey}`}
                                     className={`shipment-mobile-card ${isUpcomingBookingDate(master.booking_date) ? 'shipment-mobile-card--upcoming' : ''}`}
+                                    onClick={() => onSelectShipment(master)}
                                 >
                                     <div className="shipment-mobile-card__top">
                                         <div className="shipment-mobile-card__title-wrap">
@@ -699,7 +875,10 @@ const ShipmentTable = ({
                                             type="button"
                                             className="shipment-mobile-card__menu"
                                             aria-label="Shipment actions"
-                                            onClick={() => setMobileActionTarget(master)}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setMobileActionTarget(master);
+                                            }}
                                         >
                                             <MoreHorizontal size={18} />
                                         </button>
@@ -720,7 +899,7 @@ const ShipmentTable = ({
                                         className="shipment-mobile-card__update"
                                         title={formatLastUpdateLine(master)}
                                     >
-                                        {formatLastUpdateLine(master)}
+                                                {formatLastUpdateLine(master)}
                                     </div>
 
                                     <div className="shipment-mobile-card__footer">
@@ -743,6 +922,17 @@ const ShipmentTable = ({
 
                     <div className="shipment-table-desktop">
                         <table className="design-table shipping-table">
+                    <colgroup>
+                        <col className="shipping-col-check" />
+                        <col className="shipping-col-id" />
+                        <col className="shipping-col-status" />
+                        <col className="shipping-col-current" />
+                        <col className="shipping-col-eta" />
+                        <col className="shipping-col-show-date" />
+                        <col className="shipping-col-carrier" />
+                        <col className="shipping-col-route" />
+                        <col className="shipping-col-actions" />
+                    </colgroup>
                     <thead className="design-table__thead">
                         <tr>
                             <th className="design-table__th design-table__th--left shipping-col-check">
@@ -781,9 +971,9 @@ const ShipmentTable = ({
                                 </div>
                             </FilterPopover>
 
-                            <th className="design-table__th design-table__th--left shipping-col-current">Current Status</th>
-                            <th className="design-table__th design-table__th--left shipping-col-eta">Date</th>
-                            <th className="design-table__th design-table__th--left shipping-col-show-date">Show Date</th>
+                            <SortHeader title="Latest Event" className="shipping-col-current" sortKey="current" sortConfig={sortConfig} onSort={handleSort} />
+                            <SortHeader title="Date" className="shipping-col-eta" sortKey="eta" sortConfig={sortConfig} onSort={handleSort} />
+                            <SortHeader title="Show Date" className="shipping-col-show-date" sortKey="showDate" sortConfig={sortConfig} onSort={handleSort} />
 
                             <FilterPopover title="Carrier" className="shipping-col-carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
                                 <div className="fp-check-list">
@@ -804,13 +994,13 @@ const ShipmentTable = ({
                                 </div>
                             </FilterPopover>
 
-                            <th className="design-table__th design-table__th--left shipping-col-route">Route</th>
+                            <SortHeader title="Route" className="shipping-col-route" sortKey="route" sortConfig={sortConfig} onSort={handleSort} />
                             <th className="design-table__th design-table__th--left shipping-col-actions">Actions</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        {filteredGroups.map(({ master, childRows, masterKey }) => {
+                        {showSkeletonRows ? <ShipmentTableSkeleton /> : sortedGroups.map(({ master, childRows, masterKey }) => {
                             const hasChildren = childRows.length > 0;
                             const isExpanded = expandedRows.has(masterKey);
                             const isSelected = master.id != null && selectedIds.includes(master.id);
@@ -850,8 +1040,8 @@ const ShipmentTable = ({
                                                     <Package size={14} />
                                                 </span>
 
-                                                <div className="shipment-main-cell__content truncate-cell" title={master.items || master.recipient || 'Shipment'}>
-                                                    <div className="tid-name">{master.items && master.items !== 'Package' ? master.items : (master.recipient || 'Shipment')}</div>
+                                                <div className="shipment-main-cell__content truncate-cell" title={`${shipmentDisplayName(master)} | ${displayValue(master.tracking_number)}`}>
+                                                    <div className="tid-name">{shipmentDisplayName(master)}</div>
                                                     <div className="tid-num">
                                                         {displayValue(master.tracking_number)}
                                                         {hasChildren ? <span className="shipment-child-count">+{childRows.length}</span> : null}
@@ -871,30 +1061,18 @@ const ShipmentTable = ({
 
                                         <td className="design-table__td shipping-col-current">
                                             <div className="shipment-current-status" title={masterStatusTitle}>
-                                                {masterStatusMeta.date ? (
-                                                    <span className="shipment-current-status__date">{masterStatusMeta.date}</span>
-                                                ) : null}
                                                 <span className="shipment-current-status__headline">{masterStatusMeta.headline}</span>
-                                                {masterStatusMeta.location ? (
-                                                    <span className="shipment-current-status__location">{masterStatusMeta.location}</span>
-                                                ) : null}
+                                                <span className="shipment-current-status__meta">
+                                                    {[masterStatusMeta.location, masterStatusMeta.date].filter(Boolean).join(' · ') || '—'}
+                                                </span>
                                             </div>
                                         </td>
 
                                         <td className="design-table__td shipping-col-eta">
                                             <div className="shipment-date-cell">
-                                                {(() => {
-                                                    const formatted = formatDateTime(master.eta);
-                                                    if (typeof formatted === 'object') {
-                                                        return (
-                                                            <>
-                                                                <span className="shipment-date-cell__date">{formatted.datePart}</span>
-                                                                <span className="shipment-date-cell__time">{formatted.timePart}</span>
-                                                            </>
-                                                        );
-                                                    }
-                                                    return <span className="shipment-date-cell__date">{formatted || '-'}</span>;
-                                                })()}
+                                                {masterStatusMeta.date ? (
+                                                    <span className="shipment-date-cell__date">{masterStatusMeta.date}</span>
+                                                ) : <span className="shipment-date-cell__date">—</span>}
                                             </div>
                                         </td>
 
@@ -909,7 +1087,7 @@ const ShipmentTable = ({
                                         </td>
 
                                         <td className="design-table__td shipping-col-route">
-                                            <div className="shipment-route-cell">
+                                            <div className="shipment-route-cell" title={shortRouteLabel(master)}>
                                                 <div className="shipment-route-line">
                                                     <span className="shipment-route-label">FROM</span>
                                                     <span>{shortLocation(master.origin)}</span>
@@ -924,30 +1102,13 @@ const ShipmentTable = ({
                                         <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
                                             <div className="action-cell__inner">
                                                 <button type="button" className="track-btn" onClick={() => onSelectShipment(master)}>Track</button>
-                                                {onArchiveShipment ? (
-                                                    <button
-                                                        type="button"
-                                                        className="archive-btn"
-                                                        title={master.is_archived ? 'Restore to Dashboard' : 'Move to Storage'}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            onArchiveShipment(master.id);
-                                                        }}
-                                                    >
-                                                        {master.is_archived ? 'Restore' : 'Move'}
-                                                    </button>
-                                                ) : null}
-                                                <button
-                                                    type="button"
-                                                    className="delete-btn"
-                                                    title="Delete shipment"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        onDeleteShipment(master.id);
-                                                    }}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <RowActionMenu
+                                                    shipment={master}
+                                                    onView={() => onSelectShipment(master)}
+                                                    onMove={() => onArchiveShipment?.(master.id)}
+                                                    onDelete={() => onDeleteShipment(master.id)}
+                                                    canMove={Boolean(onArchiveShipment && master.id != null)}
+                                                />
                                             </div>
                                         </td>
                                     </tr>
@@ -973,7 +1134,7 @@ const ShipmentTable = ({
                                                     <span className="tid-icon child-icon">
                                                         <Package size={12} />
                                                     </span>
-                                                    <div className="shipment-main-cell__content truncate-cell">
+                                                    <div className="shipment-main-cell__content truncate-cell" title={`${child.items && child.items !== 'Package' ? child.items : 'Child Package'} | ${displayValue(child.__displayTracking || child.tracking_number)}`}>
                                                         <div className="tid-name child-name">{child.items && child.items !== 'Package' ? child.items : 'Child Package'}</div>
                                                         <div className="tid-num">{displayValue(child.__displayTracking || child.tracking_number)}</div>
                                                     </div>
@@ -986,23 +1147,16 @@ const ShipmentTable = ({
 
                                             <td className="design-table__td shipping-col-current">
                                                 <div className="shipment-current-status shipment-current-status--child" title={childStatusTitle}>
-                                                    {childStatusMeta.date ? (
-                                                        <span className="shipment-current-status__date">{childStatusMeta.date}</span>
-                                                    ) : null}
                                                     <span className="shipment-current-status__headline">{childStatusMeta.headline}</span>
-                                                    {childStatusMeta.location ? (
-                                                        <span className="shipment-current-status__location">{childStatusMeta.location}</span>
-                                                    ) : null}
+                                                    <span className="shipment-current-status__meta">
+                                                        {[childStatusMeta.location, childStatusMeta.date].filter(Boolean).join(' · ') || '—'}
+                                                    </span>
                                                 </div>
                                             </td>
 
                                             <td className="design-table__td shipping-col-eta">
                                                 <div className="shipment-date-cell shipment-date-cell--child">
-                                                    {(() => {
-                                                        const formatted = formatDateTime(child.eta);
-                                                        if (typeof formatted === 'object') return <span className="shipment-date-cell__date">{formatted.datePart}</span>;
-                                                        return <span className="shipment-date-cell__date">{formatted || '-'}</span>;
-                                                    })()}
+                                                    <span className="shipment-date-cell__date">{childStatusMeta.date || '—'}</span>
                                                 </div>
                                             </td>
 
@@ -1017,7 +1171,7 @@ const ShipmentTable = ({
                                             </td>
 
                                             <td className="design-table__td shipping-col-route">
-                                                <div className="shipment-route-cell shipment-route-cell--child">
+                                                <div className="shipment-route-cell shipment-route-cell--child" title={shortRouteLabel(child)}>
                                                     <div className="shipment-route-line">{shortLocation(child.origin)}</div>
                                                     <div className="shipment-route-line">{shortLocation(child.destination)}</div>
                                                 </div>
@@ -1030,8 +1184,15 @@ const ShipmentTable = ({
                                                         className="track-btn mini-btn"
                                                         onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
                                                     >
-                                                        Details
+                                                        Track
                                                     </button>
+                                                    <RowActionMenu
+                                                        shipment={child}
+                                                        onView={() => onSelectShipment(toChildSelectionPayload(child, master))}
+                                                        onMove={() => onArchiveShipment?.(child.id)}
+                                                        onDelete={() => child.id != null ? onDeleteShipment(child.id) : onDeleteShipment(master.id)}
+                                                        canMove={Boolean(onArchiveShipment && child.id != null)}
+                                                    />
                                                 </div>
                                             </td>
                                         </tr>
@@ -1172,6 +1333,16 @@ const ShipmentTable = ({
                             ) : null}
                             <button
                                 type="button"
+                                className="shipping-mobile-action"
+                                onClick={async () => {
+                                    await copyToClipboard(mobileActionTarget.tracking_number);
+                                    setMobileActionTarget(null);
+                                }}
+                            >
+                                <Copy size={16} /> Copy Tracking ID
+                            </button>
+                            <button
+                                type="button"
                                 className="shipping-mobile-action shipping-mobile-action--danger"
                                 onClick={() => {
                                     onDeleteShipment(mobileActionTarget.id);
@@ -1185,10 +1356,17 @@ const ShipmentTable = ({
                 </>
             ) : null}
 
-            {filteredGroups.length === 0 && !loading ? (
-                <div className="shipment-table-empty">
+            {sortedGroups.length === 0 && !loading && !error ? (
+                <div className="shipment-table-state shipment-table-empty">
                     <Package size={40} className="shipment-table-empty__icon" />
-                    <p>{groupedShipments.length === 0 ? 'No shipments tracked yet.' : 'No shipments match your filters.'}</p>
+                    <h3>{groupedShipments.length === 0 ? 'No shipments found' : 'No shipments match your filters'}</h3>
+                    <p>{groupedShipments.length === 0 ? 'Try changing filters or import shipment data.' : 'Try changing filters or clearing the table search.'}</p>
+                    {groupedShipments.length === 0 ? (
+                        <div className="shipment-state-actions">
+                            {onImportShipments ? <button type="button" className="shipment-state-btn" onClick={onImportShipments}>Import Shipments</button> : null}
+                            {onBookShipment ? <button type="button" className="shipment-state-btn shipment-state-btn--primary" onClick={onBookShipment}>Book Shipment</button> : null}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
         </div>
