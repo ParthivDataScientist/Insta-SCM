@@ -277,6 +277,40 @@ const getCurrentStatusMeta = (shipment) => {
     };
 };
 
+const splitEventHeadline = (headline, fallbackStatus) => {
+    const text = normalizeToken(headline);
+    const fallback = normalizeToken(fallbackStatus);
+
+    if (!text || text === '-') {
+        return {
+            status: fallback || 'Status',
+            message: '—',
+        };
+    }
+
+    const dividerIndex = text.indexOf(':');
+    if (dividerIndex > 0) {
+        const status = text.slice(0, dividerIndex).trim();
+        const message = text.slice(dividerIndex + 1).trim();
+        return {
+            status: status || fallback || 'Status',
+            message: message || text,
+        };
+    }
+
+    if (fallback && text.toLowerCase().startsWith(`${fallback.toLowerCase()}:`)) {
+        return {
+            status: fallback,
+            message: text.slice(fallback.length + 1).trim() || text,
+        };
+    }
+
+    return {
+        status: fallback || 'Status',
+        message: text,
+    };
+};
+
 const parseComparableDate = (dateValue) => {
     const raw = String(dateValue ?? '').trim();
     if (!raw) return null;
@@ -560,10 +594,49 @@ const SortHeader = ({ title, className = '', sortKey, sortConfig, onSort }) => {
 
 const RowActionMenu = ({ shipment, onView, onMove, onDelete, canMove = true, align = 'right' }) => {
     const [open, setOpen] = useState(false);
+    const [menuStyle, setMenuStyle] = useState(null);
     const ref = useRef(null);
     useOnClickOutside(ref, () => setOpen(false));
 
     const trackingNumber = shipment?.__displayTracking || shipment?.tracking_number;
+
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const updateMenuPosition = () => {
+            if (!ref.current) return;
+
+            const rect = ref.current.getBoundingClientRect();
+            const menuWidth = 204;
+            const menuHeight = canMove ? 166 : 126;
+            const gutter = 12;
+            const preferredLeft = align === 'left' ? rect.left : rect.right - menuWidth;
+            const left = Math.min(
+                window.innerWidth - menuWidth - gutter,
+                Math.max(gutter, preferredLeft),
+            );
+            const canOpenBelow = rect.bottom + 8 + menuHeight <= window.innerHeight - gutter;
+            const top = canOpenBelow
+                ? rect.bottom + 8
+                : Math.max(gutter, rect.top - menuHeight - 8);
+
+            setMenuStyle({
+                top: `${top}px`,
+                left: `${left}px`,
+                width: `${menuWidth}px`,
+                maxHeight: `${Math.max(112, window.innerHeight - top - gutter)}px`,
+            });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [align, canMove, open]);
 
     const runAction = async (action) => {
         await action();
@@ -585,7 +658,7 @@ const RowActionMenu = ({ shipment, onView, onMove, onDelete, canMove = true, ali
                 <MoreHorizontal size={16} />
             </button>
             {open ? (
-                <div className="shipment-row-menu__content" onClick={(event) => event.stopPropagation()}>
+                <div className="shipment-row-menu__content" style={menuStyle || undefined} onClick={(event) => event.stopPropagation()}>
                     <button type="button" onClick={() => runAction(onView)}>
                         <Eye size={14} /> View Details
                     </button>
@@ -1007,6 +1080,7 @@ const ShipmentTable = ({
                             const masterHasUpcomingShow = isUpcomingShowDate(master.show_date);
                             const masterHasUpcomingBooking = isUpcomingBookingDate(master.booking_date);
                             const masterStatusMeta = getCurrentStatusMeta(master);
+                            const masterEventHeadline = splitEventHeadline(masterStatusMeta.headline, master.status);
                             const masterStatusTitle = [masterStatusMeta.date, masterStatusMeta.headline, masterStatusMeta.location]
                                 .filter(Boolean)
                                 .join(' | ');
@@ -1061,7 +1135,10 @@ const ShipmentTable = ({
 
                                         <td className="design-table__td shipping-col-current">
                                             <div className="shipment-current-status" title={masterStatusTitle}>
-                                                <span className="shipment-current-status__headline">{masterStatusMeta.headline}</span>
+                                                <div className="shipment-current-status__top">
+                                                    <span className="shipment-current-status__badge">{displayValue(masterEventHeadline.status)}</span>
+                                                    <span className="shipment-current-status__headline">{masterEventHeadline.message}</span>
+                                                </div>
                                                 <span className="shipment-current-status__meta">
                                                     {[masterStatusMeta.location, masterStatusMeta.date].filter(Boolean).join(' · ') || '—'}
                                                 </span>
@@ -1117,6 +1194,7 @@ const ShipmentTable = ({
                                         const childHasUpcomingShow = isUpcomingShowDate(child.show_date || master.show_date);
                                         const childHasUpcomingBooking = isUpcomingBookingDate(child.booking_date || master.booking_date);
                                         const childStatusMeta = getCurrentStatusMeta(child);
+                                        const childEventHeadline = splitEventHeadline(childStatusMeta.headline, child.status || master.status);
                                         const childStatusTitle = [childStatusMeta.date, childStatusMeta.headline, childStatusMeta.location]
                                             .filter(Boolean)
                                             .join(' | ');
@@ -1147,7 +1225,10 @@ const ShipmentTable = ({
 
                                             <td className="design-table__td shipping-col-current">
                                                 <div className="shipment-current-status shipment-current-status--child" title={childStatusTitle}>
-                                                    <span className="shipment-current-status__headline">{childStatusMeta.headline}</span>
+                                                    <div className="shipment-current-status__top">
+                                                        <span className="shipment-current-status__badge">{displayValue(childEventHeadline.status)}</span>
+                                                        <span className="shipment-current-status__headline">{childEventHeadline.message}</span>
+                                                    </div>
                                                     <span className="shipment-current-status__meta">
                                                         {[childStatusMeta.location, childStatusMeta.date].filter(Boolean).join(' · ') || '—'}
                                                     </span>
