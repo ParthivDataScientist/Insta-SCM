@@ -173,25 +173,6 @@ const stripLocationFromDescription = (description, location) => {
     return cleaned.trim().replace(/[,:;.\-]+$/, '').trim();
 };
 
-const normalizeHistoryForCompare = (history = []) => {
-    if (!Array.isArray(history)) return [];
-    return history
-        .filter(Boolean)
-        .map((entry) => ({
-            description: normalizeToken(entry?.description),
-            location: normalizeToken(entry?.location),
-            status: normalizeToken(entry?.status),
-            date: normalizeToken(entry?.date),
-        }));
-};
-
-const historiesMatch = (left = [], right = []) => {
-    const a = normalizeHistoryForCompare(left);
-    const b = normalizeHistoryForCompare(right);
-    if (!a.length || a.length !== b.length) return false;
-    return JSON.stringify(a) === JSON.stringify(b);
-};
-
 const isEmptyStatus = (value) => {
     const token = normalizeToken(value).toLowerCase();
     return !token || ['unknown', 'pending', 'tracking unavailable', 'awaiting child scan'].includes(token);
@@ -199,7 +180,7 @@ const isEmptyStatus = (value) => {
 
 const buildChildScanHistory = (child, master) => {
     const explicitHistory = Array.isArray(child?.history) ? child.history.filter(Boolean) : [];
-    if (explicitHistory.length > 0 && !historiesMatch(explicitHistory, master?.history)) {
+    if (explicitHistory.length > 0) {
         return explicitHistory;
     }
 

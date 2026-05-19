@@ -814,6 +814,7 @@ def _resolve_child_fallback_result(
     db: Session,
     tracking_number: str,
     master_tracking_number: Optional[str] = None,
+    allow_master_context: bool = False,
 ) -> Optional[dict]:
     """
     Resolve a child package from already saved master shipment data when the
@@ -902,6 +903,62 @@ def _resolve_child_fallback_result(
     return None
 
 
+def _extract_child_result_from_master_result(
+    master_result: dict,
+    tracking_number: str,
+    master_tracking_number: Optional[str],
+) -> Optional[dict]:
+    tn = (tracking_number or "").strip().upper()
+    if not tn or not isinstance(master_result, dict):
+        return None
+
+    parcels = master_result.get("child_parcels")
+    if not isinstance(parcels, list):
+        return None
+
+    for parcel in parcels:
+        if not isinstance(parcel, dict):
+            continue
+        child_tn = str(parcel.get("tracking_number") or "").strip().upper()
+        if child_tn != tn:
+            continue
+
+        child_status = parcel.get("status") or master_result.get("status") or "Unknown"
+        child_raw_status = (
+            parcel.get("raw_status")
+            or parcel.get("current_status")
+            or master_result.get("current_status")
+            or child_status
+        )
+        child_history = parcel.get("history") if isinstance(parcel.get("history"), list) else []
+        last_scan_date = (
+            parcel.get("last_date")
+            or (child_history[0].get("date") if child_history and isinstance(child_history[0], dict) else "")
+            or master_result.get("last_scan_date")
+            or ""
+        )
+
+        return {
+            "carrier": parcel.get("carrier") or master_result.get("carrier") or "DHL",
+            "status": child_status,
+            "raw_status": child_raw_status,
+            "current_status": child_raw_status,
+            "origin": parcel.get("origin") or master_result.get("origin") or "Unknown",
+            "destination": parcel.get("destination") or master_result.get("destination") or "Unknown",
+            "eta": parcel.get("eta") or master_result.get("eta") or "Unknown",
+            "progress": parcel.get("progress")
+            if parcel.get("progress") is not None
+            else _progress_from_status(child_status),
+            "history": child_history,
+            "master_tracking_number": master_tracking_number or master_result.get("tracking_number"),
+            "is_master": False,
+            "child_parcels": [],
+            "last_scan_date": last_scan_date,
+        }
+
+    return None
+
+
 def track_and_save(
     tracking_number: str,
     recipient: Optional[str],
@@ -986,6 +1043,13 @@ def track_and_save(
 
         # Ensure the result is applied back to the child row
         if api_target_tn != tracking_number and "error" not in result:
+            child_result = _extract_child_result_from_master_result(
+                result,
+                tracking_number=tracking_number,
+                master_tracking_number=master_tracking_number or api_target_tn,
+            )
+            if child_result:
+                result = child_result
             result["tracking_number"] = tracking_number
 
         if "error" in result and carrier_name != "DHL":
@@ -1413,20 +1477,20 @@ def preview_track(
             return {"error": "UPS tracking is not yet supported."}
         return {"error": f"Could not detect carrier for '{tracking_number}'."}
 
-    if service is not None and db is not None and master_tracking_number:
-        contextual_fallback = _resolve_child_fallback_result(
-            db=db,
-            tracking_number=tracking_number,
-            master_tracking_number=master_tracking_number,
-            allow_master_context=(carrier_name == "DHL"),
-        )
-        if contextual_fallback:
-            result = _apply_stuck_exception_policy(contextual_fallback)
-            result["tracking_number"] = tracking_number
-            result["carrier"] = str(result.get("carrier") or carrier_name)
-            return result
+    api_target_tn = tracking_number
+    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and master_tracking_number:
+        api_target_tn = master_tracking_number
 
-    result = service.track(tracking_number)
+    result = service.track(api_target_tn)
+    if api_target_tn != tracking_number and "error" not in result:
+        child_result = _extract_child_result_from_master_result(
+            result,
+            tracking_number=tracking_number,
+            master_tracking_number=master_tracking_number or api_target_tn,
+        )
+        if child_result:
+            result = child_result
+
     if "error" in result:
         if db is not None:
             fallback = _resolve_child_fallback_result(
