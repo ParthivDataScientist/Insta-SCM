@@ -2,6 +2,7 @@
 Shipments API endpoints - HTTP layer only.
 All business logic lives in app.services.shipment_service.
 """
+import asyncio
 import io
 import logging
 from typing import List, Optional
@@ -35,6 +36,9 @@ from app.services.shipment_service import (
     refresh_tracked_shipments,
     schedule_pickup,
     track_and_save,
+    _fetch_shipment_live_status,
+    save_shipment_to_db,
+    _resolve_child_fallback_result,
 )
 from app.services.carrier_detection import detect_carrier
 from app.services.dhl import DHLService
@@ -262,6 +266,7 @@ def _save_sheet_row_without_live_tracking(
     destination: Optional[str] = None,
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
+    commit: bool = True,
 ) -> Optional[dict]:
     """
     Keep spreadsheet imports complete even when live tracking is unsupported.
@@ -335,8 +340,9 @@ def _save_sheet_row_without_live_tracking(
             shipment.is_master = is_master
 
     db.add(shipment)
-    db.commit()
-    db.refresh(shipment)
+    if commit:
+        db.commit()
+        db.refresh(shipment)
     return {"tracking_number": tracking_number, "status": "saved_without_live_tracking", "carrier": carrier}
 
 
@@ -520,9 +526,9 @@ async def _process_excel_import(contents: bytes, db: Session):
         logger.error("Excel import: missing tracking columns (tracking_number or master_awb/child_awb)")
         return {"error": "Missing required tracking columns. Ensure 'Master AWB' or 'Tracking Number' exists.", "success": 0, "failed": 0}
 
-    success = 0
-    failed = 0
-    errors = []
+    # Phase 1: Collect metadata and run concurrent network lookups without DB session
+    tasks = []
+    row_metadata = []
     
     last_master_awb = None
     last_master_client_name = None
@@ -553,54 +559,139 @@ async def _process_excel_import(contents: bytes, db: Session):
         project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
 
         if project_id is not None and not db.get(DashboardProject, project_id):
-            failed += 1
-            errors.append(f"{tracking_num}: linked project not found")
+            row_info = {
+                "tracking_number": tracking_num.upper(),
+                "project_error": f"{tracking_num.upper()}: linked project not found",
+            }
+            row_metadata.append(row_info)
+            async def dummy_project_error():
+                return {"error": "Project not found"}
+            tasks.append(dummy_project_error())
             continue
 
-        res = await track_and_save(
-            tracking_number=tracking_num.upper(),
-            recipient=recipient,
-            items=items_name,
-            show_date=show_date,
-            exhibition_name=exhibition_name,
-            db=db,
-            cs=cs,
-            no_of_box=no_of_box,
-            project_id=project_id,
-            destination=destination_hint,
-            # Pass MPS flags
-            master_tracking_number=master_to_use,
-            is_master=is_master,
-            remarks=_first_present_row_value(row, "remarks"),
-            booking_date=_first_present_row_value(row, "booking_dt", "booking_date")
-        )
-        
-        if "error" in res:
-            fallback_res = _save_sheet_row_without_live_tracking(
-                db=db,
-                tracking_number=tracking_num,
-                recipient=recipient,
-                items=items_name,
-                show_date=show_date,
-                exhibition_name=exhibition_name,
-                cs=cs,
-                no_of_box=no_of_box,
-                project_id=project_id,
-                destination=destination_hint,
-                master_tracking_number=master_to_use,
-                is_master=is_master,
-                remarks=_first_present_row_value(row, "remarks"),
-                booking_date=_first_present_row_value(row, "booking_dt", "booking_date"),
+        carrier_name = detect_carrier(tracking_num)
+        row_info = {
+            "tracking_number": tracking_num.upper(),
+            "carrier_name": carrier_name,
+            "recipient": recipient,
+            "items": items_name,
+            "show_date": show_date,
+            "exhibition_name": exhibition_name,
+            "cs": cs,
+            "no_of_box": no_of_box,
+            "project_id": project_id,
+            "destination": destination_hint,
+            "master_to_use": master_to_use,
+            "is_master": is_master,
+            "remarks": _first_present_row_value(row, "remarks"),
+            "booking_date": _first_present_row_value(row, "booking_dt", "booking_date"),
+        }
+        row_metadata.append(row_info)
+
+        if carrier_name in ("DHL", "FedEx"):
+            tasks.append(
+                _fetch_shipment_live_status(
+                    tracking_number=tracking_num,
+                    master_tracking_number=master_to_use,
+                )
             )
-            if fallback_res:
-                logger.info("Imported %s without live tracking provider (%s)", tracking_num, fallback_res["carrier"])
-                success += 1
-            else:
-                logger.warning("Import failed for %s: %s", tracking_num, res["error"])
-                failed += 1
-                errors.append(f"{tracking_num}: {res['error']}")
         else:
+            async def dummy_fetch():
+                return {"error": "Skipped live tracking"}
+            tasks.append(dummy_fetch())
+
+    # Concurrently gather all live network requests
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Phase 2: Sequential DB Write
+    success = 0
+    failed = 0
+    errors = []
+
+    for row_info, result in zip(row_metadata, results):
+        tracking_number = row_info["tracking_number"]
+        if "project_error" in row_info:
+            failed += 1
+            errors.append(row_info["project_error"])
+            continue
+
+        if isinstance(result, Exception) or "error" in result:
+            carrier_name = row_info["carrier_name"]
+            fallback_res = None
+            if carrier_name in ("DHL", "FedEx", "UPS", "Unknown"):
+                fallback_res = _resolve_child_fallback_result(
+                    db=db,
+                    tracking_number=tracking_number,
+                    master_tracking_number=row_info["master_to_use"],
+                    allow_master_context=(carrier_name == "DHL"),
+                )
+            if fallback_res:
+                result = fallback_res
+            else:
+                fallback_res = _save_sheet_row_without_live_tracking(
+                    db=db,
+                    tracking_number=tracking_number,
+                    recipient=row_info["recipient"],
+                    items=row_info["items"],
+                    show_date=row_info["show_date"],
+                    exhibition_name=row_info["exhibition_name"],
+                    cs=row_info["cs"],
+                    no_of_box=row_info["no_of_box"],
+                    project_id=row_info["project_id"],
+                    destination=row_info["destination"],
+                    booking_date=row_info["booking_date"],
+                    show_city=row_info["show_city"],
+                    cs_type=row_info["cs_type"],
+                    remarks=row_info["remarks"],
+                    master_tracking_number=row_info["master_to_use"],
+                    is_master=row_info["is_master"],
+                    commit=False,
+                )
+                if fallback_res:
+                    logger.info("Imported %s without live tracking provider (%s)", tracking_number, fallback_res["carrier"])
+                    success += 1
+                else:
+                    err_msg = str(result) if isinstance(result, Exception) else result.get("error", "Unknown error")
+                    logger.warning("Import failed for %s: %s", tracking_number, err_msg)
+                    failed += 1
+                    errors.append(f"{tracking_number}: {err_msg}")
+                continue
+
+        # Save the resolved result using save_shipment_to_db sequentially with commit=False
+        try:
+            save_shipment_to_db(
+                db=db,
+                tracking_number=tracking_number,
+                result=result,
+                recipient=row_info["recipient"],
+                items=row_info["items"],
+                show_date=row_info["show_date"],
+                exhibition_name=row_info["exhibition_name"],
+                cs=row_info["cs"],
+                no_of_box=row_info["no_of_box"],
+                project_id=row_info["project_id"],
+                booking_date=row_info["booking_date"],
+                show_city=row_info["show_city"],
+                cs_type=row_info["cs_type"],
+                remarks=row_info["remarks"],
+                master_tracking_number=row_info["master_to_use"],
+                is_master=row_info["is_master"],
+                destination=row_info["destination"],
+                commit=False,
+            )
             success += 1
+        except Exception as e:
+            failed += 1
+            errors.append(f"{tracking_number}: {str(e)}")
+
+    # Single final commit
+    if success > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to commit batch Excel import: {str(e)}")
+            raise e
 
     logger.info("Excel import complete: %d succeeded, %d failed", success, failed)
     return {"success": success, "failed": failed, "errors": errors}
@@ -638,9 +729,9 @@ async def import_excel(
 
 
 async def _process_webhook_payload(payload: WebhookPayload, db: Session):
-    success = 0
-    failed = 0
-    errors = []
+    # Phase 1: Collect metadata and run concurrent network lookups without DB session
+    tasks = []
+    row_metadata = []
     
     last_master_awb = None
     last_master_client_name = None
@@ -656,57 +747,126 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
         if not tracking_number:
             continue
 
-        try:
-            res = await track_and_save(
-                tracking_number=tracking_number,
-                recipient=row.client_name,
-                items=None, # Not explicitly in sheet as an item field
-                show_date=row.show_date,
-                exhibition_name="Unknown Exhibition", # We can update if sheet adds it
-                db=db,
-                cs=row.cs_type,
-                no_of_box=row.no_of_box,
-                project_id=None,
-                destination=row.ship_to_location,
-                booking_date=row.booking_date,
-                show_city=row.show_city,
-                cs_type=row.cs_type,
-                remarks=row.remarks,
-                master_tracking_number=master_to_use,
-                is_master=is_master
+        carrier_name = detect_carrier(tracking_number)
+        row_info = {
+            "tracking_number": tracking_number,
+            "carrier_name": carrier_name,
+            "recipient": row.client_name,
+            "items": None,
+            "show_date": row.show_date,
+            "exhibition_name": "Unknown Exhibition",
+            "cs": row.cs_type,
+            "no_of_box": row.no_of_box,
+            "project_id": None,
+            "destination": row.ship_to_location,
+            "booking_date": row.booking_date,
+            "show_city": row.show_city,
+            "cs_type": row.cs_type,
+            "remarks": row.remarks,
+            "master_to_use": master_to_use,
+            "is_master": is_master,
+        }
+        row_metadata.append(row_info)
+
+        if carrier_name in ("DHL", "FedEx"):
+            tasks.append(
+                _fetch_shipment_live_status(
+                    tracking_number=tracking_number,
+                    master_tracking_number=master_to_use,
+                )
             )
-            if "error" in res:
+        else:
+            async def dummy_fetch():
+                return {"error": "Skipped live tracking"}
+            tasks.append(dummy_fetch())
+
+    # Concurrently gather all live network requests
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Phase 2: Sequential DB Write
+    success = 0
+    failed = 0
+    errors = []
+
+    for row_info, result in zip(row_metadata, results):
+        tracking_number = row_info["tracking_number"]
+
+        if isinstance(result, Exception) or "error" in result:
+            carrier_name = row_info["carrier_name"]
+            fallback_res = None
+            if carrier_name in ("DHL", "FedEx", "UPS", "Unknown"):
+                fallback_res = _resolve_child_fallback_result(
+                    db=db,
+                    tracking_number=tracking_number,
+                    master_tracking_number=row_info["master_to_use"],
+                    allow_master_context=(carrier_name == "DHL"),
+                )
+            if fallback_res:
+                result = fallback_res
+            else:
                 fallback_res = _save_sheet_row_without_live_tracking(
                     db=db,
                     tracking_number=tracking_number,
-                    recipient=row.client_name,
-                    items=None,
-                    show_date=row.show_date,
-                    exhibition_name="Unknown Exhibition",
-                    cs=row.cs_type,
-                    no_of_box=row.no_of_box,
-                    project_id=None,
-                    destination=row.ship_to_location,
-                    booking_date=row.booking_date,
-                    show_city=row.show_city,
-                    cs_type=row.cs_type,
-                    remarks=row.remarks,
-                    master_tracking_number=master_to_use,
-                    is_master=is_master,
+                    recipient=row_info["recipient"],
+                    items=row_info["items"],
+                    show_date=row_info["show_date"],
+                    exhibition_name=row_info["exhibition_name"],
+                    cs=row_info["cs"],
+                    no_of_box=row_info["no_of_box"],
+                    project_id=row_info["project_id"],
+                    destination=row_info["destination"],
+                    booking_date=row_info["booking_date"],
+                    show_city=row_info["show_city"],
+                    cs_type=row_info["cs_type"],
+                    remarks=row_info["remarks"],
+                    master_tracking_number=row_info["master_to_use"],
+                    is_master=row_info["is_master"],
+                    commit=False,
                 )
                 if fallback_res:
                     success += 1
                 else:
+                    err_msg = str(result) if isinstance(result, Exception) else result.get("error", "Unknown error")
                     failed += 1
-                    errors.append(f"{tracking_number}: {res['error']}")
-            else:
-                success += 1
+                    errors.append(f"{tracking_number}: {err_msg}")
+                continue
+
+        # Save the resolved result using save_shipment_to_db sequentially with commit=False
+        try:
+            save_shipment_to_db(
+                db=db,
+                tracking_number=tracking_number,
+                result=result,
+                recipient=row_info["recipient"],
+                items=row_info["items"],
+                show_date=row_info["show_date"],
+                exhibition_name=row_info["exhibition_name"],
+                cs=row_info["cs"],
+                no_of_box=row_info["no_of_box"],
+                project_id=row_info["project_id"],
+                booking_date=row_info["booking_date"],
+                show_city=row_info["show_city"],
+                cs_type=row_info["cs_type"],
+                remarks=row_info["remarks"],
+                master_tracking_number=row_info["master_to_use"],
+                is_master=row_info["is_master"],
+                destination=row_info["destination"],
+                commit=False,
+            )
+            success += 1
         except Exception as e:
-            db.rollback()
-            logger.error(f"Error processing webhook row {tracking_number}: {str(e)}")
             failed += 1
             errors.append(f"{tracking_number}: {str(e)}")
-            
+
+    # Single final commit
+    if success > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to commit batch webhook payload: {str(e)}")
+            raise e
+
     return {"success": success, "failed": failed, "errors": errors}
 
 

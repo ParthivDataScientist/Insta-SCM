@@ -960,13 +960,28 @@ def _extract_child_result_from_master_result(
     return None
 
 
-async def track_and_save(
+async def _fetch_shipment_live_status(
     tracking_number: str,
+    master_tracking_number: Optional[str] = None,
+) -> dict:
+    """
+    Phase 1 Helper: Perform only the live network call via preview_track WITHOUT a database session.
+    """
+    return await preview_track(
+        tracking_number=tracking_number,
+        db=None,
+        master_tracking_number=master_tracking_number,
+    )
+
+
+def save_shipment_to_db(
+    db: Session,
+    tracking_number: str,
+    result: dict,
     recipient: Optional[str],
     items: Optional[str],
     show_date: Optional[str],
     exhibition_name: str,
-    db: Session,
     cs: Optional[str] = None,
     no_of_box: Optional[str] = None,
     project_id: Optional[int] = None,
@@ -978,102 +993,10 @@ async def track_and_save(
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
+    commit: bool = True,
 ) -> dict:
-    """
-    Detect carrier, call tracking API, then upsert the shipment record in DB.
-    Returns a result dict. On error, the dict will contain an 'error' key.
-    """
     tracking_number = (tracking_number or "").strip().upper()
-    carrier_name = detect_carrier(tracking_number)
-    result: dict
-    service = None
-
-    if carrier_name == "DHL":
-        service = DHLService()
-    elif carrier_name == "FedEx":
-        service = FedExService()
-    elif carrier_name in ("UPS", "Unknown"):
-        fallback = _resolve_child_fallback_result(
-            db=db,
-            tracking_number=tracking_number,
-            master_tracking_number=master_tracking_number,
-        )
-        if fallback:
-            result = fallback
-            carrier_name = str(result.get("carrier") or carrier_name)
-            logger.info(
-                "Resolved %s from stored master/child data (carrier=%s) without live API call.",
-                tracking_number,
-                carrier_name,
-            )
-        elif carrier_name == "UPS":
-            return {
-                "tracking_number": tracking_number,
-                "error": "UPS tracking is not yet supported. Supported carriers: FedEx, DHL.",
-            }
-        else:
-            supported_formats = (
-                "Supported formats: FedEx (12/15/20/22 digits), DHL "
-                "(10-digit AWB, eCommerce ID, or JD child piece ID), UPS (1Z...)."
-            )
-            return {
-                "tracking_number": tracking_number,
-                "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
-                f"{supported_formats}",
-            }
-
-    # Ensure we preserve the master tracking number for child piece linkage in the DB.
-    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and not master_tracking_number:
-        existing_row = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
-        if existing_row and existing_row.master_tracking_number:
-            master_tracking_number = existing_row.master_tracking_number
-
-    # We used to have an early exit here that resolved child shipments from the master context 
-    # BEFORE calling the API. This caused stale data during refreshes. 
-    # Now we always attempt a live lookup first, and only use the master context as a fallback 
-    # if the live lookup fails.
-
-    if service is not None:
-        api_target_tn = tracking_number
-        if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and master_tracking_number:
-            logger.info("DHL child piece %s tracking delegated to master %s.", tracking_number, master_tracking_number)
-            api_target_tn = master_tracking_number
-
-        logger.info("Performing live carrier lookup for %s (%s)", api_target_tn, carrier_name)
-        result = await service.track(api_target_tn)
-
-        # Ensure the result is applied back to the child row
-        if api_target_tn != tracking_number and "error" not in result:
-            child_result = _extract_child_result_from_master_result(
-                result,
-                tracking_number=tracking_number,
-                master_tracking_number=master_tracking_number or api_target_tn,
-            )
-            if child_result:
-                result = child_result
-            result["tracking_number"] = tracking_number
-
-        if "error" in result and carrier_name != "DHL":
-            # Fallback for child pieces or temporary API failures
-            contextual_fallback = _resolve_child_fallback_result(
-                db=db,
-                tracking_number=tracking_number,
-                master_tracking_number=master_tracking_number,
-            )
-            if contextual_fallback:
-                result = contextual_fallback
-                carrier_name = str(result.get("carrier") or carrier_name)
-                logger.info(
-                    "Live lookup failed for %s (%s), but resolved from stored master/child context.",
-                    tracking_number,
-                    carrier_name,
-                )
-            else:
-                logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
-                return {"tracking_number": tracking_number, "error": result["error"]}
-        elif "error" in result:
-            logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
-            return {"tracking_number": tracking_number, "error": result["error"]}
+    carrier_name = result.get("carrier") or detect_carrier(tracking_number)
 
     result = _apply_stuck_exception_policy(result)
 
@@ -1182,13 +1105,147 @@ async def track_and_save(
 
         logger.info("Updated shipment record for %s", tracking_number)
 
-
-
     db.add(shipment)
-    db.commit()
-    db.refresh(shipment)
+    if commit:
+        db.commit()
+        db.refresh(shipment)
 
     return {"tracking_number": tracking_number, "status": "success", "carrier": carrier_name}
+
+
+async def track_and_save(
+    tracking_number: str,
+    recipient: Optional[str],
+    items: Optional[str],
+    show_date: Optional[str],
+    exhibition_name: str,
+    db: Session,
+    cs: Optional[str] = None,
+    no_of_box: Optional[str] = None,
+    project_id: Optional[int] = None,
+    booking_date: Optional[str] = None,
+    show_city: Optional[str] = None,
+    cs_type: Optional[str] = None,
+    remarks: Optional[str] = None,
+    last_scan_date: Optional[str] = None,
+    master_tracking_number: Optional[str] = None,
+    is_master: Optional[bool] = None,
+    destination: Optional[str] = None,
+) -> dict:
+    """
+    Detect carrier, call tracking API, then upsert the shipment record in DB.
+    Returns a result dict. On error, the dict will contain an 'error' key.
+    """
+    tracking_number = (tracking_number or "").strip().upper()
+    carrier_name = detect_carrier(tracking_number)
+    result: dict
+    service = None
+
+    if carrier_name == "DHL":
+        service = DHLService()
+    elif carrier_name == "FedEx":
+        service = FedExService()
+    elif carrier_name in ("UPS", "Unknown"):
+        fallback = _resolve_child_fallback_result(
+            db=db,
+            tracking_number=tracking_number,
+            master_tracking_number=master_tracking_number,
+        )
+        if fallback:
+            result = fallback
+            carrier_name = str(result.get("carrier") or carrier_name)
+            logger.info(
+                "Resolved %s from stored master/child data (carrier=%s) without live API call.",
+                tracking_number,
+                carrier_name,
+            )
+        elif carrier_name == "UPS":
+            return {
+                "tracking_number": tracking_number,
+                "error": "UPS tracking is not yet supported. Supported carriers: FedEx, DHL.",
+            }
+        else:
+            supported_formats = (
+                "Supported formats: FedEx (12/15/20/22 digits), DHL "
+                "(10-digit AWB, eCommerce ID, or JD child piece ID), UPS (1Z...)."
+            )
+            return {
+                "tracking_number": tracking_number,
+                "error": f"Could not detect carrier for tracking number '{tracking_number}'. "
+                f"{supported_formats}",
+            }
+
+    # Ensure we preserve the master tracking number for child piece linkage in the DB.
+    if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and not master_tracking_number:
+        existing_row = db.exec(select(Shipment).where(Shipment.tracking_number == tracking_number)).first()
+        if existing_row and existing_row.master_tracking_number:
+            master_tracking_number = existing_row.master_tracking_number
+
+    if service is not None:
+        api_target_tn = tracking_number
+        if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and master_tracking_number:
+            logger.info("DHL child piece %s tracking delegated to master %s.", tracking_number, master_tracking_number)
+            api_target_tn = master_tracking_number
+
+        logger.info("Performing live carrier lookup for %s (%s)", api_target_tn, carrier_name)
+        result = await service.track(api_target_tn)
+
+        # Ensure the result is applied back to the child row
+        if api_target_tn != tracking_number and "error" not in result:
+            child_result = _extract_child_result_from_master_result(
+                result,
+                tracking_number=tracking_number,
+                master_tracking_number=master_tracking_number or api_target_tn,
+            )
+            if child_result:
+                result = child_result
+            result["tracking_number"] = tracking_number
+
+        if "error" in result and carrier_name != "DHL":
+            # Fallback for child pieces or temporary API failures
+            contextual_fallback = _resolve_child_fallback_result(
+                db=db,
+                tracking_number=tracking_number,
+                master_tracking_number=master_tracking_number,
+            )
+            if contextual_fallback:
+                result = contextual_fallback
+                carrier_name = str(result.get("carrier") or carrier_name)
+                logger.info(
+                    "Live lookup failed for %s (%s), but resolved from stored master/child context.",
+                    tracking_number,
+                    carrier_name,
+                )
+            else:
+                logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
+                return {"tracking_number": tracking_number, "error": result["error"]}
+        elif "error" in result:
+            logger.warning("Tracking failed for %s (%s): %s", tracking_number, carrier_name, result["error"])
+            return {"tracking_number": tracking_number, "error": result["error"]}
+
+    result = _apply_stuck_exception_policy(result)
+
+    return save_shipment_to_db(
+        db=db,
+        tracking_number=tracking_number,
+        result=result,
+        recipient=recipient,
+        items=items,
+        show_date=show_date,
+        exhibition_name=exhibition_name,
+        cs=cs,
+        no_of_box=no_of_box,
+        project_id=project_id,
+        booking_date=booking_date,
+        show_city=show_city,
+        cs_type=cs_type,
+        remarks=remarks,
+        last_scan_date=last_scan_date,
+        master_tracking_number=master_tracking_number,
+        is_master=is_master,
+        destination=destination,
+        commit=True,
+    )
 
 
 def rate_shipment(payload: dict) -> dict:
@@ -1552,37 +1609,73 @@ async def refresh_tracked_shipments(
     refreshed = 0
     errors: list[str] = []
 
+    # Phase 1: Concurrent Network (without DB session)
     tasks = []
     for shipment in shipments:
         tasks.append(
-            track_and_save(
+            _fetch_shipment_live_status(
                 tracking_number=shipment.tracking_number,
-                recipient=shipment.recipient,
-                items=shipment.items,
-                show_date=shipment.show_date,
-                exhibition_name=shipment.exhibition_name or "Unknown Exhibition",
-                db=db,
-                cs=shipment.cs,
-                no_of_box=shipment.no_of_box,
-                project_id=shipment.project_id,
                 master_tracking_number=shipment.master_tracking_number,
-                is_master=shipment.is_master,
-                booking_date=shipment.booking_date,
-                show_city=shipment.show_city,
-                cs_type=shipment.cs_type,
-                remarks=shipment.remarks,
             )
         )
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
+    # Phase 2: Sequential DB Write
     for shipment, result in zip(shipments, results):
         if isinstance(result, Exception):
             errors.append(f"{shipment.tracking_number}: {str(result)}")
-        elif "error" in result:
-            errors.append(f"{shipment.tracking_number}: {result['error']}")
-        else:
+            continue
+
+        # If live network lookup failed, try to get local fallback sequentially
+        if "error" in result:
+            carrier_name = detect_carrier(shipment.tracking_number)
+            fallback_res = _resolve_child_fallback_result(
+                db=db,
+                tracking_number=shipment.tracking_number,
+                master_tracking_number=shipment.master_tracking_number,
+                allow_master_context=(carrier_name == "DHL"),
+            )
+            if fallback_res:
+                result = fallback_res
+            else:
+                errors.append(f"{shipment.tracking_number}: {result['error']}")
+                continue
+
+        try:
+            save_shipment_to_db(
+                db=db,
+                tracking_number=shipment.tracking_number,
+                result=result,
+                recipient=shipment.recipient,
+                items=shipment.items,
+                show_date=shipment.show_date,
+                exhibition_name=shipment.exhibition_name or "Unknown Exhibition",
+                cs=shipment.cs,
+                no_of_box=shipment.no_of_box,
+                project_id=shipment.project_id,
+                booking_date=shipment.booking_date,
+                show_city=shipment.show_city,
+                cs_type=shipment.cs_type,
+                remarks=shipment.remarks,
+                last_scan_date=shipment.last_scan_date,
+                master_tracking_number=shipment.master_tracking_number,
+                is_master=shipment.is_master,
+                destination=shipment.destination,
+                commit=False,  # DO NOT commit sequentially!
+            )
             refreshed += 1
+        except Exception as e:
+            errors.append(f"{shipment.tracking_number}: {str(e)}")
+
+    # Single commit at the very end
+    if refreshed > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to commit batch refresh: {str(e)}")
+            raise e
 
     return {
         "requested": len(shipments),
