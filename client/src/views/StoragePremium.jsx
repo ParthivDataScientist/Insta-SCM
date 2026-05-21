@@ -7,7 +7,6 @@ import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
 
 export default function StoragePremium() {
     const [selected, setSelected] = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
     const {
         loading,
         error,
@@ -15,6 +14,9 @@ export default function StoragePremium() {
         filteredShipments,
         searchQuery,
         setSearchQuery,
+        selectedIds,
+        setSelectedIds,
+        handleSelectAll,
         deleteShipment,
         archiveShipment,
         batchDelete,
@@ -97,6 +99,7 @@ export default function StoragePremium() {
                             onArchiveShipment={archiveShipment}
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
+                            onSelectAll={handleSelectAll}
                             selectedShipment={selected}
                         />
                     )}

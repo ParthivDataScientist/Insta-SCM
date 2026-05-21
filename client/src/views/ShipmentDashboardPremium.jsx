@@ -17,6 +17,7 @@ export default function ShipmentDashboardPremium() {
     const {
         shipments, stats, loading, refreshing, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
+        selectedIds, setSelectedIds, handleSelectAll,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
 
@@ -33,7 +34,6 @@ export default function ShipmentDashboardPremium() {
     }, [refreshTracking]);
 
     const [selectedShipment, setSelectedShipment] = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
     const [showTrack, setShowTrack] = useState(false);
     const [showMobileHeaderActions, setShowMobileHeaderActions] = useState(false);
     const [isMobileViewport, setIsMobileViewport] = useState(() => (
@@ -406,6 +406,7 @@ export default function ShipmentDashboardPremium() {
                                 onArchiveShipment={handleArchive}
                                 selectedIds={selectedIds}
                                 onSelectionChange={setSelectedIds}
+                                onSelectAll={handleSelectAll}
                                 selectedShipment={selectedShipment}
                             />
                         </div>

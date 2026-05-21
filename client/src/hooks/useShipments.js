@@ -19,6 +19,22 @@ export function useShipments() {
     const [dateFilter, setDateFilter] = useState('All');
     const [isArchivedView, setIsArchivedView] = useState(false);
 
+    // Selection state
+    const [selectedIds, setSelectedIds] = useState([]);
+
+    const handleSelectAll = useCallback(() => {
+        if (selectedIds.length === filteredShipments.length && filteredShipments.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredShipments.map(s => s.id).filter(id => id != null));
+        }
+    }, [filteredShipments, selectedIds]);
+
+    // Reset selection when filters or view changes to prevent accidental batch actions
+    useEffect(() => {
+        setSelectedIds([]);
+    }, [filter, searchQuery, carrierFilter, dateFilter, isArchivedView]);
+
     const getErrorMessage = useCallback((err) => {
         return err?.response?.data?.detail || err?.message || 'Something went wrong';
     }, []);
@@ -225,6 +241,8 @@ export function useShipments() {
         carrierFilter, setCarrierFilter,
         dateFilter, setDateFilter,
         isArchivedView, setIsArchivedView,
+        selectedIds, setSelectedIds,
+        handleSelectAll,
         deleteShipment,
         archiveShipment,
         batchDelete,

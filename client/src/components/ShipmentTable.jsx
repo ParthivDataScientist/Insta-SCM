@@ -8,6 +8,7 @@ import {
     Eye,
     Filter,
     Loader,
+    Minus,
     MoreHorizontal,
     Package,
     Search,
@@ -718,6 +719,7 @@ const ShipmentTable = ({
     onArchiveShipment,
     selectedIds = [],
     onSelectionChange = () => {},
+    onSelectAll,
     onClearFilters = () => {},
     selectedShipment,
 }) => {
@@ -826,7 +828,15 @@ const ShipmentTable = ({
     const visibleMasterIds = sortedGroups
         .map((group) => group.master.id)
         .filter((id) => id != null);
-    const allVisibleSelected = visibleMasterIds.length > 0 && visibleMasterIds.every((id) => selectedIds.includes(id));
+    
+    const isAllSelected = onSelectAll
+        ? (selectedIds.length === shipments.length && shipments.length > 0)
+        : (visibleMasterIds.length > 0 && visibleMasterIds.every((id) => selectedIds.includes(id)));
+
+    const isIndeterminate = onSelectAll
+        ? (selectedIds.length > 0 && selectedIds.length < shipments.length)
+        : (visibleMasterIds.length > 0 && !isAllSelected && visibleMasterIds.some((id) => selectedIds.includes(id)));
+
     const hasFilters = Boolean(idSearch || exhibitionFilter.length || statusFilter.length || carrierFilter.length);
     const tableHasRows = sortedGroups.length > 0;
     const showSkeletonRows = loading && !tableHasRows;
@@ -839,10 +849,14 @@ const ShipmentTable = ({
     };
 
     const handleSelectAll = () => {
-        if (allVisibleSelected) {
-            onSelectionChange(selectedIds.filter((id) => !visibleMasterIds.includes(id)));
+        if (onSelectAll) {
+            onSelectAll();
         } else {
-            onSelectionChange([...new Set([...selectedIds, ...visibleMasterIds])]);
+            if (isAllSelected) {
+                onSelectionChange(selectedIds.filter((id) => !visibleMasterIds.includes(id)));
+            } else {
+                onSelectionChange([...new Set([...selectedIds, ...visibleMasterIds])]);
+            }
         }
     };
 
@@ -1016,8 +1030,16 @@ const ShipmentTable = ({
                     <thead className="design-table__thead">
                         <tr>
                             <th className="design-table__th design-table__th--left shipping-col-check">
-                                <button type="button" className={`custom-checkbox ${allVisibleSelected ? 'checked' : ''}`} onClick={handleSelectAll}>
-                                    {allVisibleSelected ? <Check size={10} /> : null}
+                                <button 
+                                    type="button" 
+                                    className={`custom-checkbox ${isAllSelected ? 'checked' : ''} ${isIndeterminate ? 'indeterminate' : ''}`} 
+                                    onClick={handleSelectAll}
+                                >
+                                    {isAllSelected ? (
+                                        <Check size={10} />
+                                    ) : isIndeterminate ? (
+                                        <Minus size={10} />
+                                    ) : null}
                                 </button>
                             </th>
 

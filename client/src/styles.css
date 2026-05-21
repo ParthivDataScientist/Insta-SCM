@@ -2649,7 +2649,8 @@ select {
     transition: all 0.2s;
 }
 
-.custom-checkbox.checked {
+.custom-checkbox.checked,
+.custom-checkbox.indeterminate {
     background: var(--blu);
     border-color: var(--blu);
 }
