@@ -406,6 +406,7 @@ export default function ShipmentDashboardPremium() {
                                 onArchiveShipment={handleArchive}
                                 selectedIds={selectedIds}
                                 onSelectionChange={setSelectedIds}
+                                selectedShipment={selectedShipment}
                             />
                         </div>
                     </div>

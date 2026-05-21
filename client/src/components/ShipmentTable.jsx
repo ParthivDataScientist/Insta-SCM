@@ -1,4 +1,4 @@
-﻿import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Archive,
     Check,
@@ -719,6 +719,7 @@ const ShipmentTable = ({
     selectedIds = [],
     onSelectionChange = () => {},
     onClearFilters = () => {},
+    selectedShipment,
 }) => {
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
@@ -728,6 +729,12 @@ const ShipmentTable = ({
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [mobileActionTarget, setMobileActionTarget] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
+
+    const handleViewMaster = (shipment) => {
+        if (onSelectShipment && shipment) {
+            onSelectShipment({ ...shipment, is_master: true });
+        }
+    };
 
     const groupedShipments = useMemo(() => (
         buildPositionalGroups(shipments).map((group, index) => {
@@ -933,7 +940,7 @@ const ShipmentTable = ({
                                 <article
                                     key={`mobile-${masterKey}`}
                                     className={`shipment-mobile-card ${isUpcomingBookingDate(master.booking_date) ? 'shipment-mobile-card--upcoming' : ''}`}
-                                    onClick={() => onSelectShipment(master)}
+                                    onClick={() => handleViewMaster(master)}
                                 >
                                     <div className="shipment-mobile-card__top">
                                         <div className="shipment-mobile-card__title-wrap">
@@ -979,7 +986,7 @@ const ShipmentTable = ({
                                         <button
                                             type="button"
                                             className="shipment-mobile-card__track"
-                                            onClick={() => onSelectShipment(master)}
+                                            onClick={() => handleViewMaster(master)}
                                         >
                                             Track
                                         </button>
@@ -1085,9 +1092,11 @@ const ShipmentTable = ({
                                 .filter(Boolean)
                                 .join(' | ');
 
+                            const isMasterActive = selectedShipment?.id === master.id && selectedShipment?.is_master !== false;
+
                             return (
                                 <Fragment key={masterKey}>
-                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${masterHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''}`} onClick={() => onSelectShipment(master)}>
+                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${masterHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''} ${isMasterActive ? 'active-row' : ''}`} onClick={() => handleViewMaster(master)}>
                                         <td className="design-table__td shipping-col-check" onClick={(event) => handleSelectMaster(event, master.id)}>
                                             <span className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                                                 {isSelected ? <Check size={10} /> : null}
@@ -1178,10 +1187,10 @@ const ShipmentTable = ({
 
                                         <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
                                             <div className="action-cell__inner">
-                                                <button type="button" className="track-btn" onClick={() => onSelectShipment(master)}>Track</button>
+                                                <button type="button" className="track-btn" onClick={() => handleViewMaster(master)}>Track</button>
                                                 <RowActionMenu
                                                     shipment={master}
-                                                    onView={() => onSelectShipment(master)}
+                                                    onView={() => handleViewMaster(master)}
                                                     onMove={() => onArchiveShipment?.(master.id)}
                                                     onDelete={() => onDeleteShipment(master.id)}
                                                     canMove={Boolean(onArchiveShipment && master.id != null)}
@@ -1198,10 +1207,14 @@ const ShipmentTable = ({
                                         const childStatusTitle = [childStatusMeta.date, childStatusMeta.headline, childStatusMeta.location]
                                             .filter(Boolean)
                                             .join(' | ');
+                                        const isChildActive = selectedShipment && 
+                                            selectedShipment.is_master === false &&
+                                            (selectedShipment.id === child.id || 
+                                             selectedShipment.tracking_number === (child.__displayTracking || child.tracking_number));
                                         return (
                                         <tr
                                             key={child.__rowKey}
-                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${childHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''}`}
+                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${childHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''} ${isChildActive ? 'active-row' : ''}`}
                                             onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
                                         >
                                             <td className="design-table__td shipping-col-check" />
@@ -1394,7 +1407,7 @@ const ShipmentTable = ({
                                 type="button"
                                 className="shipping-mobile-action"
                                 onClick={() => {
-                                    onSelectShipment(mobileActionTarget);
+                                    handleViewMaster(mobileActionTarget);
                                     setMobileActionTarget(null);
                                 }}
                             >

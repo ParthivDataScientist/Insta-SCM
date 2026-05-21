@@ -258,6 +258,7 @@ export default function ShipmentDashboard() {
                             onArchiveShipment={handleArchive}
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
+                            selectedShipment={selectedShipment}
                         />
                     )}
 

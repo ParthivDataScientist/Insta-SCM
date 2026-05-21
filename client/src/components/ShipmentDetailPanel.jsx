@@ -257,7 +257,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                         <Package size={14} />
                         <div>
                             <label>Exhibition</label>
-                            <span>{s.exhibition_name || 'N/A'}</span>
+                            <span>{(!s.exhibition_name || s.exhibition_name === 'Unknown Exhibition') ? (s.project_client_name || s.recipient || 'N/A') : s.exhibition_name}</span>
                         </div>
                     </div>
                     <div className="logistics-item">

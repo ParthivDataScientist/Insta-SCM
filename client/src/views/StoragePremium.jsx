@@ -97,6 +97,7 @@ export default function StoragePremium() {
                             onArchiveShipment={archiveShipment}
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
+                            selectedShipment={selected}
                         />
                     )}
                 </div>

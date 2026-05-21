@@ -145,6 +145,7 @@ export default function Storage() {
                                         onArchiveShipment={archiveShipment} // Toggle back to active
                                         selectedIds={selectedIds}
                                         onSelectionChange={setSelectedIds}
+                                        selectedShipment={selected}
                                     />
                                 )}
                             </div>
