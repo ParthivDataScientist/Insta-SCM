@@ -1186,7 +1186,7 @@ const ShipmentTable = ({
 
                                         <td className="design-table__td shipping-col-show-date">
                                             <div className="shipment-date-cell">
-                                                <span className="shipment-date-cell__date">{formatShowDateDisplay(master.show_date)}</span>
+                                                <span className="shipment-date-cell__date">{master.show_date || 'TBD'}</span>
                                             </div>
                                         </td>
 
@@ -1278,7 +1278,7 @@ const ShipmentTable = ({
 
                                             <td className="design-table__td shipping-col-show-date">
                                                 <div className="shipment-date-cell shipment-date-cell--child">
-                                                    <span className="shipment-date-cell__date">{formatShowDateDisplay(child.show_date || master.show_date)}</span>
+                                                    <span className="shipment-date-cell__date">{(child.show_date || master.show_date) || 'TBD'}</span>
                                                 </div>
                                             </td>
 

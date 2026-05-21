@@ -264,7 +264,7 @@ const ShipmentDetailPanel = ({ shipment, onClose, onDeleted, isPanel = false }) 
                         <Calendar size={14} />
                         <div>
                             <label>Show Date / Info</label>
-                            <span>{s.show_date || '—'}</span>
+                            <span>{s.show_date || 'TBD'}</span>
                         </div>
                     </div>
                 </div>
