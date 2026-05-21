@@ -346,7 +346,7 @@ export default function ShipmentDashboardPremium() {
                         animation: 'fadeIn 0.3s ease-out'
                     }}>
                         <RefreshCw size={14} style={{ animation: 'spin 1.5s linear infinite' }} />
-                        <span>Syncing latest shipment status in the background...</span>
+                        <span>Fetching latest live tracking from DHL...</span>
                     </div>
                 )}
 
