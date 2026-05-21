@@ -237,7 +237,14 @@ def test_dhl_provider_to_status_bucket_text_fallback_movement_overrides():
     # Movement overrides should override exception flags
     assert provider._to_status_bucket("processed at facility - delayed in customs") == "In Transit"
     assert provider._to_status_bucket("departed facility - on hold") == "In Transit"
-    assert provider._to_status_bucket("arrived at sorting hub - exception") == "In Transit"
+    assert provider._to_status_bucket("forwarded from sorting hub - exception") == "In Transit"
+
+
+def test_dhl_provider_to_status_bucket_cd_quirk():
+    provider = DHLProvider()
+    assert provider._to_status_bucket("Clearance event", "CD") == "In Transit"
+    assert provider._to_status_bucket("Clearance event with delay", "CD") == "Exception"
+    assert provider._to_status_bucket("Clearance Delay", "CD") == "Exception"
 
 
 def test_dhl_provider_to_status_bucket_text_fallback_strict_boundaries():

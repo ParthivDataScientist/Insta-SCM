@@ -25,6 +25,8 @@ FEDEX_STATUS_MAP = {
     "on fedex vehicle": "Out for Delivery",
     "out for delivery": "Out for Delivery",
     "at local fedex": "Out for Delivery",
+    "on the way": "In Transit",
+    "arrived": "In Transit",
     # Exception / Hold
     "exception": "Exception",
     "clearance delay": "Exception",
@@ -62,18 +64,30 @@ def map_fedex_status(raw_status: str) -> str:
     """Map a raw FedEx status string to our dashboard status categories."""
     lower = raw_status.lower().strip()
 
-    # High-priority exception keywords
-    if any(k in lower for k in ["delay", "exception", "held"]):
-        return "Exception"
+    recovery_keywords = ["resolved", "released", "cleared", "completed", "departed", "processed", "on the way"]
+    has_recovery = any(k in lower for k in recovery_keywords)
+
+    # High-priority exception keywords - skipped if recovery keyword exists
+    if not has_recovery:
+        # Refine the exception check to ignore standard customs events:
+        if "clearance event" in lower and "delay" not in lower:
+            pass
+        elif any(k in lower for k in ["delay", "exception", "held"]):
+            return "Exception"
 
     # Direct match first
     if lower in FEDEX_STATUS_MAP:
-        return FEDEX_STATUS_MAP[lower]
+        val = FEDEX_STATUS_MAP[lower]
+        if not (val == "Exception" and has_recovery):
+            return val
 
     # Partial match — sorted by key length (longest first) for specificity
     for key in sorted(FEDEX_STATUS_MAP.keys(), key=len, reverse=True):
         if key in lower:
-            return FEDEX_STATUS_MAP[key]
+            val = FEDEX_STATUS_MAP[key]
+            if val == "Exception" and has_recovery:
+                continue
+            return val
 
     # Fallback: if "deliver" is anywhere in the string, it's delivered
     if "deliver" in lower:

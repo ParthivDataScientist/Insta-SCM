@@ -295,3 +295,21 @@ class TestFedExMPSParser:
             "884158465642",
             "884158465643",
         }
+
+
+def test_map_fedex_status_recovery_and_quirks():
+    from app.services.fedex import map_fedex_status
+    
+    # Test generic transit keys added to FEDEX_STATUS_MAP
+    assert map_fedex_status("on the way") == "In Transit"
+    assert map_fedex_status("arrived") == "In Transit"
+
+    # Test Recovery Keywords (skip Exception block)
+    assert map_fedex_status("clearance delay resolved") == "In Transit"
+    assert map_fedex_status("shipment exception released") == "In Transit"
+    assert map_fedex_status("held in customs cleared") == "In Transit"
+    assert map_fedex_status("processed at sorting facility - exception delayed") == "In Transit"
+    
+    # Test standard customs events without delays ignored
+    assert map_fedex_status("clearance event") == "In Transit"
+    assert map_fedex_status("clearance event delay") == "Exception"

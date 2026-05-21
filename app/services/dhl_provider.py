@@ -773,8 +773,15 @@ class DHLProvider:
         IN_TRANSIT_CODES = {"AF", "DF", "PL", "AR", "DP"}
 
         code = _text_or_empty(event_code).upper().strip()
+        status = _text_or_empty(raw_status).lower()
 
-        # Primary Code Check
+        # Handle the CD (Clearance Delay/Event) quirk
+        if code == "CD":
+            if "clearance event" in status and "delay" not in status:
+                return "In Transit"
+            return "Exception"
+
+        # Primary Code Check for other codes
         if code in EXCEPTION_CODES:
             return "Exception"
         if code in DELIVERED_CODES:
@@ -784,35 +791,32 @@ class DHLProvider:
         if code in IN_TRANSIT_CODES:
             return "In Transit"
 
-        # Fallback to Strict Text Parsing
-        status = _text_or_empty(raw_status).lower()
+        # Special overrides to bypass all text-based exception logic
+        if "with delivery courier" in status:
+            return "Out for Delivery"
 
-        # Explicit movement overrides to prevent false exceptions
-        movement_overrides = ("departed", "processed", "arrived", "forwarded")
-        if any(word in status for word in movement_overrides):
+        movement_words = ["departed", "processed", "forwarded", "released", "resolved", "cleared"]
+        if any(word in status for word in movement_words):
             return "In Transit"
 
         # Exception check with strict word boundaries
-        exception_words = (
-            "exception",
-            "hold",
-            "customs delay",
-            "customs hold",
-            "clearance delay",
-            "delay",
-            "return",
-            "undeliver",
-            "attempted",
-        )
-        for word in exception_words:
-            pattern = rf"\b{re.escape(word)}"
+        exception_patterns = [
+            r"\bexception\w*\b",
+            r"\bhold\w*\b",
+            r"\bheld\b",
+            r"\bdelay\w*\b",
+            r"\breturn\w*\b",
+            r"\bundeliver\w*\b",
+            r"\battempt\w*\b",
+        ]
+        for pattern in exception_patterns:
             if re.search(pattern, status):
                 return "Exception"
 
         # Out for delivery check
         out_for_delivery_words = ("out for delivery", "with delivery courier", "with courier")
         for word in out_for_delivery_words:
-            pattern = rf"\b{re.escape(word)}"
+            pattern = rf"\b{re.escape(word)}\b"
             if re.search(pattern, status):
                 return "Out for Delivery"
 
@@ -826,7 +830,10 @@ class DHLProvider:
         )
         has_delivered = False
         for marker in delivered_markers:
-            pattern = rf"\b{re.escape(marker)}"
+            if marker == "delivered":
+                pattern = r"\bdelivered\b"
+            else:
+                pattern = rf"\b{re.escape(marker)}\b"
             if re.search(pattern, status):
                 has_delivered = True
                 break
@@ -835,7 +842,7 @@ class DHLProvider:
             in_progress_exclusions = ("delivery facility", "out for delivery", "scheduled for delivery", "attempted")
             has_exclusion = False
             for exclusion in in_progress_exclusions:
-                pattern = rf"\b{re.escape(exclusion)}"
+                pattern = rf"\b{re.escape(exclusion)}\b"
                 if re.search(pattern, status):
                     has_exclusion = True
                     break
