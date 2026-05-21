@@ -156,7 +156,7 @@ class TestTrackShipment:
         project = create_project(client, "Stuck Shipment Project")
         stale_date = (datetime.now(timezone.utc) - timedelta(days=3, hours=1)).isoformat()
 
-        def mock_stale_track(self, tn):
+        async def mock_stale_track(self, tn):
             return {
                 "status": "In Transit",
                 "origin": "Mumbai, IN",
@@ -191,7 +191,7 @@ class TestTrackShipment:
         fresh_date = datetime.now(timezone.utc).isoformat()
         stale_child_date = (datetime.now(timezone.utc) - timedelta(days=4)).isoformat()
 
-        def mock_mps_track(self, tn):
+        async def mock_mps_track(self, tn):
             return {
                 "status": "In Transit",
                 "origin": "Mumbai, IN",
@@ -237,7 +237,7 @@ class TestTrackShipment:
     def test_track_uses_entry_destination_when_carrier_destination_unknown(self, client, monkeypatch):
         project = create_project(client, "Destination Fallback Project")
 
-        def mock_track_unknown_destination(self, tn):
+        async def mock_track_unknown_destination(self, tn):
             return {
                 "status": "In Transit",
                 "origin": "Mumbai, IN",

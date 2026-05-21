@@ -74,7 +74,7 @@ class DHLService(CarrierService):
     def __init__(self):
         self.provider = DHLProvider()
 
-    def track(self, tracking_number: str) -> Dict[str, Any]:
+    async def track(self, tracking_number: str) -> Dict[str, Any]:
         """Track a shipment using DHL Express India SOAP/WCF PostTracking."""
         normalized_tracking_number = _normalize_dhl_tracking_number(tracking_number)
         if normalized_tracking_number != tracking_number:
@@ -84,7 +84,7 @@ class DHLService(CarrierService):
                 normalized_tracking_number,
             )
 
-        return self.provider.track(normalized_tracking_number)
+        return await self.provider.track(normalized_tracking_number)
 
     def _extract_piece_data(self, shipment: Dict[str, Any]) -> Dict[str, Any]:
         """Helper to extract common fields from a single shipment/piece object."""

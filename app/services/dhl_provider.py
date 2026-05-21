@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import asyncio
 import base64
 import html
 import logging
@@ -8,7 +7,7 @@ from datetime import datetime
 from typing import Any
 import xml.etree.ElementTree as ET
 
-import requests
+import httpx
 
 from app.core.config import settings
 from app.services.carrier_base import HISTORY_STATUS_MAP
@@ -80,27 +79,28 @@ class DHLProvider:
         self.username = settings.DHL_WCF_USERNAME
         self.password = settings.DHL_WCF_PASSWORD
 
-    def track(self, awb: str) -> dict[str, Any]:
+    async def track(self, awb: str) -> dict[str, Any]:
         normalized_awb = sanitize_dhl_awb(awb)
         isolation_error = self._validate_input(normalized_awb, raw_input=awb)
         if isolation_error:
             return {"carrier": "DHL", "error": isolation_error}
 
-        all_checkpoint = self._fetch_tracking_payload(
+        all_checkpoint_task = self._fetch_tracking_payload(
             awb=normalized_awb,
             operation=self.OP_POST_TRACKING_ALL,
             soap_action=self.ACTION_POST_TRACKING_ALL,
             result_node="PostTracking_AllCheckpointResult",
         )
-        if all_checkpoint.get("error") and all_checkpoint["error"] != "Shipment not found":
-            logger.warning("DHL all-checkpoint call failed for %s: %s", normalized_awb, all_checkpoint["error"])
-
-        summary = self._fetch_tracking_payload(
+        summary_task = self._fetch_tracking_payload(
             awb=normalized_awb,
             operation=self.OP_POST_TRACKING,
             soap_action=self.soap_action or self.ACTION_POST_TRACKING,
             result_node="PostTrackingResult",
         )
+        all_checkpoint, summary = await asyncio.gather(all_checkpoint_task, summary_task)
+
+        if all_checkpoint.get("error") and all_checkpoint["error"] != "Shipment not found":
+            logger.warning("DHL all-checkpoint call failed for %s: %s", normalized_awb, all_checkpoint["error"])
 
         if summary.get("error") and all_checkpoint.get("error"):
             # If both failed, return the summary error (unless it's just "not found")
@@ -128,7 +128,7 @@ class DHLProvider:
 
         return None
 
-    def _fetch_tracking_payload(
+    async def _fetch_tracking_payload(
         self,
         *,
         awb: str,
@@ -140,13 +140,14 @@ class DHLProvider:
         headers = self._build_headers(soap_action_override=soap_action)
 
         try:
-            response = requests.post(
-                self.endpoint,
-                data=envelope.encode("utf-8"),
-                headers=headers,
-                timeout=self.timeout_seconds,
-            )
-        except requests.RequestException as exc:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.endpoint,
+                    content=envelope.encode("utf-8"),
+                    headers=headers,
+                    timeout=self.timeout_seconds,
+                )
+        except httpx.HTTPError as exc:
             logger.error("DHL SOAP request failed for %s (%s): %s", awb, operation, exc)
             return {"error": f"DHL SOAP Request Failed: {exc}"}
 
@@ -240,6 +241,8 @@ class DHLProvider:
         message = _text_or_empty(detail)
         lower_message = message.lower()
         if "object reference not set to an instance of an object" in lower_message:
+            if is_dhl_child_piece_id(normalized_awb):
+                return DHL_CHILD_PIECE_CONTEXT_ERROR
             return DHL_SOAP_INTERNAL_ERROR
         return f"DHL SOAP Error: {message or 'Unknown carrier error'}"
 

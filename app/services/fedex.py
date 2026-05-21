@@ -246,7 +246,11 @@ class FedExService(CarrierService):
                 return parsed
         return None
 
-    def track(self, tracking_number: str) -> Dict[str, Any]:
+    async def track(self, tracking_number: str) -> Dict[str, Any]:
+        from fastapi.concurrency import run_in_threadpool
+        return await run_in_threadpool(self._track_sync, tracking_number)
+
+    def _track_sync(self, tracking_number: str) -> Dict[str, Any]:
         normalized_tracking_number = _normalize_fedex_tracking_number(tracking_number)
         if normalized_tracking_number != tracking_number:
             logger.info(

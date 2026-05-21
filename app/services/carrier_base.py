@@ -23,9 +23,9 @@ HISTORY_STATUS_MAP: Dict[str, str] = {
 
 class CarrierService(ABC):
     @abstractmethod
-    def track(self, tracking_number: str) -> Dict[str, Any]:
+    async def track(self, tracking_number: str) -> Dict[str, Any]:
         """
-        Track a shipment given a tracking number.
+        Track a shipment given a tracking number asynchronously.
         Returns a standardized dict with at least 'status', 'history'.
         On failure, returns a dict with an 'error' key.
         """

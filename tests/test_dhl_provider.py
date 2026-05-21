@@ -1,4 +1,5 @@
 import html
+import pytest
 
 from app.services.dhl_provider import DHL_CHILD_PIECE_CONTEXT_ERROR, DHL_SOAP_INTERNAL_ERROR, DHLProvider
 from app.services.dhl_validation import DHL_AWB_FORMAT_ERROR
@@ -36,9 +37,10 @@ def _wrap_fault(message: str) -> str:
     )
 
 
-def test_dhl_provider_rejects_invalid_awb():
+@pytest.mark.anyio
+async def test_dhl_provider_rejects_invalid_awb():
     provider = DHLProvider()
-    result = provider.track("1Z12345E0291980793")
+    result = await provider.track("1Z12345E0291980793")
     assert result["error"] == DHL_AWB_FORMAT_ERROR
 
 
@@ -48,31 +50,33 @@ def test_dhl_provider_accepts_child_piece_identifier():
     assert provider._validate_input(child_piece, raw_input=child_piece) is None
 
 
-def test_dhl_provider_translates_child_piece_null_reference_fault(monkeypatch):
+@pytest.mark.anyio
+async def test_dhl_provider_translates_child_piece_null_reference_fault(monkeypatch):
     provider = DHLProvider()
     fault = _wrap_fault("Object reference not set to an instance of an object.")
 
-    monkeypatch.setattr(
-        "app.services.dhl_provider.requests.post",
-        lambda *args, **kwargs: _MockResponse(status_code=500, text=fault),
-    )
+    async def mock_post(*args, **kwargs):
+        return _MockResponse(status_code=500, text=fault)
 
-    result = provider.track("JD014600012565061255")
+    monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+
+    result = await provider.track("JD014600012565061255")
 
     assert result["error"] == DHL_CHILD_PIECE_CONTEXT_ERROR
     assert "Object reference" not in result["error"]
 
 
-def test_dhl_provider_translates_awb_null_reference_fault(monkeypatch):
+@pytest.mark.anyio
+async def test_dhl_provider_translates_awb_null_reference_fault(monkeypatch):
     provider = DHLProvider()
     fault = _wrap_fault("Object reference not set to an instance of an object.")
 
-    monkeypatch.setattr(
-        "app.services.dhl_provider.requests.post",
-        lambda *args, **kwargs: _MockResponse(status_code=500, text=fault),
-    )
+    async def mock_post(*args, **kwargs):
+        return _MockResponse(status_code=500, text=fault)
 
-    result = provider.track("1234567890")
+    monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+
+    result = await provider.track("1234567890")
 
     assert result["error"] == DHL_SOAP_INTERNAL_ERROR
     assert "Object reference" not in result["error"]
@@ -85,7 +89,8 @@ def test_dhl_provider_uses_awbnumber_tag():
     assert "AWBNo" not in envelope
 
 
-def test_dhl_provider_maps_tracking_payload(monkeypatch):
+@pytest.mark.anyio
+async def test_dhl_provider_maps_tracking_payload(monkeypatch):
     provider = DHLProvider()
 
     payload = (
@@ -111,12 +116,12 @@ def test_dhl_provider_maps_tracking_payload(monkeypatch):
     )
 
     soap = _wrap_in_soap(payload)
-    monkeypatch.setattr(
-        "app.services.dhl_provider.requests.post",
-        lambda *args, **kwargs: _MockResponse(status_code=200, text=soap),
-    )
+    async def mock_post(*args, **kwargs):
+        return _MockResponse(status_code=200, text=soap)
 
-    result = provider.track("1234567890")
+    monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+
+    result = await provider.track("1234567890")
 
     assert result["current_status"] == "Arrived at delivery facility"
     assert result["estimated_delivery"] == "2026-04-22"
@@ -125,20 +130,22 @@ def test_dhl_provider_maps_tracking_payload(monkeypatch):
     assert result["carrier"] == "DHL"
 
 
-def test_dhl_provider_returns_not_found(monkeypatch):
+@pytest.mark.anyio
+async def test_dhl_provider_returns_not_found(monkeypatch):
     provider = DHLProvider()
     payload = '<?xml version="1.0" encoding="utf-8"?><ActionStatus>No Shipments Found</ActionStatus>'
     soap = _wrap_in_soap(payload)
-    monkeypatch.setattr(
-        "app.services.dhl_provider.requests.post",
-        lambda *args, **kwargs: _MockResponse(status_code=200, text=soap),
-    )
+    async def mock_post(*args, **kwargs):
+        return _MockResponse(status_code=200, text=soap)
 
-    result = provider.track("1234567890")
+    monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+
+    result = await provider.track("1234567890")
     assert result["error"] == "Shipment not found"
 
 
-def test_dhl_provider_prefers_all_checkpoint_history(monkeypatch):
+@pytest.mark.anyio
+async def test_dhl_provider_prefers_all_checkpoint_history(monkeypatch):
     provider = DHLProvider()
     all_checkpoint_payload = (
         '<?xml version="1.0" encoding="utf-8"?>'
@@ -165,12 +172,12 @@ def test_dhl_provider_prefers_all_checkpoint_history(monkeypatch):
         _MockResponse(status_code=200, text=_wrap_in_soap(summary_payload, "PostTrackingResult")),
     ]
 
-    def fake_post(*args, **kwargs):
+    async def fake_post(*args, **kwargs):
         return responses.pop(0)
 
-    monkeypatch.setattr("app.services.dhl_provider.requests.post", fake_post)
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
 
-    result = provider.track("1234567890")
+    result = await provider.track("1234567890")
 
     assert result["current_status"] == "Out for delivery"
     assert result["last_location"] == "IRVING, TX, US"
@@ -179,7 +186,8 @@ def test_dhl_provider_prefers_all_checkpoint_history(monkeypatch):
     assert len(result["history"]) == 2
 
 
-def test_dhl_provider_marks_explicit_delivered_as_delivered(monkeypatch):
+@pytest.mark.anyio
+async def test_dhl_provider_marks_explicit_delivered_as_delivered(monkeypatch):
     provider = DHLProvider()
     payload = (
         '<?xml version="1.0" encoding="utf-8"?>'
@@ -193,11 +201,11 @@ def test_dhl_provider_marks_explicit_delivered_as_delivered(monkeypatch):
     )
 
     soap = _wrap_in_soap(payload, "PostTracking_AllCheckpointResult")
-    monkeypatch.setattr(
-        "app.services.dhl_provider.requests.post",
-        lambda *args, **kwargs: _MockResponse(status_code=200, text=soap),
-    )
+    async def mock_post(*args, **kwargs):
+        return _MockResponse(status_code=200, text=soap)
+
+    monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
 
     # summary call will fail with "missing result node", but detailed succeeds and is enough
-    result = provider.track("1234567890")
+    result = await provider.track("1234567890")
     assert result["status"] == "Delivered"

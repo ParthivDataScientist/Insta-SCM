@@ -69,11 +69,14 @@ def client_fixture(monkeypatch):
             }
         ],
     }
+    async def mock_async_track(self, tn):
+        return mock_track_result
+
     monkeypatch.setattr(
-        "app.services.fedex.FedExService.track", lambda self, tn: mock_track_result
+        "app.services.fedex.FedExService.track", mock_async_track
     )
     monkeypatch.setattr(
-        "app.services.dhl.DHLService.track", lambda self, tn: mock_track_result
+        "app.services.dhl.DHLService.track", mock_async_track
     )
 
     with TestClient(app) as c:

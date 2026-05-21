@@ -3,6 +3,7 @@ Shipment Service Layer
 Encapsulates all business logic for tracking and managing shipments.
 Endpoints should call these functions instead of containing business logic directly.
 """
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
@@ -166,7 +167,7 @@ def _apply_stuck_exception_policy(result: dict) -> dict:
         return result
 
     # Disabled artificial stuck exception policy per user request so the DB uses the true API status
-    return result
+    # return result
 
     current_status = str(result.get("status", "") or "")
     if _is_delivered_status(current_status):
@@ -959,7 +960,7 @@ def _extract_child_result_from_master_result(
     return None
 
 
-def track_and_save(
+async def track_and_save(
     tracking_number: str,
     recipient: Optional[str],
     items: Optional[str],
@@ -1039,7 +1040,7 @@ def track_and_save(
             api_target_tn = master_tracking_number
 
         logger.info("Performing live carrier lookup for %s (%s)", api_target_tn, carrier_name)
-        result = service.track(api_target_tn)
+        result = await service.track(api_target_tn)
 
         # Ensure the result is applied back to the child row
         if api_target_tn != tracking_number and "error" not in result:
@@ -1443,7 +1444,7 @@ def get_stats(db: Session) -> dict:
     }
 
 
-def preview_track(
+async def preview_track(
     tracking_number: str,
     db: Optional[Session] = None,
     master_tracking_number: Optional[str] = None,
@@ -1481,7 +1482,7 @@ def preview_track(
     if carrier_name == "DHL" and is_dhl_child_piece_id(tracking_number) and master_tracking_number:
         api_target_tn = master_tracking_number
 
-    result = service.track(api_target_tn)
+    result = await service.track(api_target_tn)
     if api_target_tn != tracking_number and "error" not in result:
         child_result = _extract_child_result_from_master_result(
             result,
@@ -1490,7 +1491,6 @@ def preview_track(
         )
         if child_result:
             result = child_result
-
     if "error" in result:
         if db is not None:
             fallback = _resolve_child_fallback_result(
@@ -1517,7 +1517,7 @@ def preview_track(
 
 
 
-def refresh_tracked_shipments(
+async def refresh_tracked_shipments(
     db: Session,
     shipment_ids: Optional[Sequence[int]] = None,
     include_archived: bool = False,
@@ -1552,25 +1552,34 @@ def refresh_tracked_shipments(
     refreshed = 0
     errors: list[str] = []
 
+    tasks = []
     for shipment in shipments:
-        result = track_and_save(
-            tracking_number=shipment.tracking_number,
-            recipient=shipment.recipient,
-            items=shipment.items,
-            show_date=shipment.show_date,
-            exhibition_name=shipment.exhibition_name or "Unknown Exhibition",
-            db=db,
-            cs=shipment.cs,
-            no_of_box=shipment.no_of_box,
-            project_id=shipment.project_id,
-            master_tracking_number=shipment.master_tracking_number,
-            is_master=shipment.is_master,
-            booking_date=shipment.booking_date,
-            show_city=shipment.show_city,
-            cs_type=shipment.cs_type,
-            remarks=shipment.remarks,
+        tasks.append(
+            track_and_save(
+                tracking_number=shipment.tracking_number,
+                recipient=shipment.recipient,
+                items=shipment.items,
+                show_date=shipment.show_date,
+                exhibition_name=shipment.exhibition_name or "Unknown Exhibition",
+                db=db,
+                cs=shipment.cs,
+                no_of_box=shipment.no_of_box,
+                project_id=shipment.project_id,
+                master_tracking_number=shipment.master_tracking_number,
+                is_master=shipment.is_master,
+                booking_date=shipment.booking_date,
+                show_city=shipment.show_city,
+                cs_type=shipment.cs_type,
+                remarks=shipment.remarks,
+            )
         )
-        if "error" in result:
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for shipment, result in zip(shipments, results):
+        if isinstance(result, Exception):
+            errors.append(f"{shipment.tracking_number}: {str(result)}")
+        elif "error" in result:
             errors.append(f"{shipment.tracking_number}: {result['error']}")
         else:
             refreshed += 1

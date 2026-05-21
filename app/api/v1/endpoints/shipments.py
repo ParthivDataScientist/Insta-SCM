@@ -370,7 +370,7 @@ def _validate_project_reference(db: Session, project_id: Optional[int]) -> Optio
 
 
 @router.get("/track/{tracking_number}/preview")
-def preview_shipment(
+async def preview_shipment(
     tracking_number: str = Path(
         ...,
         min_length=8,
@@ -385,7 +385,7 @@ def preview_shipment(
     _key: str = Depends(verify_api_key),
 ):
     """Fetch live tracking data for a tracking number WITHOUT saving to the database."""
-    result = preview_track(
+    result = await preview_track(
         tracking_number.upper(),
         db=db,
         master_tracking_number=(master_tracking_number or "").upper() or None,
@@ -396,7 +396,7 @@ def preview_shipment(
 
 
 @router.get("/dhl/track/{awb}/preview")
-def preview_dhl_shipment(
+async def preview_dhl_shipment(
     awb: str = Path(
         ...,
         min_length=10,
@@ -409,7 +409,7 @@ def preview_dhl_shipment(
     DHL-only preview endpoint with strict AWB validation and isolated DHL provider flow.
     """
     normalized_awb = validate_dhl_awb_or_400(awb)
-    result = DHLService().track(normalized_awb)
+    result = await DHLService().track(normalized_awb)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return {
@@ -470,7 +470,7 @@ def schedule_dhl_pickup(
 
 
 @router.post("/track/{tracking_number}", status_code=201)
-def track_shipment(
+async def track_shipment(
     tracking_number: str = Path(
         ...,
         min_length=8,
@@ -485,7 +485,7 @@ def track_shipment(
     """Track a shipment via carrier API and save/update in DB."""
     if body.project_id is not None:
         _validate_project_reference(db, body.project_id)
-    result = track_and_save(
+    result = await track_and_save(
         tracking_number=tracking_number.upper(),
         recipient=body.recipient,
         items=body.shipment_name,
@@ -506,7 +506,7 @@ def track_shipment(
 # Batch import from Excel - uses BackgroundTasks so the response is immediate
 # ---------------------------------------------------------------------------
 
-def _process_excel_import(contents: bytes, db: Session):
+async def _process_excel_import(contents: bytes, db: Session):
     """Parse Excel rows and track each shipment, supporting Master/Child vertical nesting logic."""
     df = pd.read_excel(io.BytesIO(contents))
     # Normalize column names for easier lookup
@@ -557,7 +557,7 @@ def _process_excel_import(contents: bytes, db: Session):
             errors.append(f"{tracking_num}: linked project not found")
             continue
 
-        res = track_and_save(
+        res = await track_and_save(
             tracking_number=tracking_num.upper(),
             recipient=recipient,
             items=items_name,
@@ -614,7 +614,6 @@ async def import_excel(
 ):
     """
     Import shipments from an Excel file (.xlsx/.xls).
-    Processing runs in a threadpool to prevent blocking the async event loop.
     Expected columns: tracking_number, name (optional), show_date (optional)
     """
     if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
@@ -624,7 +623,7 @@ async def import_excel(
     if len(contents) > MAX_EXCEL_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 5 MB.")
 
-    result = await run_in_threadpool(_process_excel_import, contents, db)
+    result = await _process_excel_import(contents, db)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -638,7 +637,7 @@ async def import_excel(
     }
 
 
-def _process_webhook_payload(payload: WebhookPayload, db: Session):
+async def _process_webhook_payload(payload: WebhookPayload, db: Session):
     success = 0
     failed = 0
     errors = []
@@ -658,7 +657,7 @@ def _process_webhook_payload(payload: WebhookPayload, db: Session):
             continue
 
         try:
-            res = track_and_save(
+            res = await track_and_save(
                 tracking_number=tracking_number,
                 recipient=row.client_name,
                 items=None, # Not explicitly in sheet as an item field
@@ -722,7 +721,7 @@ async def google_sheet_webhook(
     Webhook to receive batch imports from Google Sheet.
     Implements Vertical Logic for Master/Child AWBs.
     """
-    result = await run_in_threadpool(_process_webhook_payload, payload, db)
+    result = await _process_webhook_payload(payload, db)
     return {
         "status": "completed",
         "success": result["success"],
@@ -1048,13 +1047,13 @@ def shipment_stats(db: Session = Depends(get_session)):
 
 
 @router.post("/refresh", status_code=200)
-def refresh_shipments(
+async def refresh_shipments(
     body: RefreshRequest,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """Refresh saved shipments from their carriers and hydrate missing MPS child parcels."""
-    return refresh_tracked_shipments(
+    return await refresh_tracked_shipments(
         db=db,
         shipment_ids=body.shipment_ids,
         include_children=body.include_children,

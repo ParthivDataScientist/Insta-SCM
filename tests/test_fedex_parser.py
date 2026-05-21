@@ -141,7 +141,8 @@ class TestFedExMPSParser:
         expected = {"888000000001", "888000000002", "888000000003"}
         assert set(result["child_tracking_numbers"]) == expected
 
-    def test_track_extracts_children_from_nested_associated_response(self, fedex_service, fedex_response, monkeypatch):
+    @pytest.mark.anyio
+    async def test_track_extracts_children_from_nested_associated_response(self, fedex_service, fedex_response, monkeypatch):
         import app.services.fedex as fedex_mod
 
         monkeypatch.setattr(fedex_mod, "_fedex_token", "")
@@ -211,7 +212,7 @@ class TestFedExMPSParser:
 
         monkeypatch.setattr("app.services.fedex.requests.post", fake_post)
 
-        result = fedex_service.track("884158465641")
+        result = await fedex_service.track("884158465641")
 
         assert result["is_master"] is True
         assert {parcel["tracking_number"] for parcel in result["child_parcels"]} == {
@@ -219,7 +220,8 @@ class TestFedExMPSParser:
             "884158465643",
         }
 
-    def test_track_extracts_children_from_complete_track_results_shape(self, fedex_service, fedex_response, monkeypatch):
+    @pytest.mark.anyio
+    async def test_track_extracts_children_from_complete_track_results_shape(self, fedex_service, fedex_response, monkeypatch):
         import app.services.fedex as fedex_mod
 
         monkeypatch.setattr(fedex_mod, "_fedex_token", "")
@@ -286,7 +288,7 @@ class TestFedExMPSParser:
 
         monkeypatch.setattr("app.services.fedex.requests.post", fake_post)
 
-        result = fedex_service.track("884158465641")
+        result = await fedex_service.track("884158465641")
 
         assert result["is_master"] is True
         assert {parcel["tracking_number"] for parcel in result["child_parcels"]} == {
