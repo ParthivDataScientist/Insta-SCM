@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useShipments } from '../hooks/useShipments';
@@ -19,6 +19,18 @@ export default function ShipmentDashboardPremium() {
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
+
+    const hasAutoRefreshed = useRef(false);
+
+    useEffect(() => {
+        if (!hasAutoRefreshed.current) {
+            hasAutoRefreshed.current = true;
+            const timer = setTimeout(() => {
+                refreshTracking();
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [refreshTracking]);
 
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
@@ -314,6 +326,29 @@ export default function ShipmentDashboardPremium() {
                 sidebarOverlay
             >
                 <AlertBanner message={error} />
+
+                {refreshing && (
+                    <div className="shipping-sync-indicator" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 16px',
+                        marginBottom: '16px',
+                        borderRadius: '8px',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        color: '#2563eb',
+                        fontSize: '0.85rem',
+                        fontWeight: '500',
+                        width: 'fit-content',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                        backdropFilter: 'blur(4px)',
+                        animation: 'fadeIn 0.3s ease-out'
+                    }}>
+                        <RefreshCw size={14} style={{ animation: 'spin 1.5s linear infinite' }} />
+                        <span>Syncing latest shipment status in the background...</span>
+                    </div>
+                )}
 
                 <div className="premium-sliding-layout premium-sliding-layout--compact">
                     <div className={`premium-sliding-main ${selectedShipment || showTrack ? 'is-shrunk' : ''}`}>
