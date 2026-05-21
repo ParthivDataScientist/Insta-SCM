@@ -529,6 +529,65 @@ class TestExportShipment:
         assert is_yellow(ws.cell(row=soon_row, column=4)) is True
         assert is_yellow(ws.cell(row=later_row, column=4)) is False
 
+    def test_export_formats_current_status_as_timeline_card(self, client, monkeypatch):
+        project = create_project(client, "Export Status Timeline Card Project")
+        event_date = "2026-05-19T12:11:00Z"
+
+        async def mock_track(self, tn):
+            return {
+                "status": "In Transit",
+                "origin": "Mumbai, IN",
+                "destination": "Irving, TX, US",
+                "eta": "2026-04-25",
+                "progress": 40,
+                "history": [
+                    {
+                        "description": "Shipment has departed from a DHL facility MUMBAI (BOMBAY)-IND",
+                        "location": "MUMBAI (BOMBAY)-IND",
+                        "status": "Departed Facility",
+                        "date": event_date,
+                    }
+                ],
+            }
+
+        monkeypatch.setattr("app.services.fedex.FedExService.track", mock_track)
+
+        # Trigger track to create the shipment in the DB
+        client.post(
+            "/api/v1/shipments/track/999999999999",
+            json={"exhibition_name": "Test Card Exhibition", "project_id": project["id"]},
+        )
+
+        export_resp = client.get("/api/v1/shipments/export-excel")
+        assert export_resp.status_code == 200
+
+        wb = load_workbook(io.BytesIO(export_resp.content))
+        ws = wb.active
+
+        # Find row for 999999999999 (Column 9 is Master AWB)
+        row_idx = None
+        for i in range(2, ws.max_row + 1):
+            if str(ws.cell(row=i, column=9).value).strip() == "999999999999":
+                row_idx = i
+                break
+
+        assert row_idx is not None, "Shipment tracking number not found in export"
+
+        # Check Column 11 (Current Status)
+        status_cell = ws.cell(row=row_idx, column=11)
+        status_val = status_cell.value
+        
+        expected_status = (
+            "May 19, 2026 • 12:11 PM\n"
+            "Departed Facility\n"
+            "MUMBAI (BOMBAY)-IND\n"
+            "Shipment has departed from a DHL facility MUMBAI (BOMBAY)-IND"
+        )
+        assert status_val == expected_status
+        assert status_cell.alignment.wrap_text is True
+        assert status_cell.alignment.vertical == "top"
+
+
 
 class TestGoogleSheetWebhook:
     def test_webhook_treats_row_with_master_and_child_as_child_record(self, client):

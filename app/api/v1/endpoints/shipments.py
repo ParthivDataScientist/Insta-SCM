@@ -985,37 +985,115 @@ def export_shipments(
         formatted = _safe_date(raw_value)
         return formatted if formatted else ""
 
-    def _status_date_time_location(raw_dt, raw_location):
-        date_part = _safe_date(raw_dt)
-        time_part = _safe_time(raw_dt)
-        location = str(raw_location or "").strip()
+    def _format_event_date(raw_dt):
+        if not raw_dt:
+            return ""
+        token = str(raw_dt).strip()
+        has_time = ":" in token or "T" in token
+        try:
+            dt = pd.to_datetime(token)
+            if pd.isna(dt):
+                return token
+            month = dt.strftime("%b")
+            day = dt.day
+            year = dt.year
+            if has_time:
+                time_part = dt.strftime("%I:%M %p")
+                if time_part.startswith("0"):
+                    time_part = time_part[1:]
+                return f"{month} {day}, {year} • {time_part}"
+            else:
+                return f"{month} {day}, {year}"
+        except Exception:
+            return token
 
-        datetime_label = " ".join(token for token in [date_part, time_part] if token).strip()
-        parts = [token for token in [datetime_label, location] if token]
-        return " | ".join(parts) if parts else dash
+    def _format_current_status_card(date_raw, status_raw, location_raw, description_raw):
+        date_line = _format_event_date(date_raw)
+        status_line = str(status_raw or "").strip()
+        location_line = str(location_raw or "").strip()
+        description_line = str(description_raw or "").strip()
+
+        lines = []
+        if date_line:
+            lines.append(date_line)
+        if status_line:
+            lines.append(status_line)
+        if location_line:
+            lines.append(location_line)
+        if description_line and description_line != status_line:
+            lines.append(description_line)
+
+        return "\n".join(lines) if lines else "-"
 
     def _build_master_latest(shipment: Shipment):
         if shipment.history:
             latest = shipment.history[0]
-            return _status_date_time_location(latest.get("date"), latest.get("location")), _safe_date(latest.get("date"))
-        return _status_date_time_location(shipment.last_scan_date, shipment.destination or shipment.origin), _safe_date(shipment.last_scan_date)
+            card = _format_current_status_card(
+                latest.get("date"),
+                latest.get("status"),
+                latest.get("location"),
+                latest.get("description")
+            )
+            return card, _safe_date(latest.get("date"))
+        card = _format_current_status_card(
+            shipment.last_scan_date,
+            shipment.status,
+            shipment.destination or shipment.origin,
+            ""
+        )
+        return card, _safe_date(shipment.last_scan_date)
 
     def _build_child_latest(parent: Shipment, child: dict):
         c_date_raw = child.get("last_date")
         c_loc = child.get("last_location") or ""
+        c_status = child.get("status") or "In Transit"
+        c_desc = child.get("raw_status") or ""
+
+        # Check if there is history in child dict
+        history_list = child.get("history")
+        if history_list and isinstance(history_list, list):
+            latest = history_list[0]
+            card = _format_current_status_card(
+                latest.get("date"),
+                latest.get("status"),
+                latest.get("location"),
+                latest.get("description")
+            )
+            return card, _safe_date(latest.get("date"))
+
         if (not c_loc) and parent.history:
             master_latest = parent.history[0]
             c_loc = master_latest.get("location", c_loc)
             if not c_date_raw:
                 c_date_raw = master_latest.get("date")
+                c_status = master_latest.get("status", c_status)
+                c_desc = master_latest.get("description", c_desc)
 
-        return _status_date_time_location(c_date_raw, c_loc), _safe_date(c_date_raw)
+        card = _format_current_status_card(
+            c_date_raw,
+            c_status,
+            c_loc,
+            c_desc
+        )
+        return card, _safe_date(c_date_raw)
 
     def _build_child_latest_from_shipment(child: Shipment):
         if child.history:
             latest = child.history[0]
-            return _status_date_time_location(latest.get("date"), latest.get("location")), _safe_date(latest.get("date"))
-        return _status_date_time_location(child.last_scan_date, child.destination or child.origin), _safe_date(child.last_scan_date)
+            card = _format_current_status_card(
+                latest.get("date"),
+                latest.get("status"),
+                latest.get("location"),
+                latest.get("description")
+            )
+            return card, _safe_date(latest.get("date"))
+        card = _format_current_status_card(
+            child.last_scan_date,
+            child.status,
+            child.destination or child.origin,
+            ""
+        )
+        return card, _safe_date(child.last_scan_date)
 
     def _parse_show_date(raw_value) -> Optional[date]:
         if raw_value is None:
@@ -1052,6 +1130,8 @@ def export_shipments(
                 cell.fill = yellow_fill
             if col in [3, 8]:
                 cell.alignment = alignment_center
+            elif col == 11:
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
             if bold_master_awb and col == 9:
                 cell.font = Font(bold=True)
 
