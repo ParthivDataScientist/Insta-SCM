@@ -209,3 +209,59 @@ async def test_dhl_provider_marks_explicit_delivered_as_delivered(monkeypatch):
     # summary call will fail with "missing result node", but detailed succeeds and is enough
     result = await provider.track("1234567890")
     assert result["status"] == "Delivered"
+
+
+def test_dhl_provider_to_status_bucket_event_codes():
+    provider = DHLProvider()
+
+    # Test Exception Codes
+    assert provider._to_status_bucket("", "WX") == "Exception"
+    assert provider._to_status_bucket("In Transit", "CD") == "Exception"
+    assert provider._to_status_bucket("Normal delivery", "OH") == "Exception"
+
+    # Test Delivered Codes
+    assert provider._to_status_bucket("Customs Hold", "OK") == "Delivered"
+
+    # Test Out for Delivery Codes
+    assert provider._to_status_bucket("In Transit", "WC") == "Out for Delivery"
+
+    # Test In Transit Codes
+    assert provider._to_status_bucket("Exception", "AF") == "In Transit"
+    assert provider._to_status_bucket("Exception", "DF") == "In Transit"
+    assert provider._to_status_bucket("Exception", "PL") == "In Transit"
+
+
+def test_dhl_provider_to_status_bucket_text_fallback_movement_overrides():
+    provider = DHLProvider()
+
+    # Movement overrides should override exception flags
+    assert provider._to_status_bucket("processed at facility - delayed in customs") == "In Transit"
+    assert provider._to_status_bucket("departed facility - on hold") == "In Transit"
+    assert provider._to_status_bucket("arrived at sorting hub - exception") == "In Transit"
+
+
+def test_dhl_provider_to_status_bucket_text_fallback_strict_boundaries():
+    provider = DHLProvider()
+
+    # Match exceptions with strict boundary / prefix checks
+    assert provider._to_status_bucket("customs delay") == "Exception"
+    assert provider._to_status_bucket("undelivered shipment") == "Exception"
+    assert provider._to_status_bucket("on hold at destination") == "Exception"
+
+    # Word boundary prevents partial/false matches
+    assert provider._to_status_bucket("the threshold is high") == "In Transit"  # "hold" is in "threshold" but shouldn't match
+    assert provider._to_status_bucket("scheduled for delivery") == "In Transit"
+    assert provider._to_status_bucket("arrived at delivery facility") == "In Transit"  # "delivery" shouldn't trigger delivered
+
+
+def test_dhl_provider_to_status_bucket_text_fallback_delivered():
+    provider = DHLProvider()
+
+    # Match delivered phrases
+    assert provider._to_status_bucket("shipment delivered") == "Delivered"
+    assert provider._to_status_bucket("delivered - signed for by John") == "Delivered"
+
+    # Exclusions prevent false positives
+    assert provider._to_status_bucket("arrived at delivery facility") == "In Transit"
+    assert provider._to_status_bucket("out for delivery") == "Out for Delivery"
+    assert provider._to_status_bucket("attempted delivery") == "Exception"

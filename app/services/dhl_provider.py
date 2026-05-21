@@ -766,22 +766,57 @@ class DHLProvider:
         return None
 
     def _to_status_bucket(self, raw_status: str, event_code: str = "") -> str:
-        status = _text_or_empty(raw_status).lower()
-        code = _text_or_empty(event_code).upper()
+        # Define Code Sets
+        EXCEPTION_CODES = {"OH", "RD", "BA", "CD", "CR", "NH", "WX", "PY"}
+        DELIVERED_CODES = {"OK"}
+        OUT_FOR_DELIVERY_CODES = {"WC"}
+        IN_TRANSIT_CODES = {"AF", "DF", "PL", "AR", "DP"}
 
-        # Event-code hints for DHL India WCF payloads.
-        if code == "WC":
-            return "Out for Delivery"
+        code = _text_or_empty(event_code).upper().strip()
 
-        # Exception first to avoid false "delivered" positives like "undelivered".
-        if any(token in status for token in ("exception", "hold", "customs delay", "customs hold", "clearance delay", "delay", "return", "undeliver", "attempted")):
+        # Primary Code Check
+        if code in EXCEPTION_CODES:
             return "Exception"
-
-        if any(token in status for token in ("out for delivery", "with delivery courier", "with courier")):
+        if code in DELIVERED_CODES:
+            return "Delivered"
+        if code in OUT_FOR_DELIVERY_CODES:
             return "Out for Delivery"
+        if code in IN_TRANSIT_CODES:
+            return "In Transit"
 
-        # Delivered should be explicit, not inferred from words like
-        # "delivery facility" or "scheduled for delivery".
+        # Fallback to Strict Text Parsing
+        status = _text_or_empty(raw_status).lower()
+
+        # Explicit movement overrides to prevent false exceptions
+        movement_overrides = ("departed", "processed", "arrived", "forwarded")
+        if any(word in status for word in movement_overrides):
+            return "In Transit"
+
+        # Exception check with strict word boundaries
+        exception_words = (
+            "exception",
+            "hold",
+            "customs delay",
+            "customs hold",
+            "clearance delay",
+            "delay",
+            "return",
+            "undeliver",
+            "attempted",
+        )
+        for word in exception_words:
+            pattern = rf"\b{re.escape(word)}"
+            if re.search(pattern, status):
+                return "Exception"
+
+        # Out for delivery check
+        out_for_delivery_words = ("out for delivery", "with delivery courier", "with courier")
+        for word in out_for_delivery_words:
+            pattern = rf"\b{re.escape(word)}"
+            if re.search(pattern, status):
+                return "Out for Delivery"
+
+        # Delivered check
         delivered_markers = (
             "shipment delivered",
             "delivery successful",
@@ -789,8 +824,22 @@ class DHLProvider:
             "proof of delivery",
             "delivered",
         )
-        if any(marker in status for marker in delivered_markers):
-            if not any(token in status for token in ("delivery facility", "out for delivery", "scheduled for delivery", "attempted")):
+        has_delivered = False
+        for marker in delivered_markers:
+            pattern = rf"\b{re.escape(marker)}"
+            if re.search(pattern, status):
+                has_delivered = True
+                break
+
+        if has_delivered:
+            in_progress_exclusions = ("delivery facility", "out for delivery", "scheduled for delivery", "attempted")
+            has_exclusion = False
+            for exclusion in in_progress_exclusions:
+                pattern = rf"\b{re.escape(exclusion)}"
+                if re.search(pattern, status):
+                    has_exclusion = True
+                    break
+            if not has_exclusion:
                 return "Delivered"
 
         return "In Transit"
