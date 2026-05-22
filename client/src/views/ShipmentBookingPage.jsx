@@ -349,7 +349,6 @@ export default function ShipmentBookingPage() {
     const [failedStep, setFailedStep] = useState('');
     const [copiedAwb, setCopiedAwb] = useState(false);
 
-    const payload = useMemo(() => buildPayload(form), [form]);
     const validationError = useMemo(() => validateBookingForm(form), [form]);
     const isCommercialShipment = form.shipment.shipment_type !== 'NORMAL';
     const isCsbVShipment = form.shipment.shipment_type === 'CSB_V';
@@ -404,7 +403,8 @@ export default function ShipmentBookingPage() {
         setError('');
         setFailedStep('');
         try {
-            const result = await shipmentsService.rateShipment(payload);
+            const freshPayload = buildPayload(form);
+            const result = await shipmentsService.rateShipment(freshPayload);
             setRating(result);
             setCreated(null);
             setPickup(null);
@@ -426,7 +426,8 @@ export default function ShipmentBookingPage() {
         setError('');
         setFailedStep('');
         try {
-            const result = await shipmentsService.createShipment(payload);
+            const freshPayload = buildPayload(form);
+            const result = await shipmentsService.createShipment(freshPayload);
             setCreated(result);
             setPickup(null);
         } catch (err) {

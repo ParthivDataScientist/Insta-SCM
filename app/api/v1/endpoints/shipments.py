@@ -533,6 +533,23 @@ async def _process_excel_import(contents: bytes, db: Session):
     last_master_awb = None
     last_master_client_name = None
     
+    # Fetch valid project IDs upfront to eliminate database query leaks inside the loop
+    valid_project_ids = set()
+    if "project_id" in df.columns:
+        project_ids_in_sheet = set()
+        for val in df["project_id"]:
+            if pd.notna(val):
+                try:
+                    project_ids_in_sheet.add(int(val))
+                except (ValueError, TypeError):
+                    pass
+        if project_ids_in_sheet:
+            valid_project_ids = set(
+                db.exec(
+                    select(DashboardProject.id).where(DashboardProject.id.in_(list(project_ids_in_sheet)))
+                ).all()
+            )
+
     for _, row in df.iterrows():
         row_client_name = _first_present_row_value(row, "client_name", "recipient")
         tracking_num, master_to_use, is_master, last_master_awb, last_master_client_name = _resolve_tracking_row(
@@ -558,7 +575,7 @@ async def _process_excel_import(contents: bytes, db: Session):
         
         project_id = int(row["project_id"]) if "project_id" in df.columns and pd.notna(row.get("project_id")) else None
 
-        if project_id is not None and not db.get(DashboardProject, project_id):
+        if project_id is not None and project_id not in valid_project_ids:
             row_info = {
                 "tracking_number": tracking_num.upper(),
                 "project_error": f"{tracking_num.upper()}: linked project not found",
@@ -1254,8 +1271,12 @@ def export_shipments(
         column = col[0].column_letter
         for cell in col:
             try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
+                if cell.value is not None:
+                    val_str = str(cell.value)
+                    lines = val_str.split("\n")
+                    max_line_len = max(len(line) for line in lines) if lines else 0
+                    if max_line_len > max_length:
+                        max_length = max_line_len
             except (ValueError, TypeError):
                 logger.warning("Failed to evaluate length for cell value: %s", cell.value)
                 pass

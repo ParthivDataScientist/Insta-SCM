@@ -21,17 +21,17 @@ export default function ShipmentDashboardPremium() {
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
 
-    const hasAutoRefreshed = useRef(false);
+    const refreshTrackingRef = useRef(refreshTracking);
+    useEffect(() => {
+        refreshTrackingRef.current = refreshTracking;
+    }, [refreshTracking]);
 
     useEffect(() => {
-        if (!hasAutoRefreshed.current) {
-            hasAutoRefreshed.current = true;
-            const timer = setTimeout(() => {
-                refreshTracking();
-            }, 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [refreshTracking]);
+        const timer = setTimeout(() => {
+            refreshTrackingRef.current();
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, []);
 
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [showTrack, setShowTrack] = useState(false);
