@@ -201,16 +201,101 @@ class DHLService(CarrierService):
                 # If there are multiple pieces and we haven't already filled child_parcels
                 if len(pieces) > 1:
                     is_master = True
+                    
+                    # Check if any piece or global event has segmented/piece-specific data
+                    has_any_segmented_events = False
+                    for ev in main_shipment.get("events", []):
+                        if ev.get("pieceIds") or ev.get("pieceId") or ev.get("trackingNumber"):
+                            has_any_segmented_events = True
+                            break
+                    if not has_any_segmented_events:
+                        for piece_item in pieces:
+                            if piece_item.get("events") or piece_item.get("actualEvents"):
+                                has_any_segmented_events = True
+                                break
+                    
                     for p in pieces:
                         p_tn = p.get("trackingNumber") or p.get("id")
                         if not p_tn or p_tn == tracking_number:
                             continue
                         
-                        # Piece objects may omit scan data. Do not copy the master
-                        # timeline/status into each child because pieces can move
-                        # independently after the master scan.
+                        # Extract piece history if available
+                        p_events = p.get("events") or p.get("actualEvents") or []
+                        p_history = []
+                        if p_events:
+                            for event in p_events:
+                                desc = event.get("description", "")
+                                location_obj = event.get("location", {}).get("address", {})
+                                loc = f"{location_obj.get('addressLocality', '')}, {location_obj.get('countryCode', '')}".strip(", ")
+                                timestamp = event.get("timestamp")
+                                if not timestamp:
+                                    timestamp = (event.get("date", "") + " " + event.get("time", "")).strip()
+                                type_code = event.get("typeCode", "")
+                                event_status = HISTORY_STATUS_MAP.get(type_code, type_code)
+                                p_history.append({
+                                    "description": desc,
+                                    "location": loc,
+                                    "status": event_status,
+                                    "date": timestamp,
+                                })
+                        else:
+                            # Try to filter global events matching this piece's tracking number or ID
+                            global_events = main_shipment.get("events", [])
+                            for event in global_events:
+                                piece_ids = event.get("pieceIds") or []
+                                if not isinstance(piece_ids, list):
+                                    piece_ids = [piece_ids]
+                                extra_ids = [event.get("pieceId"), event.get("trackingNumber")]
+                                all_matching_ids = [str(x).strip().lower() for x in (piece_ids + extra_ids) if x]
+                                
+                                if p_tn.strip().lower() in all_matching_ids:
+                                    desc = event.get("description", "")
+                                    location_obj = event.get("location", {}).get("address", {})
+                                    loc = f"{location_obj.get('addressLocality', '')}, {location_obj.get('countryCode', '')}".strip(", ")
+                                    timestamp = event.get("timestamp")
+                                    if not timestamp:
+                                        timestamp = (event.get("date", "") + " " + event.get("time", "")).strip()
+                                    type_code = event.get("typeCode", "")
+                                    event_status = HISTORY_STATUS_MAP.get(type_code, type_code)
+                                    p_history.append({
+                                        "description": desc,
+                                        "location": loc,
+                                        "status": event_status,
+                                        "date": timestamp,
+                                    })
+                        
+                        # Sort newest first
+                        if p_history:
+                            p_history.sort(key=lambda x: x["date"], reverse=True)
+
                         p_raw_status = p.get("status", {}).get("status") or "Pending"
+                        if p_history and p_raw_status == "Pending" and has_any_segmented_events:
+                            # Use status from most recent history event if available
+                            p_raw_status = p_history[0]["description"]
+                        
+                        # Synchronize master's newer events into child history if parent has moved
+                        if p_history and data.get("history"):
+                            try:
+                                m_latest_date = data["history"][0].get("date")
+                                p_latest_date = p_history[0].get("date")
+                                if m_latest_date and p_latest_date:
+                                    import pandas as pd
+                                    m_date = pd.to_datetime(m_latest_date)
+                                    p_date = pd.to_datetime(p_latest_date)
+                                    if m_date > p_date:
+                                        newer_scans = []
+                                        for h_item in data["history"]:
+                                            if h_item.get("date"):
+                                                h_date = pd.to_datetime(h_item["date"])
+                                                if h_date > p_date:
+                                                    newer_scans.append(h_item)
+                                        p_history = newer_scans + p_history
+                                        p_raw_status = p_history[0]["description"]
+                            except Exception:
+                                pass
+                                
                         p_status = map_dhl_status(p_raw_status) if p_raw_status != "Pending" else "Pending"
+                        
                         child_parcels.append({
                             "tracking_number": p_tn,
                             "status": p_status,
@@ -218,7 +303,7 @@ class DHLService(CarrierService):
                             "origin": data["origin"],
                             "destination": data["destination"],
                             "eta": data["eta"],
-                            "history": [],
+                            "history": p_history,
                             "carrier": "DHL",
                         })
 

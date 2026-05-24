@@ -134,6 +134,10 @@ class SheetRow(BaseModel):
         default=None,
         validation_alias=AliasChoices("remarks", "Remarks"),
     )
+    country: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("country", "Country"),
+    )
 
 class WebhookPayload(BaseModel):
     rows: List[SheetRow]
@@ -266,6 +270,7 @@ def _save_sheet_row_without_live_tracking(
     destination: Optional[str] = None,
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
+    country: Optional[str] = None,
     commit: bool = True,
 ) -> Optional[dict]:
     """
@@ -305,6 +310,7 @@ def _save_sheet_row_without_live_tracking(
             master_tracking_number=master_tracking_number,
             is_master=bool(is_master),
             child_parcels=[],
+            country=country,
         )
     else:
         shipment.carrier = carrier
@@ -338,6 +344,8 @@ def _save_sheet_row_without_live_tracking(
             shipment.master_tracking_number = master_tracking_number
         if is_master is not None:
             shipment.is_master = is_master
+        if country is not None:
+            shipment.country = country
 
     db.add(shipment)
     if commit:
@@ -602,6 +610,7 @@ async def _process_excel_import(contents: bytes, db: Session):
             "is_master": is_master,
             "remarks": _first_present_row_value(row, "remarks"),
             "booking_date": _first_present_row_value(row, "booking_dt", "booking_date"),
+            "country": _first_present_row_value(row, "country"),
         }
         row_metadata.append(row_info)
 
@@ -662,6 +671,7 @@ async def _process_excel_import(contents: bytes, db: Session):
                     remarks=row_info["remarks"],
                     master_tracking_number=row_info["master_to_use"],
                     is_master=row_info["is_master"],
+                    country=row_info.get("country"),
                     commit=False,
                 )
                 if fallback_res:
@@ -694,6 +704,7 @@ async def _process_excel_import(contents: bytes, db: Session):
                 master_tracking_number=row_info["master_to_use"],
                 is_master=row_info["is_master"],
                 destination=row_info["destination"],
+                country=row_info.get("country"),
                 commit=False,
             )
             success += 1
@@ -782,6 +793,7 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
             "remarks": row.remarks,
             "master_to_use": master_to_use,
             "is_master": is_master,
+            "country": row.country,
         }
         row_metadata.append(row_info)
 
@@ -838,6 +850,7 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
                     remarks=row_info["remarks"],
                     master_tracking_number=row_info["master_to_use"],
                     is_master=row_info["is_master"],
+                    country=row_info.get("country"),
                     commit=False,
                 )
                 if fallback_res:
@@ -868,6 +881,7 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
                 master_tracking_number=row_info["master_to_use"],
                 is_master=row_info["is_master"],
                 destination=row_info["destination"],
+                country=row_info.get("country"),
                 commit=False,
             )
             success += 1
@@ -945,8 +959,10 @@ def export_shipments(
     # Create Workbook
     from openpyxl import Workbook
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Shipments"
+    
+    ws_transit = wb.active
+    ws_transit.title = "In Transit"
+    ws_delivered = wb.create_sheet(title="Delivered")
 
     today_str = datetime.now().strftime("%d.%m.%Y")
     
@@ -962,14 +978,6 @@ def export_shipments(
     yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
     alignment_center = Alignment(horizontal="center", vertical="center")
     border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-
-    # Write headers
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.border = border
-        cell.alignment = alignment_center
 
     def _safe_date(raw_value):
         if not raw_value:
@@ -1078,13 +1086,16 @@ def export_shipments(
             )
             return card, _safe_date(latest.get("date"))
 
-        if (not c_loc) and parent.history:
+        # Fallback to parent details if child date is missing
+        if (not c_loc or not c_date_raw) and parent.history:
             master_latest = parent.history[0]
-            c_loc = master_latest.get("location", c_loc)
+            if not c_loc:
+                c_loc = master_latest.get("location", c_loc)
             if not c_date_raw:
                 c_date_raw = master_latest.get("date")
-                c_status = master_latest.get("status", c_status)
-                c_desc = master_latest.get("description", c_desc)
+                if not c_desc:
+                    c_status = master_latest.get("status", c_status)
+                    c_desc = master_latest.get("description", c_desc)
 
         card = _format_current_status_card(
             c_date_raw,
@@ -1094,7 +1105,12 @@ def export_shipments(
         )
         return card, _safe_date(c_date_raw)
 
-    def _build_child_latest_from_shipment(child: Shipment):
+    def _build_child_latest_from_shipment(parent: Shipment, child: Shipment):
+        c_date_raw = child.last_scan_date
+        c_loc = child.destination or child.origin or ""
+        c_status = child.status or "In Transit"
+        c_desc = ""
+
         if child.history:
             latest = child.history[0]
             card = _format_current_status_card(
@@ -1104,13 +1120,22 @@ def export_shipments(
                 latest.get("description")
             )
             return card, _safe_date(latest.get("date"))
+
+        # Fallback to parent details if child date is missing
+        if (not c_date_raw or c_date_raw == "-") and parent and parent.history:
+            master_latest = parent.history[0]
+            c_loc = master_latest.get("location", c_loc)
+            c_date_raw = master_latest.get("date")
+            c_status = master_latest.get("status", c_status)
+            c_desc = master_latest.get("description", c_desc)
+
         card = _format_current_status_card(
-            child.last_scan_date,
-            child.status,
-            child.destination or child.origin,
-            ""
+            c_date_raw,
+            c_status,
+            c_loc,
+            c_desc
         )
-        return card, _safe_date(child.last_scan_date)
+        return card, _safe_date(c_date_raw)
 
     def _parse_show_date(raw_value) -> Optional[date]:
         if raw_value is None:
@@ -1139,19 +1164,6 @@ def export_shipments(
         window_end = today + timedelta(days=20)
         return today <= parsed <= window_end
 
-    def _write_row(row_idx: int, values: list, bold_master_awb: bool = False):
-        for col, val in enumerate(values, 1):
-            cell = ws.cell(row=row_idx, column=col, value=val)
-            cell.border = border
-            if headers[col - 1] == "Show date" and _should_highlight_show_date(val):
-                cell.fill = yellow_fill
-            if col in [3, 8]:
-                cell.alignment = alignment_center
-            elif col == 11:
-                cell.alignment = Alignment(wrap_text=True, vertical="top")
-            if bold_master_awb and col == 9:
-                cell.font = Font(bold=True)
-
     # Group records by linkage: rows with master_tracking_number are children.
     children_by_master = {}
     top_level_shipments = []
@@ -1163,124 +1175,161 @@ def export_shipments(
         else:
             top_level_shipments.append(shipment)
 
-    current_row = 2
-    rendered_master_tns = set()
     dash = "-"
 
-    for s in top_level_shipments:
-        master_tn = (s.tracking_number or "").strip().upper()
-        if master_tn:
-            rendered_master_tns.add(master_tn)
+    def _populate_sheet(ws, top_level_list, children_dict):
+        # Write headers
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = alignment_center
 
-        latest_status, h_date = _build_master_latest(s)
-        row_data = [
-            s.destination or dash,
-            s.recipient or dash,
-            _format_booking_date(s.booking_date) or dash,
-            s.show_date or dash,
-            s.show_city or s.exhibition_name or dash,
-            s.cs_type or s.cs or dash,
-            s.no_of_box or dash,
-            s.carrier.upper() if s.carrier else dash,
-            s.tracking_number,
-            "",  # Child AWB is empty on master row
-            latest_status,
-            s.remarks or dash,
-            h_date or dash,
-        ]
-        _write_row(current_row, row_data, bold_master_awb=True)
-        current_row += 1
+        def _write_row(row_idx: int, values: list, bold_master_awb: bool = False):
+            for col, val in enumerate(values, 1):
+                cell = ws.cell(row=row_idx, column=col, value=val)
+                cell.border = border
+                if headers[col - 1] == "Show date" and _should_highlight_show_date(val):
+                    cell.fill = yellow_fill
+                if col in [3, 8]:
+                    cell.alignment = alignment_center
+                elif col == 11:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+                if bold_master_awb and col == 9:
+                    cell.font = Font(bold=True)
 
-        rendered_child_tns = set()
+        current_row = 2
+        rendered_master_tns = set()
 
-        # Render child records saved as individual Shipment rows.
-        for child in children_by_master.get(master_tn, []):
-            child_status, child_date = _build_child_latest_from_shipment(child)
-            child_tn = (child.tracking_number or "").strip().upper()
-            if child_tn:
-                rendered_child_tns.add(child_tn)
+        for s in top_level_list:
+            master_tn = (s.tracking_number or "").strip().upper()
+            if master_tn:
+                rendered_master_tns.add(master_tn)
 
-            child_data = [
-                child.destination or s.destination or dash,
-                child.recipient or s.recipient or dash,
-                _format_booking_date(child.booking_date) or _format_booking_date(s.booking_date) or dash,
-                child.show_date or s.show_date or dash,
-                child.show_city or child.exhibition_name or s.show_city or s.exhibition_name or dash,
-                child.cs_type or child.cs or s.cs_type or s.cs or dash,
-                "",  # No of Box empty for child rows in export format
-                child.carrier.upper() if child.carrier else (s.carrier.upper() if s.carrier else dash),
-                "",  # Master AWB empty for child row
-                child.tracking_number or dash,
-                child_status,
-                child.remarks or s.remarks or dash,
-                child_date or dash,
-            ]
-            _write_row(current_row, child_data)
-            current_row += 1
-
-        # Render legacy JSON child parcels, skipping duplicates already rendered.
-        for c in s.child_parcels or []:
-            c_tn = str(c.get("tracking_number") or "").strip().upper()
-            if c_tn and c_tn in rendered_child_tns:
-                continue
-            c_latest, c_date = _build_child_latest(s, c)
-            child_data = [
+            latest_status, h_date = _build_master_latest(s)
+            row_data = [
                 s.destination or dash,
                 s.recipient or dash,
                 _format_booking_date(s.booking_date) or dash,
                 s.show_date or dash,
                 s.show_city or s.exhibition_name or dash,
                 s.cs_type or s.cs or dash,
-                "",  # No of Box empty for child
+                s.no_of_box or dash,
                 s.carrier.upper() if s.carrier else dash,
-                "",  # Master AWB empty for child
-                c.get("tracking_number") or dash,
-                c_latest,
+                s.tracking_number,
+                "",  # Child AWB is empty on master row
+                latest_status,
                 s.remarks or dash,
-                c_date or dash,
+                h_date or dash,
             ]
-            _write_row(current_row, child_data)
+            _write_row(current_row, row_data, bold_master_awb=True)
             current_row += 1
 
-    # Preserve orphan child records even if the master row is missing in DB.
-    for master_tn, orphan_children in children_by_master.items():
-        if master_tn in rendered_master_tns:
-            continue
-        for child in orphan_children:
-            child_status, child_date = _build_child_latest_from_shipment(child)
-            orphan_row = [
-                child.destination or dash,
-                child.recipient or dash,
-                _format_booking_date(child.booking_date) or dash,
-                child.show_date or dash,
-                child.show_city or child.exhibition_name or dash,
-                child.cs_type or child.cs or dash,
-                "",  # Keep child row format
-                child.carrier.upper() if child.carrier else dash,
-                master_tn,
-                child.tracking_number or dash,
-                child_status,
-                child.remarks or dash,
-                child_date or dash,
-            ]
-            _write_row(current_row, orphan_row)
-            current_row += 1
-    # Adjust column widths
-    for col in ws.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if cell.value is not None:
-                    val_str = str(cell.value)
-                    lines = val_str.split("\n")
-                    max_line_len = max(len(line) for line in lines) if lines else 0
-                    if max_line_len > max_length:
-                        max_length = max_line_len
-            except (ValueError, TypeError):
-                logger.warning("Failed to evaluate length for cell value: %s", cell.value)
-                pass
-        ws.column_dimensions[column].width = min(max_length + 2, 40)
+            rendered_child_tns = set()
+
+            # Render child records saved as individual Shipment rows.
+            for child in children_dict.get(master_tn, []):
+                child_status, child_date = _build_child_latest_from_shipment(s, child)
+                child_tn = (child.tracking_number or "").strip().upper()
+                if child_tn:
+                    rendered_child_tns.add(child_tn)
+
+                child_data = [
+                    child.destination or s.destination or dash,
+                    child.recipient or s.recipient or dash,
+                    _format_booking_date(child.booking_date) or _format_booking_date(s.booking_date) or dash,
+                    child.show_date or s.show_date or dash,
+                    child.show_city or child.exhibition_name or s.show_city or s.exhibition_name or dash,
+                    child.cs_type or child.cs or s.cs_type or s.cs or dash,
+                    "",  # No of Box empty for child rows in export format
+                    child.carrier.upper() if child.carrier else (s.carrier.upper() if s.carrier else dash),
+                    "",  # Master AWB empty for child row
+                    child.tracking_number or dash,
+                    child_status,
+                    child.remarks or s.remarks or dash,
+                    child_date or dash,
+                ]
+                _write_row(current_row, child_data)
+                current_row += 1
+
+            # Render legacy JSON child parcels, skipping duplicates already rendered.
+            for c in s.child_parcels or []:
+                c_tn = str(c.get("tracking_number") or "").strip().upper()
+                if c_tn and c_tn in rendered_child_tns:
+                    continue
+                c_latest, c_date = _build_child_latest(s, c)
+                child_data = [
+                    s.destination or dash,
+                    s.recipient or dash,
+                    _format_booking_date(s.booking_date) or dash,
+                    s.show_date or dash,
+                    s.show_city or s.exhibition_name or dash,
+                    s.cs_type or s.cs or dash,
+                    "",  # No of Box empty for child
+                    s.carrier.upper() if s.carrier else dash,
+                    "",  # Master AWB empty for child
+                    c.get("tracking_number") or dash,
+                    c_latest,
+                    s.remarks or dash,
+                    c_date or dash,
+                ]
+                _write_row(current_row, child_data)
+                current_row += 1
+
+        # Preserve orphan child records even if the master row is missing in DB.
+        for master_tn, orphan_children in children_dict.items():
+            if master_tn in rendered_master_tns:
+                continue
+            for child in orphan_children:
+                is_child_delivered = (child.status == "Delivered")
+                is_delivered_sheet = (ws.title == "Delivered")
+                if is_child_delivered != is_delivered_sheet:
+                    continue
+
+                child_status, child_date = _build_child_latest_from_shipment(child, child)
+                orphan_row = [
+                    child.destination or dash,
+                    child.recipient or dash,
+                    _format_booking_date(child.booking_date) or dash,
+                    child.show_date or dash,
+                    child.show_city or child.exhibition_name or dash,
+                    child.cs_type or child.cs or dash,
+                    "",  # Keep child row format
+                    child.carrier.upper() if child.carrier else dash,
+                    master_tn,
+                    child.tracking_number or dash,
+                    child_status,
+                    child.remarks or dash,
+                    child_date or dash,
+                ]
+                _write_row(current_row, orphan_row)
+                current_row += 1
+
+        # Adjust column widths
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if cell.value is not None:
+                        val_str = str(cell.value)
+                        lines = val_str.split("\n")
+                        max_line_len = max(len(line) for line in lines) if lines else 0
+                        if max_line_len > max_length:
+                            max_length = max_line_len
+                except (ValueError, TypeError):
+                    logger.warning("Failed to evaluate length for cell value: %s", cell.value)
+                    pass
+            ws.column_dimensions[column].width = min(max_length + 2, 40)
+
+    # Filter top-level list by status
+    top_transit = [s for s in top_level_shipments if s.status != "Delivered"]
+    top_delivered = [s for s in top_level_shipments if s.status == "Delivered"]
+
+    # Populate sheets
+    _populate_sheet(ws_transit, top_transit, children_by_master)
+    _populate_sheet(ws_delivered, top_delivered, children_by_master)
 
     # Save to buffer
     output = io.BytesIO()

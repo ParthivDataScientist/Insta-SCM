@@ -370,6 +370,11 @@ class DHLProvider:
 
         events = []
         for node in payload_root.findall(".//ShipmentEvent"):
+            p_ref = (
+                _text_or_empty(node.findtext("PieceID")) or
+                _text_or_empty(node.findtext("LicensePlate")) or
+                _text_or_empty(node.findtext("PieceNumber"))
+            )
             event = {
                 "date": _text_or_empty(node.findtext("Date")),
                 "time": _text_or_empty(node.findtext("Time")),
@@ -379,6 +384,8 @@ class DHLProvider:
             }
             if not event["location"]:
                 event["location"] = _text_or_empty(node.findtext("ServiceAreaCode"))
+            if p_ref:
+                event["piece_ref"] = p_ref
             events.append(event)
 
         if events:
@@ -389,14 +396,15 @@ class DHLProvider:
                 )
                 description = event.get("description") or "Status updated"
                 status_label = DHL_EVENT_CODE_MAP.get(event.get("event_code", ""), event.get("event_code", ""))
-                history.append(
-                    {
-                        "description": description,
-                        "location": event.get("location", ""),
-                        "status": status_label or description,
-                        "date": timestamp or event.get("date", ""),
-                    }
-                )
+                history_item = {
+                    "description": description,
+                    "location": event.get("location", ""),
+                    "status": status_label or description,
+                    "date": timestamp or event.get("date", ""),
+                }
+                if "piece_ref" in event:
+                    history_item["piece_ref"] = event["piece_ref"]
+                history.append(history_item)
 
             history.sort(
                 key=lambda item: self._history_sort_key(item.get("date", "")),
@@ -432,6 +440,18 @@ class DHLProvider:
                 payload_root.findall(".//Piece")
             )
             
+            # Check if there are any segmented events at all in the whole response
+            has_any_segmented_events = any("piece_ref" in item for item in history)
+            if not has_any_segmented_events:
+                for piece_node in piece_nodes:
+                    if (
+                        piece_node.findall(".//PieceEvent") or
+                        piece_node.findall(".//Event") or
+                        piece_node.findall(".//ShipmentEvent")
+                    ):
+                        has_any_segmented_events = True
+                        break
+
             for piece_node in piece_nodes:
                 # Piece IDs can be in PieceID, LicensePlate, or PieceNumber tags
                 p_id = (
@@ -442,13 +462,78 @@ class DHLProvider:
                 )
                 
                 if p_id:
-                    # Piece-level status usually matches master summary in summary responses
-                    p_desc = (
-                        _text_or_empty(piece_node.findtext("LastDetailedStatus")) or 
-                        _text_or_empty(piece_node.findtext("Description")) or 
-                        current_status
+                    # 1. Try to find piece-specific events nested under the piece node
+                    p_events = []
+                    p_event_nodes = (
+                        piece_node.findall(".//PieceEvent") +
+                        piece_node.findall(".//Event") +
+                        piece_node.findall(".//ShipmentEvent")
                     )
-                    p_bucket = self._to_status_bucket(p_desc)
+                    for p_node in p_event_nodes:
+                        pe_date = _text_or_empty(p_node.findtext("Date"))
+                        pe_time = _text_or_empty(p_node.findtext("Time"))
+                        pe_code = _text_or_empty(p_node.findtext("EventCode"))
+                        pe_desc = _text_or_empty(p_node.findtext("Description"))
+                        pe_loc = _text_or_empty(p_node.findtext("ServiceAreaDescription"))
+                        if not pe_loc:
+                            pe_loc = _text_or_empty(p_node.findtext("ServiceAreaCode"))
+                        
+                        if pe_date or pe_desc:
+                            pe_timestamp = self._normalize_datetime_string(f"{pe_date} {pe_time}".strip())
+                            pe_status_label = DHL_EVENT_CODE_MAP.get(pe_code, pe_code or pe_desc)
+                            p_events.append({
+                                "description": pe_desc or "Status updated",
+                                "location": pe_loc,
+                                "status": pe_status_label or pe_desc,
+                                "date": pe_timestamp or pe_date,
+                            })
+                    
+                    p_history = []
+                    if p_events:
+                        p_events.sort(key=lambda item: self._history_sort_key(item.get("date", "")), reverse=True)
+                        p_history = p_events
+                    else:
+                        # 2. Try to filter the global history by matching piece_ref
+                        p_history = [item for item in history if item.get("piece_ref") == p_id]
+                    
+                    # 3. Fallback to master history ONLY if there are no segmented events in the entire response
+                    if not p_history and not has_any_segmented_events:
+                        p_history = history
+                    
+                    # Determine piece-specific current status, date, location
+                    if p_history and has_any_segmented_events:
+                        # Synchronize master's newer events into child history if parent has moved
+                        if history and history[0].get("date") and p_history[0].get("date"):
+                            try:
+                                m_date = datetime.fromisoformat(history[0]["date"].replace("Z", "+00:00"))
+                                p_date = datetime.fromisoformat(p_history[0]["date"].replace("Z", "+00:00"))
+                                if m_date > p_date:
+                                    newer_scans = []
+                                    for h_item in history:
+                                        if h_item.get("date"):
+                                            try:
+                                                h_date = datetime.fromisoformat(h_item["date"].replace("Z", "+00:00"))
+                                                if h_date > p_date:
+                                                    newer_scans.append(h_item)
+                                            except Exception:
+                                                pass
+                                    p_history = newer_scans + p_history
+                            except Exception:
+                                pass
+                        p_desc = p_history[0]["description"]
+                        p_bucket = p_history[0]["status"]
+                        p_last_date = p_history[0]["date"]
+                        p_last_location = p_history[0]["location"]
+                    else:
+                        p_desc = (
+                            _text_or_empty(piece_node.findtext("LastDetailedStatus")) or 
+                            _text_or_empty(piece_node.findtext("Description")) or 
+                            (current_status if not has_any_segmented_events else "Pending")
+                        )
+                        p_bucket = self._to_status_bucket(p_desc)
+                        p_last_date = latest.get("date") if (latest and not has_any_segmented_events) else None
+                        p_last_location = latest.get("location") if (latest and not has_any_segmented_events) else None
+
                     child_parcels.append({
                         "tracking_number": p_id,
                         "status": p_bucket,
@@ -457,9 +542,9 @@ class DHLProvider:
                         "origin": oldest.get("location") or "Unknown",
                         "destination": "Unknown",
                         "eta": estimated_delivery or "Unknown",
-                        "history": history,
-                        "last_date": latest.get("date") if latest else None,
-                        "last_location": latest.get("location") if latest else None,
+                        "history": p_history,
+                        "last_date": p_last_date,
+                        "last_location": p_last_location,
                     })
 
             return {
@@ -488,6 +573,26 @@ class DHLProvider:
         if summary_description or summary_code:
             location = self._extract_location_from_description(summary_description)
             status_bucket = self._to_status_bucket(summary_description or summary_code, event_code=summary_code)
+            
+            # Parse Date and Time from summary root if available to avoid missing scan dates
+            summary_date = (
+                _text_or_empty(payload_root.findtext("Date")) or 
+                _text_or_empty(payload_root.findtext("EventDate")) or 
+                _text_or_empty(payload_root.findtext("DateOfScan")) or 
+                _text_or_empty(payload_root.findtext("ScanDate")) or 
+                ""
+            )
+            summary_time = (
+                _text_or_empty(payload_root.findtext("Time")) or 
+                _text_or_empty(payload_root.findtext("EventTime")) or 
+                _text_or_empty(payload_root.findtext("TimeOfScan")) or 
+                _text_or_empty(payload_root.findtext("ScanTime")) or 
+                ""
+            )
+            summary_timestamp = ""
+            if summary_date:
+                summary_timestamp = self._normalize_datetime_string(f"{summary_date} {summary_time}".strip())
+
             return {
                 "current_status": summary_description or summary_code,
                 "estimated_delivery": None,
@@ -499,7 +604,7 @@ class DHLProvider:
                         "description": summary_description or summary_code,
                         "location": location or "",
                         "status": DHL_EVENT_CODE_MAP.get(summary_code, summary_code or summary_description or ""),
-                        "date": "",
+                        "date": summary_timestamp or summary_date,
                     }
                 ],
                 "origin": "Unknown",

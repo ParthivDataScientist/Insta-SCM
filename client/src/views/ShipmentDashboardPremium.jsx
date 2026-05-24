@@ -11,6 +11,8 @@ import KpiCard from '../components/app/KpiCard';
 import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import AlertBanner from '../components/AlertBanner';
 import '../design-premium.css';
+import GoogleSheetsTabBar from '../components/GoogleSheetsTabBar';
+import { isUsaShipment, isEuropeShipment, isIndiaShipment } from '../utils/regionFilter';
 
 export default function ShipmentDashboardPremium() {
     const navigate = useNavigate();
@@ -20,6 +22,45 @@ export default function ShipmentDashboardPremium() {
         selectedIds, setSelectedIds, handleSelectAll,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
     } = useShipments();
+
+    const [activeSheetTab, setActiveSheetTab] = useState('all');
+
+    // Counts for sheet tabs based on current global filters
+    const allMatchingCount = filteredShipments.length;
+    const usaMatchingCount = filteredShipments.filter(isUsaShipment).length;
+    const europeMatchingCount = filteredShipments.filter(isEuropeShipment).length;
+    const indiaMatchingCount = filteredShipments.filter(isIndiaShipment).length;
+
+    // Dynamically filtered shipments for grid display
+    const sheetFilteredShipments = React.useMemo(() => {
+        if (activeSheetTab === 'usa') {
+            return filteredShipments.filter(isUsaShipment);
+        }
+        if (activeSheetTab === 'europe') {
+            return filteredShipments.filter(isEuropeShipment);
+        }
+        if (activeSheetTab === 'india') {
+            return filteredShipments.filter(isIndiaShipment);
+        }
+        return filteredShipments;
+    }, [activeSheetTab, filteredShipments]);
+
+    // Override Stats dynamically based on region of active sheet
+    const activeSheetStats = React.useMemo(() => {
+        const regionShipments = shipments.filter(item => {
+            if (activeSheetTab === 'usa') return isUsaShipment(item);
+            if (activeSheetTab === 'europe') return isEuropeShipment(item);
+            if (activeSheetTab === 'india') return isIndiaShipment(item);
+            return true;
+        });
+
+        const total = regionShipments.length;
+        const transit = regionShipments.filter(item => item.status !== 'Delivered').length;
+        const delivered = regionShipments.filter(item => item.status === 'Delivered').length;
+        const exceptions = regionShipments.filter(item => (item.status || '').toLowerCase().includes('exception')).length;
+
+        return { total, transit, delivered, exceptions };
+    }, [activeSheetTab, shipments]);
 
     const refreshTrackingRef = useRef(refreshTracking);
     useEffect(() => {
@@ -86,7 +127,7 @@ export default function ShipmentDashboardPremium() {
 
     const handleExport = async () => {
         const selected = selectedIds.filter((id) => Number.isInteger(id));
-        const filteredIds = filteredShipments
+        const filteredIds = sheetFilteredShipments
             .map((shipment) => shipment?.id)
             .filter((id) => Number.isInteger(id));
         const idsToExport = selected.length > 0 ? selected : filteredIds;
@@ -356,7 +397,7 @@ export default function ShipmentDashboardPremium() {
                             <KpiCard
                                 icon={Truck}
                                 label="Total Shipments"
-                                value={`${stats.total ?? 0}`}
+                                value={`${activeSheetStats.total ?? 0}`}
                                 active={filter === 'All'}
                                 onClick={() => setFilter('All')}
                                 className="design-dashboard__kpi design-dashboard__kpi--all"
@@ -364,7 +405,7 @@ export default function ShipmentDashboardPremium() {
                             <KpiCard
                                 icon={Package}
                                 label="In Transit"
-                                value={`${stats.transit ?? 0}`}
+                                value={`${activeSheetStats.transit ?? 0}`}
                                 tone="blue"
                                 active={filter === 'Active'}
                                 onClick={() => setFilter('Active')}
@@ -373,7 +414,7 @@ export default function ShipmentDashboardPremium() {
                             <KpiCard
                                 icon={CheckCircle}
                                 label="Delivered"
-                                value={`${stats.delivered ?? 0}`}
+                                value={`${activeSheetStats.delivered ?? 0}`}
                                 tone="green"
                                 active={filter === 'Delivered'}
                                 onClick={() => setFilter('Delivered')}
@@ -382,7 +423,7 @@ export default function ShipmentDashboardPremium() {
                             <KpiCard
                                 icon={AlertTriangle}
                                 label="Exceptions"
-                                value={`${stats.exceptions ?? 0}`}
+                                value={`${activeSheetStats.exceptions ?? 0}`}
                                 tone="red"
                                 active={filter === 'Exception'}
                                 onClick={() => setFilter('Exception')}
@@ -392,7 +433,7 @@ export default function ShipmentDashboardPremium() {
 
                         <div className="design-dashboard__table-shell shipping-table-panel">
                             <ShipmentTable
-                                shipments={filteredShipments}
+                                shipments={sheetFilteredShipments}
                                 loading={loading}
                                 error={error}
                                 onRetry={() => loadData(false)}
@@ -408,6 +449,14 @@ export default function ShipmentDashboardPremium() {
                                 onSelectionChange={setSelectedIds}
                                 onSelectAll={handleSelectAll}
                                 selectedShipment={selectedShipment}
+                            />
+                            <GoogleSheetsTabBar
+                                activeTab={activeSheetTab}
+                                setActiveTab={setActiveSheetTab}
+                                allCount={allMatchingCount}
+                                usaCount={usaMatchingCount}
+                                europeCount={europeMatchingCount}
+                                indiaCount={indiaMatchingCount}
                             />
                         </div>
                     </div>

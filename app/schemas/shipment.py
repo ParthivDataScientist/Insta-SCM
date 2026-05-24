@@ -107,6 +107,7 @@ class ShipmentResponse(BaseModel):
     # MPS fields
     is_master: bool = False
     is_archived: bool = False
+    country: Optional[str] = None
     awb: Optional[str] = None
     label_url: Optional[str] = None
     pickup_id: Optional[str] = None

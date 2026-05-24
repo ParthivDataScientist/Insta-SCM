@@ -29,6 +29,7 @@ class ShipmentBase(SQLModel):
     project_id: Optional[int] = Field(default=None, foreign_key="dashboardproject.id")
     is_master: bool = Field(default=False)
     is_archived: bool = Field(default=False)
+    country: Optional[str] = None
     awb: Optional[str] = Field(default=None, index=True)
     label_url: Optional[str] = None
     label_path: Optional[str] = None
