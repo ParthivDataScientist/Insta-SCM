@@ -124,6 +124,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
                 applied_changes.append(f"dashboardproject.{column_name}")
         if "shipment" in inspector.get_table_names():
             shipment_ddl = {
+                "country": "ALTER TABLE shipment ADD COLUMN country VARCHAR",
                 "master_tracking_number": "ALTER TABLE shipment ADD COLUMN master_tracking_number VARCHAR",
                 "is_master": "ALTER TABLE shipment ADD COLUMN is_master BOOLEAN DEFAULT FALSE",
                 "child_tracking_numbers": "ALTER TABLE shipment ADD COLUMN child_tracking_numbers JSON",
