@@ -1,9 +1,9 @@
 /* --- New Premium Header Styles --- */
 .design-premium-header {
     position: sticky;
-    top: 20px;
+    top: 0;
     z-index: 40;
-    margin: 0 16px 28px;
+    margin: 0 0 12px;
     display: flex;
     justify-content: center;
 }
@@ -563,7 +563,7 @@
     min-height: 0;
     overflow: hidden;
     position: relative;
-    padding: 0 16px 16px;
+    padding: 0 0 8px;
     margin-top: 0;
     width: 100%;
     max-width: 1600px;
@@ -668,11 +668,11 @@
 }
 
 .shipping-dashboard-page .design-dashboard__kpi {
-    min-height: 110px !important;
-    height: 110px !important;
+    min-height: 92px !important;
+    height: 92px !important;
     min-width: 0 !important; /* Allow even shrinking */
     flex: 1 !important;
-    padding: 24px 20px 16px !important;
+    padding: 16px 20px 12px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
