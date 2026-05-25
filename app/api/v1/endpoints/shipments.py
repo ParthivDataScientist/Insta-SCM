@@ -960,9 +960,11 @@ def export_shipments(
     from openpyxl import Workbook
     wb = Workbook()
     
-    ws_transit = wb.active
-    ws_transit.title = "In Transit"
-    ws_delivered = wb.create_sheet(title="Delivered")
+    ws_all = wb.active
+    ws_all.title = "All Shipments"
+    ws_usa = wb.create_sheet(title="USA")
+    ws_europe = wb.create_sheet(title="Europe")
+    ws_india = wb.create_sheet(title="India")
 
     today_str = datetime.now().strftime("%d.%m.%Y")
     
@@ -1005,6 +1007,116 @@ def export_shipments(
                 return parsed.strftime("%I:%M %p")
             except Exception:
                 return ""
+
+    def _safe_date_time(raw_value):
+        if not raw_value:
+            return ""
+        try:
+            dt = datetime.fromisoformat(str(raw_value).replace("Z", "+00:00"))
+            return dt.strftime("%d.%m.%Y %I:%M %p")
+        except (ValueError, TypeError):
+            try:
+                parsed = pd.to_datetime(raw_value)
+                if pd.isna(parsed):
+                    return str(raw_value)
+                return parsed.strftime("%d.%m.%Y %I:%M %p")
+            except Exception:
+                return str(raw_value)
+
+    def is_usa_shipment(item) -> bool:
+        if not item:
+            return False
+        
+        country = str(item.destination or item.origin or "").strip().upper()
+        if any(k in country for k in ("USA", "US", "UNITED STATES")):
+            return True
+        if any(k in country for k in ("EUROPE", "EU", "INDIA", "IN")):
+            return False
+            
+        dest = str(item.destination or "").upper()
+        city = str(item.show_city or "").upper()
+        recipient = str(item.recipient or "").upper()
+        origin = str(item.origin or "").upper()
+        exhibition = str(item.exhibition_name or "").upper()
+        
+        us_keywords = [
+            'USA', 'UNITED STATES', ' U.S.', ' U.S.A.', ', US', ',US', 'NEW YORK', 'LAS VEGAS', 
+            'CHICAGO', 'ORLANDO', 'MIAMI', 'LOS ANGELES', 'SAN FRANCISCO', 'WASHINGTON', 'BOSTON',
+            'ATLANTA', 'DALLAS', 'HOUSTON', 'SEATTLE', 'DETROIT', 'OHIO', 'NEVADA', 'FLORIDA', 'CALIFORNIA',
+            'TEXAS', 'NEW ALBANY', 'PORTLAND'
+        ]
+        
+        import re
+        matches_us = any(
+            kw in field for kw in us_keywords for field in (dest, city, recipient, origin, exhibition)
+        ) or any(
+            re.search(r'\b(US|USA)\b', field) for field in (dest, city, exhibition, origin)
+        )
+        return bool(matches_us)
+
+    def is_europe_shipment(item) -> bool:
+        if not item:
+            return False
+            
+        country = str(item.destination or item.origin or "").strip().upper()
+        if any(k in country for k in ("EUROPE", "EU")):
+            return True
+        if any(k in country for k in ("USA", "US", "UNITED STATES", "INDIA", "IN")):
+            return False
+            
+        dest = str(item.destination or "").upper()
+        city = str(item.show_city or "").upper()
+        recipient = str(item.recipient or "").upper()
+        origin = str(item.origin or "").upper()
+        exhibition = str(item.exhibition_name or "").upper()
+        
+        eu_keywords = [
+            'GERMANY', 'DEUTSCHLAND', 'FRANCE', 'UNITED KINGDOM', 'GREAT BRITAIN', ' UK', ' U.K.', ', UK', ',UK',
+            'ITALY', 'ITALIA', 'SPAIN', 'ESPANA', 'NETHERLANDS', 'HOLLAND', 'BELGIUM', 'SWITZERLAND', 'AUSTRIA',
+            'DENMARK', 'SWEDEN', 'NORWAY', 'FINLAND', 'IRELAND', 'POLAND', 'PORTUGAL', 'GREECE', 'EUROPE', 'EU',
+            'DUSSELDORF', 'MUNICH', 'MUNCHEN', 'FRANKFURT', 'PARIS', 'LONDON', 'AMSTERDAM', 'BRUSSELS', 'MILAN', 
+            'MILANO', 'ROME', 'ROMA', 'BARCELONA', 'MADRID', 'GENEVA', 'ZURICH', 'VIENNA', 'COPENHAGEN', 
+            'STOCKHOLM', 'OSLO', 'HELSINKI', 'DUBLIN', 'WARSAW', 'LISBON', 'ATHENS', 'BIRMINGHAM', 'MANCHESTER',
+            ' NL', ' DE', ' FR', ' IT', ' ES', ' BE', ' CH', ' AT', ' DK', ' SE', ' NO', ' FI', ' IE', ' PL', ' PT', ' GR'
+        ]
+        
+        import re
+        matches_eu = any(
+            kw in field for kw in eu_keywords for field in (dest, city, recipient, origin, exhibition)
+        ) or any(
+            re.search(r'\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b', field) for field in (dest, city, exhibition, origin)
+        )
+        return bool(matches_eu and not is_usa_shipment(item))
+
+    def is_india_shipment(item) -> bool:
+        if not item:
+            return False
+            
+        country = str(item.destination or item.origin or "").strip().upper()
+        if any(k in country for k in ("INDIA", "IN")):
+            return True
+        if any(k in country for k in ("USA", "US", "UNITED STATES", "EUROPE", "EU")):
+            return False
+            
+        dest = str(item.destination or "").upper()
+        city = str(item.show_city or "").upper()
+        recipient = str(item.recipient or "").upper()
+        origin = str(item.origin or "").upper()
+        exhibition = str(item.exhibition_name or "").upper()
+        
+        in_keywords = [
+            'INDIA', 'IN', ', IN', ',IN', 'NOIDA', 'MUMBAI', 'CHENNAI', 'DELHI', 'BENGALURU', 
+            'BANGALORE', 'KOLKATA', 'JAIPUR', 'HYDERABAD', 'PUNE', 'INDORE', 'JIO', 'HITEX', 
+            'BIEC', 'PRAGATI', 'MAIDAN', 'HAVELLS', 'WIPRO', 'RELIANCE'
+        ]
+        
+        import re
+        matches_in = any(
+            kw in field for kw in in_keywords for field in (dest, city, recipient, origin, exhibition)
+        ) or any(
+            re.search(r'\b(IN|IND)\b', field) for field in (dest, city, exhibition, origin)
+        )
+        return bool(matches_in and not is_usa_shipment(item) and not is_europe_shipment(item))
 
     def _format_booking_date(raw_value):
         formatted = _safe_date(raw_value)
@@ -1078,7 +1190,7 @@ def export_shipments(
                 latest.get("description"),
                 eta
             )
-            return card, _safe_date(latest.get("date"))
+            return card, _safe_date_time(latest.get("date"))
         card = _format_current_status_card(
             shipment.last_scan_date,
             shipment.status,
@@ -1086,7 +1198,7 @@ def export_shipments(
             "",
             eta
         )
-        return card, _safe_date(shipment.last_scan_date)
+        return card, _safe_date_time(shipment.last_scan_date)
 
     def _build_child_latest(parent: Shipment, child: dict):
         c_date_raw = child.get("last_date")
@@ -1106,7 +1218,7 @@ def export_shipments(
                 latest.get("description"),
                 c_eta
             )
-            return card, _safe_date(latest.get("date"))
+            return card, _safe_date_time(latest.get("date"))
 
         # Fallback to parent details if child date is missing
         if (not c_loc or not c_date_raw) and parent.history:
@@ -1126,7 +1238,7 @@ def export_shipments(
             c_desc,
             c_eta
         )
-        return card, _safe_date(c_date_raw)
+        return card, _safe_date_time(c_date_raw)
 
     def _build_child_latest_from_shipment(parent: Shipment, child: Shipment):
         eta = child.eta or "Pending"
@@ -1139,7 +1251,7 @@ def export_shipments(
                 latest.get("description"),
                 eta
             )
-            return card, _safe_date(latest.get("date"))
+            return card, _safe_date_time(latest.get("date"))
 
         c_loc = child.destination or child.origin
         c_date_raw = child.last_scan_date
@@ -1161,7 +1273,7 @@ def export_shipments(
             c_desc,
             eta
         )
-        return card, _safe_date(c_date_raw)
+        return card, _safe_date_time(c_date_raw)
 
     def _parse_show_date(raw_value) -> Optional[date]:
         if raw_value is None:
@@ -1308,9 +1420,11 @@ def export_shipments(
             if master_tn in rendered_master_tns:
                 continue
             for child in orphan_children:
-                is_child_delivered = (child.status == "Delivered")
-                is_delivered_sheet = (ws.title == "Delivered")
-                if is_child_delivered != is_delivered_sheet:
+                if ws.title == "USA" and not is_usa_shipment(child):
+                    continue
+                if ws.title == "Europe" and not is_europe_shipment(child):
+                    continue
+                if ws.title == "India" and not is_india_shipment(child):
                     continue
 
                 child_status, child_date = _build_child_latest_from_shipment(child, child)
@@ -1349,13 +1463,16 @@ def export_shipments(
                     pass
             ws.column_dimensions[column].width = min(max_length + 2, 40)
 
-    # Filter top-level list by status
-    top_transit = [s for s in top_level_shipments if s.status != "Delivered"]
-    top_delivered = [s for s in top_level_shipments if s.status == "Delivered"]
+    # Filter top-level lists by region helper
+    top_usa = [s for s in top_level_shipments if is_usa_shipment(s)]
+    top_europe = [s for s in top_level_shipments if is_europe_shipment(s)]
+    top_india = [s for s in top_level_shipments if is_india_shipment(s)]
 
     # Populate sheets
-    _populate_sheet(ws_transit, top_transit, children_by_master)
-    _populate_sheet(ws_delivered, top_delivered, children_by_master)
+    _populate_sheet(ws_all, top_level_shipments, children_by_master)
+    _populate_sheet(ws_usa, top_usa, children_by_master)
+    _populate_sheet(ws_europe, top_europe, children_by_master)
+    _populate_sheet(ws_india, top_india, children_by_master)
 
     # Save to buffer
     output = io.BytesIO()

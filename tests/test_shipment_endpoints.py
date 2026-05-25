@@ -586,6 +586,11 @@ class TestExportShipment:
         assert status_cell.alignment.wrap_text is True
         assert status_cell.alignment.vertical == "top"
 
+        # Check Column 13 (Last Scan date / Same place)
+        last_scan_cell = ws.cell(row=row_idx, column=13)
+        assert last_scan_cell.value == "19.05.2026 12:11 PM"
+
+
 
 
 class TestGoogleSheetWebhook:
