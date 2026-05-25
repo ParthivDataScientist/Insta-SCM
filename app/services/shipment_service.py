@@ -1109,6 +1109,38 @@ def save_shipment_to_db(
         if carrier_name == "DHL" and not shipment.awb:
             shipment.awb = tracking_number
 
+        # --- Propagate updates to separate child records if this is a master ---
+        if (shipment.is_master or result.get("is_master")) and result.get("child_parcels"):
+            for child_data in result["child_parcels"]:
+                child_tn = (child_data.get("tracking_number") or "").strip().upper()
+                if not child_tn:
+                    continue
+                
+                # Find if this child exists as a separate row in the database
+                child_shipment = db.exec(
+                    select(Shipment).where(Shipment.tracking_number == child_tn)
+                ).first()
+                
+                if child_shipment:
+                    # Update child row with its own distinct data from the master's MPS response
+                    child_shipment.status = child_data.get("status") or child_shipment.status
+                    child_shipment.raw_status = child_data.get("raw_status") or child_data.get("current_status") or child_shipment.raw_status
+                    child_shipment.lifecycle_state = _derive_lifecycle_state(child_shipment.status)
+                    child_shipment.origin = child_data.get("origin") or child_shipment.origin or shipment.origin
+                    child_shipment.destination = child_data.get("destination") or child_shipment.destination or shipment.destination
+                    child_shipment.eta = child_data.get("eta") or child_shipment.eta or shipment.eta
+                    
+                    child_history = child_data.get("history")
+                    if child_history and isinstance(child_history, list) and len(child_history) > 0:
+                        child_shipment.history = child_history
+                        if child_history[0].get("date"):
+                            child_shipment.last_scan_date = child_history[0]["date"]
+                    else:
+                        child_shipment.last_scan_date = child_data.get("last_date") or child_shipment.last_scan_date
+                    
+                    db.add(child_shipment)
+                    logger.info("Propagated update from master %s to child row %s", tracking_number, child_tn)
+
         logger.info("Updated shipment record for %s", tracking_number)
 
     db.add(shipment)

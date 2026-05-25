@@ -270,11 +270,13 @@ const getCurrentStatusMeta = (shipment) => {
         };
     }
 
-    const fallbackDate = String(shipment?.last_scan_date || '').trim();
+    const fallbackDateRaw = String(shipment?.last_scan_date || '').trim();
+    const dateLabel = fallbackDateRaw ? formatStatusDate(fallbackDateRaw) : '';
+    const fallbackLocation = String(shipment?.destination || shipment?.origin || '').trim();
     return {
-        date: fallbackDate,
+        date: dateLabel,
         headline: shipment?.current_status || shipment?.raw_status || shipment?.status || '-',
-        location: '',
+        location: fallbackLocation,
     };
 };
 

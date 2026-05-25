@@ -449,6 +449,14 @@ export default function ShipmentDashboardPremium() {
                                 selectedShipment={selectedShipment}
                                 onFilteredShipmentsChange={setDisplayedShipmentIds}
                             />
+                            <GoogleSheetsTabBar
+                                activeTab={activeSheetTab}
+                                setActiveTab={setActiveSheetTab}
+                                allCount={allMatchingCount}
+                                usaCount={usaMatchingCount}
+                                europeCount={europeMatchingCount}
+                                indiaCount={indiaMatchingCount}
+                            />
                         </div>
                     </div>
 
