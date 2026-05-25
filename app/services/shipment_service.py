@@ -859,6 +859,8 @@ def _resolve_child_fallback_result(
             stored_child_history = parcel.get("history")
 
             child_history = list(stored_child_history) if isinstance(stored_child_history, list) else []
+            if not child_history:
+                child_history = list(master.history or [])
             if not child_history and (child_last_date or child_last_location or has_explicit_child_status):
                 child_history.append(
                     {
@@ -993,6 +995,7 @@ def save_shipment_to_db(
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
+    country: Optional[str] = None,
     commit: bool = True,
 ) -> dict:
     tracking_number = (tracking_number or "").strip().upper()
@@ -1039,6 +1042,7 @@ def save_shipment_to_db(
             master_tracking_number=master_tracking_number or result.get("master_tracking_number"),
             is_master=is_master if is_master is not None else result.get("is_master", False),
             child_parcels=result.get("child_parcels", []),
+            country=country,
         )
         logger.info("Created new shipment record for %s (%s)", tracking_number, carrier_name)
     else:
@@ -1069,6 +1073,8 @@ def save_shipment_to_db(
             shipment.remarks = remarks
         if last_scan_date is not None:
             shipment.last_scan_date = last_scan_date
+        if country is not None:
+            shipment.country = country
 
 
         # Only update fields if the API returned meaningful data
@@ -1131,6 +1137,7 @@ async def track_and_save(
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
+    country: Optional[str] = None,
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -1244,6 +1251,7 @@ async def track_and_save(
         master_tracking_number=master_tracking_number,
         is_master=is_master,
         destination=destination,
+        country=country,
         commit=True,
     )
 
