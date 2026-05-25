@@ -21,6 +21,7 @@ export default function StoragePremium() {
         archiveShipment,
         batchDelete,
         batchArchive,
+        updateShipment,
     } = useShipments();
 
     useEffect(() => {
@@ -101,6 +102,7 @@ export default function StoragePremium() {
                             onSelectionChange={setSelectedIds}
                             onSelectAll={handleSelectAll}
                             selectedShipment={selected}
+                            onUpdateShipment={updateShipment}
                         />
                     )}
                 </div>

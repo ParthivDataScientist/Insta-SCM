@@ -21,6 +21,7 @@ export default function ShipmentDashboardPremium() {
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         selectedIds, setSelectedIds, handleSelectAll,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
+        updateShipment,
     } = useShipments();
 
     const [activeSheetTab, setActiveSheetTab] = useState('all');
@@ -430,7 +431,7 @@ export default function ShipmentDashboardPremium() {
                         </div>
 
                         <div className="design-dashboard__table-shell shipping-table-panel">
-                            <ShipmentTable
+                             <ShipmentTable
                                 shipments={sheetFilteredShipments}
                                 loading={loading}
                                 error={error}
@@ -448,6 +449,7 @@ export default function ShipmentDashboardPremium() {
                                 onSelectAll={handleSelectAll}
                                 selectedShipment={selectedShipment}
                                 onFilteredShipmentsChange={setDisplayedShipmentIds}
+                                onUpdateShipment={updateShipment}
                             />
                             <GoogleSheetsTabBar
                                 activeTab={activeSheetTab}

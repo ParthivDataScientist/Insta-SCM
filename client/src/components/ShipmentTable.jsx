@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
+import { patchShipmentCell } from '../api/shipments';
 
 function useOnClickOutside(ref, handler) {
     useEffect(() => {
@@ -725,6 +726,7 @@ const ShipmentTable = ({
     onClearFilters = () => {},
     selectedShipment,
     onFilteredShipmentsChange,
+    onUpdateShipment,
 }) => {
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
@@ -734,6 +736,78 @@ const ShipmentTable = ({
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [mobileActionTarget, setMobileActionTarget] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
+
+    // Component states for dynamic inline editing
+    const [activeEditCell, setActiveEditCell] = useState(null); // { rowId: number, fieldName: string }
+    const [stagedValue, setStagedValue] = useState("");
+
+    const startEditing = (event, shipment, fieldName) => {
+        event.stopPropagation();
+        if (shipment.id == null) return;
+        
+        let initialVal = "";
+        if (fieldName === 'title') {
+            initialVal = shipment.title || shipment.items || "";
+        } else if (fieldName === 'estimated_delivery') {
+            const rawEta = shipment.estimated_delivery || shipment.eta || "";
+            const match = rawEta.match(/^\d{4}-\d{2}-\d{2}/);
+            initialVal = match ? match[0] : "";
+        } else if (fieldName === 'show_date') {
+            initialVal = shipment.show_date || "";
+        } else if (fieldName === 'route_str') {
+            initialVal = `${shipment.origin || ""} -> ${shipment.destination || ""}`;
+        }
+        
+        setActiveEditCell({ rowId: shipment.id, fieldName });
+        setStagedValue(initialVal);
+    };
+
+    const cancelEditing = () => {
+        setActiveEditCell(null);
+        setStagedValue("");
+    };
+
+    const commitEditing = async (shipmentId, fieldName) => {
+        if (!activeEditCell) return;
+        
+        const trimmed = stagedValue.trim();
+        const payload = {};
+        payload[fieldName] = trimmed;
+        
+        let originalVal = "";
+        if (fieldName === 'title') {
+            const ship = shipments.find(s => s.id === shipmentId);
+            originalVal = (ship?.title || ship?.items || "").trim();
+        } else if (fieldName === 'estimated_delivery') {
+            const ship = shipments.find(s => s.id === shipmentId);
+            const rawEta = ship?.estimated_delivery || ship?.eta || "";
+            const match = rawEta.match(/^\d{4}-\d{2}-\d{2}/);
+            originalVal = (match ? match[0] : "").trim();
+        } else if (fieldName === 'show_date') {
+            const ship = shipments.find(s => s.id === shipmentId);
+            originalVal = (ship?.show_date || "").trim();
+        } else if (fieldName === 'route_str') {
+            const ship = shipments.find(s => s.id === shipmentId);
+            originalVal = `${ship?.origin || ""} -> ${ship?.destination || ""}`.trim();
+        }
+        
+        if (trimmed === originalVal) {
+            cancelEditing();
+            return;
+        }
+        
+        try {
+            const updatedShipment = await patchShipmentCell(shipmentId, payload);
+            if (onUpdateShipment) {
+                onUpdateShipment(updatedShipment);
+            }
+        } catch (err) {
+            console.error("Failed to commit inline cell update:", err);
+            alert("Failed to save changes. Please try again.");
+        } finally {
+            cancelEditing();
+        }
+    };
 
     const handleViewMaster = (shipment) => {
         if (onSelectShipment && shipment) {
@@ -1153,7 +1227,6 @@ const ShipmentTable = ({
                                                 {isSelected ? <Check size={10} /> : null}
                                             </span>
                                         </td>
-
                                         <td className="design-table__td shipping-col-id">
                                             <div className="shipment-main-cell">
                                                 {hasChildren ? (
@@ -1175,11 +1248,49 @@ const ShipmentTable = ({
                                                 </span>
 
                                                 <div className="shipment-main-cell__content truncate-cell" title={`${shipmentDisplayName(master)} | ${displayValue(master.tracking_number)}`}>
-                                                    <div className="tid-name">{shipmentDisplayName(master)}</div>
-                                                    <div className="tid-num">
-                                                        {displayValue(master.tracking_number)}
-                                                        {hasChildren ? <span className="shipment-child-count">+{childRows.length}</span> : null}
-                                                    </div>
+                                                    {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'title' ? (
+                                                        <div onClick={(e) => e.stopPropagation()}>
+                                                            <input
+                                                                type="text"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '2px 6px',
+                                                                    fontSize: '0.85rem',
+                                                                    border: '1px solid #3b82f6',
+                                                                    borderRadius: '4px',
+                                                                    outline: 'none',
+                                                                    boxShadow: '0 0 0 1px #3b82f6',
+                                                                    height: '24px',
+                                                                    lineHeight: '20px',
+                                                                    background: 'var(--bg-in, #fff)',
+                                                                    color: 'var(--tx, #1f2937)',
+                                                                }}
+                                                                value={stagedValue}
+                                                                onChange={(e) => setStagedValue(e.target.value)}
+                                                                onBlur={() => commitEditing(master.id, 'title')}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') commitEditing(master.id, 'title');
+                                                                    else if (e.key === 'Escape') cancelEditing();
+                                                                }}
+                                                                autoFocus
+                                                            />
+                                                            <div className="tid-num">
+                                                                {displayValue(master.tracking_number)}
+                                                                {hasChildren ? <span className="shipment-child-count">+{childRows.length}</span> : null}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div 
+                                                            onDoubleClick={(event) => startEditing(event, master, 'title')}
+                                                            title="Double-click to edit Name"
+                                                        >
+                                                            <div className="tid-name">{shipmentDisplayName(master)}</div>
+                                                            <div className="tid-num">
+                                                                {displayValue(master.tracking_number)}
+                                                                {hasChildren ? <span className="shipment-child-count">+{childRows.length}</span> : null}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -1205,17 +1316,68 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-eta">
+                                        <td className="design-table__td shipping-col-eta" onDoubleClick={(event) => startEditing(event, master, 'estimated_delivery')}>
                                             <div className="shipment-date-cell">
-                                                {masterStatusMeta.date ? (
-                                                    <span className="shipment-date-cell__date">{masterStatusMeta.date}</span>
-                                                ) : <span className="shipment-date-cell__date">—</span>}
+                                                {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'estimated_delivery' ? (
+                                                    <input
+                                                        type="date"
+                                                        style={{
+                                                            padding: '2px 4px',
+                                                            fontSize: '0.8rem',
+                                                            border: '1px solid #3b82f6',
+                                                            borderRadius: '4px',
+                                                            outline: 'none',
+                                                            background: 'var(--bg-in, #fff)',
+                                                            color: 'var(--tx, #1f2937)',
+                                                            height: '24px',
+                                                        }}
+                                                        value={stagedValue}
+                                                        onChange={(e) => setStagedValue(e.target.value)}
+                                                        onBlur={() => commitEditing(master.id, 'estimated_delivery')}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') commitEditing(master.id, 'estimated_delivery');
+                                                            else if (e.key === 'Escape') cancelEditing();
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    masterStatusMeta.date ? (
+                                                        <span className="shipment-date-cell__date">{masterStatusMeta.date}</span>
+                                                    ) : <span className="shipment-date-cell__date">—</span>
+                                                )}
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-show-date">
+                                        <td className="design-table__td shipping-col-show-date" onDoubleClick={(event) => startEditing(event, master, 'show_date')}>
                                             <div className="shipment-date-cell">
-                                                <span className="shipment-date-cell__date">{master.show_date || 'TBD'}</span>
+                                                {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'show_date' ? (
+                                                    <input
+                                                        type="text"
+                                                        style={{
+                                                            padding: '2px 6px',
+                                                            fontSize: '0.8rem',
+                                                            border: '1px solid #3b82f6',
+                                                            borderRadius: '4px',
+                                                            outline: 'none',
+                                                            background: 'var(--bg-in, #fff)',
+                                                            color: 'var(--tx, #1f2937)',
+                                                            height: '24px',
+                                                            width: '100%',
+                                                        }}
+                                                        value={stagedValue}
+                                                        onChange={(e) => setStagedValue(e.target.value)}
+                                                        onBlur={() => commitEditing(master.id, 'show_date')}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') commitEditing(master.id, 'show_date');
+                                                            else if (e.key === 'Escape') cancelEditing();
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <span className="shipment-date-cell__date">{master.show_date || 'TBD'}</span>
+                                                )}
                                             </div>
                                         </td>
 
@@ -1223,17 +1385,43 @@ const ShipmentTable = ({
                                             <span className="carrier-cell">{displayValue(master.carrier)}</span>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-route">
-                                            <div className="shipment-route-cell" title={shortRouteLabel(master)}>
-                                                <div className="shipment-route-line">
-                                                    <span className="shipment-route-label">FROM</span>
-                                                    <span>{shortLocation(master.origin)}</span>
+                                        <td className="design-table__td shipping-col-route" onDoubleClick={(event) => startEditing(event, master, 'route_str')}>
+                                            {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'route_str' ? (
+                                                <input
+                                                    type="text"
+                                                    style={{
+                                                        padding: '2px 6px',
+                                                        fontSize: '0.8rem',
+                                                        border: '1px solid #3b82f6',
+                                                        borderRadius: '4px',
+                                                        outline: 'none',
+                                                        background: 'var(--bg-in, #fff)',
+                                                        color: 'var(--tx, #1f2937)',
+                                                        height: '24px',
+                                                        width: '100%',
+                                                    }}
+                                                    value={stagedValue}
+                                                    onChange={(e) => setStagedValue(e.target.value)}
+                                                    onBlur={() => commitEditing(master.id, 'route_str')}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') commitEditing(master.id, 'route_str');
+                                                        else if (e.key === 'Escape') cancelEditing();
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <div className="shipment-route-cell" title={shortRouteLabel(master)}>
+                                                    <div className="shipment-route-line">
+                                                        <span className="shipment-route-label">FROM</span>
+                                                        <span>{shortLocation(master.origin)}</span>
+                                                    </div>
+                                                    <div className="shipment-route-line">
+                                                        <span className="shipment-route-label">TO</span>
+                                                        <span>{shortLocation(master.destination)}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="shipment-route-line">
-                                                    <span className="shipment-route-label">TO</span>
-                                                    <span>{shortLocation(master.destination)}</span>
-                                                </div>
-                                            </div>
+                                            )}
                                         </td>
 
                                         <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
@@ -1277,8 +1465,43 @@ const ShipmentTable = ({
                                                         <Package size={12} />
                                                     </span>
                                                     <div className="shipment-main-cell__content truncate-cell" title={`${child.items && child.items !== 'Package' ? child.items : 'Child Package'} | ${displayValue(child.__displayTracking || child.tracking_number)}`}>
-                                                        <div className="tid-name child-name">{child.items && child.items !== 'Package' ? child.items : 'Child Package'}</div>
-                                                        <div className="tid-num">{displayValue(child.__displayTracking || child.tracking_number)}</div>
+                                                        {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'title' && child.id != null ? (
+                                                            <div onClick={(e) => e.stopPropagation()}>
+                                                                <input
+                                                                    type="text"
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '2px 6px',
+                                                                        fontSize: '0.85rem',
+                                                                        border: '1px solid #3b82f6',
+                                                                        borderRadius: '4px',
+                                                                        outline: 'none',
+                                                                        boxShadow: '0 0 0 1px #3b82f6',
+                                                                        height: '24px',
+                                                                        lineHeight: '20px',
+                                                                        background: 'var(--bg-in, #fff)',
+                                                                        color: 'var(--tx, #1f2937)',
+                                                                    }}
+                                                                    value={stagedValue}
+                                                                    onChange={(e) => setStagedValue(e.target.value)}
+                                                                    onBlur={() => commitEditing(child.id, 'title')}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') commitEditing(child.id, 'title');
+                                                                        else if (e.key === 'Escape') cancelEditing();
+                                                                    }}
+                                                                    autoFocus
+                                                                />
+                                                                <div className="tid-num">{displayValue(child.__displayTracking || child.tracking_number)}</div>
+                                                            </div>
+                                                        ) : (
+                                                            <div 
+                                                                onDoubleClick={(event) => child.id != null && startEditing(event, child, 'title')}
+                                                                title={child.id != null ? "Double-click to edit Name" : undefined}
+                                                            >
+                                                                <div className="tid-name child-name">{child.items && child.items !== 'Package' ? child.items : 'Child Package'}</div>
+                                                                <div className="tid-num">{displayValue(child.__displayTracking || child.tracking_number)}</div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -1299,15 +1522,66 @@ const ShipmentTable = ({
                                                 </div>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-eta">
+                                            <td className="design-table__td shipping-col-eta" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'estimated_delivery')}>
                                                 <div className="shipment-date-cell shipment-date-cell--child">
-                                                    <span className="shipment-date-cell__date">{childStatusMeta.date || '—'}</span>
+                                                    {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'estimated_delivery' && child.id != null ? (
+                                                        <input
+                                                            type="date"
+                                                            style={{
+                                                                padding: '2px 4px',
+                                                                fontSize: '0.8rem',
+                                                                border: '1px solid #3b82f6',
+                                                                borderRadius: '4px',
+                                                                outline: 'none',
+                                                                background: 'var(--bg-in, #fff)',
+                                                                color: 'var(--tx, #1f2937)',
+                                                                height: '24px',
+                                                            }}
+                                                            value={stagedValue}
+                                                            onChange={(e) => setStagedValue(e.target.value)}
+                                                            onBlur={() => commitEditing(child.id, 'estimated_delivery')}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') commitEditing(child.id, 'estimated_delivery');
+                                                                else if (e.key === 'Escape') cancelEditing();
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <span className="shipment-date-cell__date">{childStatusMeta.date || '—'}</span>
+                                                    )}
                                                 </div>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-show-date">
+                                            <td className="design-table__td shipping-col-show-date" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'show_date')}>
                                                 <div className="shipment-date-cell shipment-date-cell--child">
-                                                    <span className="shipment-date-cell__date">{(child.show_date || master.show_date) || 'TBD'}</span>
+                                                    {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'show_date' && child.id != null ? (
+                                                        <input
+                                                            type="text"
+                                                            style={{
+                                                                padding: '2px 6px',
+                                                                fontSize: '0.8rem',
+                                                                border: '1px solid #3b82f6',
+                                                                borderRadius: '4px',
+                                                                outline: 'none',
+                                                                background: 'var(--bg-in, #fff)',
+                                                                color: 'var(--tx, #1f2937)',
+                                                                height: '24px',
+                                                                width: '100%',
+                                                            }}
+                                                            value={stagedValue}
+                                                            onChange={(e) => setStagedValue(e.target.value)}
+                                                            onBlur={() => commitEditing(child.id, 'show_date')}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') commitEditing(child.id, 'show_date');
+                                                                else if (e.key === 'Escape') cancelEditing();
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <span className="shipment-date-cell__date">{(child.show_date || master.show_date) || 'TBD'}</span>
+                                                    )}
                                                 </div>
                                             </td>
 
@@ -1315,11 +1589,37 @@ const ShipmentTable = ({
                                                 <span className="carrier-cell carrier-cell--child">{displayValue(child.carrier || master.carrier)}</span>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-route">
-                                                <div className="shipment-route-cell shipment-route-cell--child" title={shortRouteLabel(child)}>
-                                                    <div className="shipment-route-line">{shortLocation(child.origin)}</div>
-                                                    <div className="shipment-route-line">{shortLocation(child.destination)}</div>
-                                                </div>
+                                            <td className="design-table__td shipping-col-route" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'route_str')}>
+                                                {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'route_str' && child.id != null ? (
+                                                    <input
+                                                        type="text"
+                                                        style={{
+                                                            padding: '2px 6px',
+                                                            fontSize: '0.8rem',
+                                                            border: '1px solid #3b82f6',
+                                                            borderRadius: '4px',
+                                                            outline: 'none',
+                                                            background: 'var(--bg-in, #fff)',
+                                                            color: 'var(--tx, #1f2937)',
+                                                            height: '24px',
+                                                            width: '100%',
+                                                        }}
+                                                        value={stagedValue}
+                                                        onChange={(e) => setStagedValue(e.target.value)}
+                                                        onBlur={() => commitEditing(child.id, 'route_str')}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') commitEditing(child.id, 'route_str');
+                                                            else if (e.key === 'Escape') cancelEditing();
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <div className="shipment-route-cell shipment-route-cell--child" title={shortRouteLabel(child)}>
+                                                        <div className="shipment-route-line">{shortLocation(child.origin)}</div>
+                                                        <div className="shipment-route-line">{shortLocation(child.destination)}</div>
+                                                    </div>
+                                                )}
                                             </td>
 
                                             <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>

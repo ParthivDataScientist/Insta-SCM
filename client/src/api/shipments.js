@@ -112,7 +112,17 @@ const shipmentsService = {
             responseType: 'blob'
         });
         return response.data;
+    },
+
+    patchShipmentCell: async (shipmentId, dataPayload) => {
+        const response = await apiClient.patch(`/api/v1/shipments/${shipmentId}`, dataPayload);
+        return response.data;
     }
+};
+
+export const patchShipmentCell = async (shipmentId, dataPayload) => {
+    const response = await apiClient.patch(`/api/v1/shipments/${shipmentId}`, dataPayload);
+    return response.data;
 };
 
 export default shipmentsService;

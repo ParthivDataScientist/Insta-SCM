@@ -153,6 +153,11 @@ def _ensure_project_schema_compatibility() -> list[str]:
                 "package_width_cm": "ALTER TABLE shipment ADD COLUMN package_width_cm FLOAT",
                 "package_height_cm": "ALTER TABLE shipment ADD COLUMN package_height_cm FLOAT",
                 "booking_payload": "ALTER TABLE shipment ADD COLUMN booking_payload JSON",
+                "title": "ALTER TABLE shipment ADD COLUMN title VARCHAR",
+                "estimated_delivery": "ALTER TABLE shipment ADD COLUMN estimated_delivery DATE",
+                "origin_city": "ALTER TABLE shipment ADD COLUMN origin_city VARCHAR",
+                "destination_city": "ALTER TABLE shipment ADD COLUMN destination_city VARCHAR",
+                "manual_lock": "ALTER TABLE shipment ADD COLUMN manual_lock BOOLEAN DEFAULT FALSE",
             }
             for col_name, ddl in shipment_ddl.items():
                 if col_name not in shipment_columns:

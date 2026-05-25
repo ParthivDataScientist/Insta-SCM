@@ -27,6 +27,7 @@ from app.schemas.shipment import (
     ShipmentCreateResponse,
     ShipmentRateResponse,
     ShipmentResponse,
+    ShipmentUpdateCell,
 )
 from app.services.shipment_service import (
     create_shipment,
@@ -1562,6 +1563,80 @@ def archive_shipment(
     if not updated:
         raise HTTPException(status_code=404, detail="Shipment not found")
     return _serialize_shipment(db, updated)
+
+
+@router.patch("/{shipment_id:int}", response_model=ShipmentResponse)
+def patch_shipment_cell(
+    shipment_id: int,
+    update_data: ShipmentUpdateCell,
+    db: Session = Depends(get_session),
+    _key: str = Depends(verify_api_key),
+):
+    """
+    Partially update a shipment's cells (spreadsheet-style CRUD).
+    Sets the manual_lock flag to True to protect manual edits from being overwritten by automatic syncs.
+    """
+    shipment_record = db.get(Shipment, shipment_id)
+    if not shipment_record:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+
+    data = update_data.model_dump(exclude_unset=True)
+
+    # Route string fallback: parse e.g. "From New York To Los Angeles" or "New York -> Los Angeles"
+    if "route_str" in data:
+        route_val = data.pop("route_str")
+        if route_val:
+            route_val = str(route_val).strip()
+            # Split route on delimiters like "->", "→", "to" (case-insensitive)
+            parsed_origin = None
+            parsed_destination = None
+            
+            import re
+            parts = re.split(r'\s*(?:->|→|to)\s*', route_val, flags=re.IGNORECASE)
+            
+            if parts and len(parts) >= 2:
+                # Remove leading 'From ' if present
+                p0 = parts[0].strip()
+                if p0.lower().startswith("from "):
+                    p0 = p0[5:].strip()
+                parsed_origin = p0
+                parsed_destination = parts[1].strip()
+            elif parts and len(parts) == 1:
+                p0 = parts[0].strip()
+                if p0.lower().startswith("from "):
+                    p0 = p0[5:].strip()
+                parsed_destination = p0
+                
+            if parsed_origin is not None:
+                data["origin_city"] = parsed_origin
+                data["origin"] = parsed_origin
+            if parsed_destination is not None:
+                data["destination_city"] = parsed_destination
+                data["destination"] = parsed_destination
+
+    # Map other fields to standard database columns for maximum compatibility
+    if "title" in data:
+        data["items"] = data["title"]
+    if "estimated_delivery" in data:
+        val = data["estimated_delivery"]
+        data["eta"] = val.isoformat() if val else None
+    if "origin_city" in data:
+        data["origin"] = data["origin_city"]
+    if "destination_city" in data:
+        data["destination"] = data["destination_city"]
+
+    # Iterate through keys and natively update the record attributes
+    for key, value in data.items():
+        setattr(shipment_record, key, value)
+
+    # Set manual lock to True
+    shipment_record.manual_lock = True
+
+    db.add(shipment_record)
+    db.commit()
+    db.refresh(shipment_record)
+
+    return _serialize_shipment(db, shipment_record)
 
 
 @router.get("/mps/{shipment_id:int}", response_model=MPSDetailResponse)

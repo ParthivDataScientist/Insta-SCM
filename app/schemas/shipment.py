@@ -7,7 +7,7 @@ These are separate from the SQLModel `Shipment` table model so that:
   3. We can expose derived / computed fields (e.g. child_tracking_numbers).
 """
 from typing import List, Literal, Optional
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
@@ -71,6 +71,15 @@ class ChildParcel(BaseModel):
         return token if token else "UNKNOWN"
 
 
+class ShipmentUpdateCell(BaseModel):
+    title: Optional[str] = None
+    estimated_delivery: Optional[date] = None
+    show_date: Optional[str] = None
+    origin_city: Optional[str] = None
+    destination_city: Optional[str] = None
+    route_str: Optional[str] = None
+
+
 class ShipmentResponse(BaseModel):
     """
     Full shipment record returned by the API.
@@ -103,6 +112,12 @@ class ShipmentResponse(BaseModel):
     history: List[dict] = []
     created_at: datetime
     updated_at: datetime
+
+    title: Optional[str] = None
+    estimated_delivery: Optional[date] = None
+    origin_city: Optional[str] = None
+    destination_city: Optional[str] = None
+    manual_lock: bool = False
 
     # MPS fields
     is_master: bool = False

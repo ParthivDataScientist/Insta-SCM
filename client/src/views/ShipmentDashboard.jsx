@@ -14,6 +14,7 @@ export default function ShipmentDashboard() {
         shipments, stats, loading, refreshing, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
+        updateShipment,
     } = useShipments();
 
     const hasAutoRefreshed = useRef(false);
@@ -258,6 +259,7 @@ export default function ShipmentDashboard() {
                             onSelectionChange={setSelectedIds}
                             selectedShipment={selectedShipment}
                             onFilteredShipmentsChange={setDisplayedShipmentIds}
+                            onUpdateShipment={updateShipment}
                         />
                     )}
 

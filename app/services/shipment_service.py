@@ -1049,13 +1049,15 @@ def save_shipment_to_db(
         shipment.status = result.get("status", shipment.status)
         shipment.lifecycle_state = _derive_lifecycle_state(shipment.status)
 
+        is_locked = getattr(shipment, "manual_lock", False)
+
         if recipient:
             shipment.recipient = recipient
-        if items:
+        if items and not is_locked:
             shipment.items = items
-        if show_date:
+        if show_date and not is_locked:
             shipment.show_date = show_date
-        if exhibition_name and exhibition_name != "Unknown Exhibition":
+        if exhibition_name and exhibition_name != "Unknown Exhibition" and not is_locked:
             shipment.exhibition_name = exhibition_name
         if cs:
             shipment.cs = cs
@@ -1078,13 +1080,13 @@ def save_shipment_to_db(
 
 
         # Only update fields if the API returned meaningful data
-        if result.get("origin") and result.get("origin") != "Unknown":
+        if result.get("origin") and result.get("origin") != "Unknown" and not is_locked:
             shipment.origin = result["origin"]
-        if api_destination and api_destination != "Unknown":
+        if api_destination and api_destination != "Unknown" and not is_locked:
             shipment.destination = api_destination
-        elif destination_input:
+        elif destination_input and not is_locked:
             shipment.destination = destination_input
-        if result.get("eta") and result.get("eta") not in ("Unknown", "TBD"):
+        if result.get("eta") and result.get("eta") not in ("Unknown", "TBD") and not is_locked:
             shipment.eta = result["eta"]
         if result.get("progress") is not None:
             shipment.progress = result["progress"]

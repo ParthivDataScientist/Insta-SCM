@@ -230,6 +230,12 @@ export function useShipments() {
         }
     }, [getErrorMessage]);
 
+    const updateShipment = useCallback((updatedShipment) => {
+        setShipments((prev) =>
+            prev.map((s) => (s.id === updatedShipment.id ? updatedShipment : s))
+        );
+    }, []);
+
     return {
         shipments,
         stats,
@@ -252,5 +258,6 @@ export function useShipments() {
         importExcel,
         refreshTracking,
         exportExcel,
+        updateShipment,
     };
 }

@@ -16,7 +16,8 @@ export default function Storage() {
     const { user } = useAuth();
     const {
         loading, error, loadData, filteredShipments,
-        deleteShipment, archiveShipment, batchDelete, batchArchive
+        deleteShipment, archiveShipment, batchDelete, batchArchive,
+        updateShipment
     } = useShipments();
 
     // Load archived data on mount
@@ -146,6 +147,7 @@ export default function Storage() {
                                         selectedIds={selectedIds}
                                         onSelectionChange={setSelectedIds}
                                         selectedShipment={selected}
+                                        onUpdateShipment={updateShipment}
                                     />
                                 )}
                             </div>

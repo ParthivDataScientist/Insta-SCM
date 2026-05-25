@@ -740,3 +740,121 @@ class TestGoogleSheetWebhook:
         assert by_tracking["JD014600012599552907"]["master_tracking_number"] == "4323923586"
         assert by_tracking["871422910760"]["is_master"] is True
         assert by_tracking["871422910760"]["master_tracking_number"] is None
+
+
+class TestPatchShipmentCell:
+    def test_patch_shipment_cell_success(self, client):
+        # 1. Create a shipment to update
+        project = create_project(client, "Patch Shipment Project")
+        client.post(
+            "/api/v1/shipments/track/888598190302",
+            json={"exhibition_name": "Patch Expo", "project_id": project["id"]},
+        )
+        list_resp = client.get("/api/v1/shipments/")
+        shipment = next(s for s in list_resp.json() if s["tracking_number"] == "888598190302")
+        shipment_id = shipment["id"]
+
+        # 2. Partially update some fields via PATCH
+        update_payload = {
+            "title": "Updated Shipment Title",
+            "show_date": "Jun 22-25, 2026",
+            "estimated_delivery": "2026-06-25",
+        }
+        patch_resp = client.patch(
+            f"/api/v1/shipments/{shipment_id}",
+            json=update_payload,
+        )
+        assert patch_resp.status_code == 200
+        patched_data = patch_resp.json()
+        assert patched_data["title"] == "Updated Shipment Title"
+        assert patched_data["items"] == "Updated Shipment Title"
+        assert patched_data["show_date"] == "Jun 22-25, 2026"
+        assert patched_data["estimated_delivery"] == "2026-06-25"
+        assert patched_data["eta"] == "2026-06-25"
+        assert patched_data["manual_lock"] is True
+
+    def test_patch_shipment_cell_not_found(self, client):
+        resp = client.patch(
+            "/api/v1/shipments/99999",
+            json={"title": "Doesn't Exist"},
+        )
+        assert resp.status_code == 404
+
+    def test_patch_shipment_cell_route_parsing(self, client):
+        # 1. Create a shipment
+        project = create_project(client, "Route Parsing Project")
+        client.post(
+            "/api/v1/shipments/track/888598190302",
+            json={"exhibition_name": "Route Expo", "project_id": project["id"]},
+        )
+        list_resp = client.get("/api/v1/shipments/")
+        shipment = next(s for s in list_resp.json() if s["tracking_number"] == "888598190302")
+        shipment_id = shipment["id"]
+
+        # 2. Test "From [Origin] To [Destination]" route format
+        patch_resp = client.patch(
+            f"/api/v1/shipments/{shipment_id}",
+            json={"route_str": "From Mumbai To Dubai"},
+        )
+        assert patch_resp.status_code == 200
+        data = patch_resp.json()
+        assert data["origin_city"] == "Mumbai"
+        assert data["origin"] == "Mumbai"
+        assert data["destination_city"] == "Dubai"
+        assert data["destination"] == "Dubai"
+
+        # 3. Test "[Origin] -> [Destination]" route format
+        patch_resp = client.patch(
+            f"/api/v1/shipments/{shipment_id}",
+            json={"route_str": "Paris -> Rome"},
+        )
+        assert patch_resp.status_code == 200
+        data = patch_resp.json()
+        assert data["origin_city"] == "Paris"
+        assert data["origin"] == "Paris"
+        assert data["destination_city"] == "Rome"
+        assert data["destination"] == "Rome"
+
+    def test_patch_shipment_cell_manual_lock_protection(self, client, monkeypatch):
+        # 1. Create a shipment
+        project = create_project(client, "Lock Protection Project")
+        client.post(
+            "/api/v1/shipments/track/888598190302",
+            json={"exhibition_name": "Lock Expo", "project_id": project["id"]},
+        )
+        list_resp = client.get("/api/v1/shipments/")
+        shipment = next(s for s in list_resp.json() if s["tracking_number"] == "888598190302")
+        shipment_id = shipment["id"]
+
+        # 2. Partially update some fields via PATCH to lock them
+        client.patch(
+            f"/api/v1/shipments/{shipment_id}",
+            json={
+                "title": "Locked Manual Title",
+                "show_date": "Locked Show Date",
+                "route_str": "From Delhi To Tokyo",
+            },
+        )
+
+        # 3. Simulate automatic carrier sync with mock data returning different fields
+        sync_resp = client.post(
+            "/api/v1/shipments/track/888598190302",
+            json={"exhibition_name": "Auto Sync Expo", "project_id": project["id"]},
+        )
+        assert sync_resp.status_code == 201
+
+        # 4. Fetch shipment again and verify values
+        get_resp = client.get(f"/api/v1/shipments/{shipment_id}")
+        assert get_resp.status_code == 200
+        updated_shipment = get_resp.json()
+
+        assert updated_shipment["title"] == "Locked Manual Title"
+        assert updated_shipment["items"] == "Locked Manual Title"
+        assert updated_shipment["show_date"] == "Locked Show Date"
+        assert updated_shipment["origin"] == "Delhi"
+        assert updated_shipment["destination"] == "Tokyo"
+
+        # Verify unlocked fields still synchronized normally
+        assert updated_shipment["progress"] == 40
+        assert updated_shipment["status"] == "In Transit"
+

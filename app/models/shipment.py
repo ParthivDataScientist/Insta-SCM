@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from sqlmodel import SQLModel, Field
 from sqlalchemy import Column, DateTime, JSON, func
 
@@ -30,6 +30,11 @@ class ShipmentBase(SQLModel):
     is_master: bool = Field(default=False)
     is_archived: bool = Field(default=False)
     country: Optional[str] = None
+    title: Optional[str] = None
+    estimated_delivery: Optional[date] = None
+    origin_city: Optional[str] = None
+    destination_city: Optional[str] = None
+    manual_lock: bool = Field(default=False)
     awb: Optional[str] = Field(default=None, index=True)
     label_url: Optional[str] = None
     label_path: Optional[str] = None
