@@ -4109,6 +4109,17 @@
     padding: 20px 24px !important; /* Balanced premium padding */
 }
 
+.shipping-dashboard-page .design-dashboard__kpi::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 8px !important; /* Thicker and highly visible colored header bar */
+    z-index: 10 !important; /* Ensure it draws on top of button background */
+    border-radius: 20px 20px 0 0 !important; /* Curves perfectly with card edges */
+}
+
 .shipping-dashboard-page .design-dashboard__kpi .premium-kpi__meta {
     gap: 10px !important; /* Increased spacing between label and metric number */
 }
@@ -4198,6 +4209,40 @@
 
 .shipment-current-status__badge {
     max-width: 140px !important; /* Prevent tracking unavailable text clipping */
+}
+
+/* 6. Stacking Context & solid background for Sticky Table Actions and Dropdowns */
+.shipping-table .design-table__row:hover .shipping-col-actions,
+.shipping-table .design-table__row:focus-within .shipping-col-actions,
+.shipping-table .design-table__row.active-row .shipping-col-actions {
+    z-index: 20 !important; /* Elevate active sticky column above other rows (which have z-index 7) */
+}
+
+/* Ensure the actions dropdown has a solid, opaque background and stands out on top */
+.shipment-row-menu__content {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
+    z-index: 999 !important; /* Render on very top of everything */
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15), 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Premium Dark Mode support for dropdown options menu */
+.dark .shipment-row-menu__content {
+    background-color: #1e293b !important;
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .shipment-row-menu__content button {
+    color: #cbd5e1 !important;
+}
+
+.dark .shipment-row-menu__content button:hover {
+    background-color: #334155 !important;
+    background: #334155 !important;
+    color: #f8fafc !important;
 }
 
 
