@@ -722,6 +722,7 @@ const ShipmentTable = ({
     onSelectAll,
     onClearFilters = () => {},
     selectedShipment,
+    onFilteredShipmentsChange,
 }) => {
     const [idSearch, setIdSearch] = useState('');
     const [exhibitionFilter, setExhibitionFilter] = useState([]);
@@ -800,6 +801,32 @@ const ShipmentTable = ({
             return String(a).localeCompare(String(b)) * direction;
         });
     }, [filteredGroups, sortConfig]);
+
+    useEffect(() => {
+        if (onFilteredShipmentsChange) {
+            const ids = [];
+            sortedGroups.forEach((group) => {
+                if (group.master && group.master.id) {
+                    ids.push(group.master.id);
+                }
+                if (group.children) {
+                    group.children.forEach((child) => {
+                        if (child && child.id) {
+                            ids.push(child.id);
+                        }
+                    });
+                }
+                if (group.childRows) {
+                    group.childRows.forEach((child) => {
+                        if (child && child.id && child.id !== group.master?.id) {
+                            ids.push(child.id);
+                        }
+                    });
+                }
+            });
+            onFilteredShipmentsChange([...new Set(ids)]);
+        }
+    }, [sortedGroups, onFilteredShipmentsChange]);
 
     useEffect(() => {
         const validKeys = new Set(sortedGroups.map((group) => group.masterKey));

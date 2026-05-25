@@ -953,7 +953,7 @@ def export_shipments(
     headers = [
         "Ship to location", "Client Name", "Booking dt.", "Show date", 
         "Show City", "C/S", "No of Box", "Courier", "Master AWB", 
-        "Child AWB #", "Current Status", "Remarks", "Last Scan date / Same place"
+        "Child AWB #", today_str, "Remarks", "Last Scan date / Same place"
     ]
     
     # Styles
@@ -1024,39 +1024,59 @@ def export_shipments(
         except Exception:
             return token
 
-    def _format_current_status_card(date_raw, status_raw, location_raw, description_raw):
-        date_line = _format_event_date(date_raw)
+    def _format_current_status_card(date_raw, status_raw, location_raw, description_raw, eta_raw):
+        event_date = _safe_date(date_raw)
         status_line = str(status_raw or "").strip()
         location_line = str(location_raw or "").strip()
         description_line = str(description_raw or "").strip()
+        eta_line = str(eta_raw or "Pending").strip()
+        if eta_line.lower() in ("unknown", "tbd", "none", ""):
+            eta_line = "Pending"
+
+        main_text = ""
+        sub_text = ""
+        if status_line and description_line and status_line != description_line:
+            main_text = status_line
+            sub_text = description_line
+        else:
+            main_text = status_line or description_line
 
         lines = []
-        if date_line:
-            lines.append(date_line)
-        if status_line:
-            lines.append(status_line)
+        if event_date and main_text:
+            lines.append(f"{event_date} : {main_text}")
+        elif event_date:
+            lines.append(event_date)
+        elif main_text:
+            lines.append(main_text)
+
+        if sub_text:
+            lines.append(sub_text)
+
         if location_line:
-            lines.append(location_line)
-        if description_line and description_line != status_line:
-            lines.append(description_line)
+            lines.append(f"{location_line} ETA: {eta_line}")
+        else:
+            lines.append(f"ETA: {eta_line}")
 
         return "\n".join(lines) if lines else "-"
 
     def _build_master_latest(shipment: Shipment):
+        eta = shipment.eta or "Pending"
         if shipment.history:
             latest = shipment.history[0]
             card = _format_current_status_card(
                 latest.get("date"),
                 latest.get("status"),
                 latest.get("location"),
-                latest.get("description")
+                latest.get("description"),
+                eta
             )
             return card, _safe_date(latest.get("date"))
         card = _format_current_status_card(
             shipment.last_scan_date,
             shipment.status,
             shipment.destination or shipment.origin,
-            ""
+            "",
+            eta
         )
         return card, _safe_date(shipment.last_scan_date)
 
@@ -1065,6 +1085,7 @@ def export_shipments(
         c_loc = child.get("last_location") or ""
         c_status = child.get("status") or "In Transit"
         c_desc = child.get("raw_status") or ""
+        c_eta = child.get("eta") or parent.eta or "Pending"
 
         # Check if there is history in child dict
         history_list = child.get("history")
@@ -1074,7 +1095,8 @@ def export_shipments(
                 latest.get("date"),
                 latest.get("status"),
                 latest.get("location"),
-                latest.get("description")
+                latest.get("description"),
+                c_eta
             )
             return card, _safe_date(latest.get("date"))
 
@@ -1090,25 +1112,29 @@ def export_shipments(
             c_date_raw,
             c_status,
             c_loc,
-            c_desc
+            c_desc,
+            c_eta
         )
         return card, _safe_date(c_date_raw)
 
     def _build_child_latest_from_shipment(child: Shipment):
+        eta = child.eta or "Pending"
         if child.history:
             latest = child.history[0]
             card = _format_current_status_card(
                 latest.get("date"),
                 latest.get("status"),
                 latest.get("location"),
-                latest.get("description")
+                latest.get("description"),
+                eta
             )
             return card, _safe_date(latest.get("date"))
         card = _format_current_status_card(
             child.last_scan_date,
             child.status,
             child.destination or child.origin,
-            ""
+            "",
+            eta
         )
         return card, _safe_date(child.last_scan_date)
 

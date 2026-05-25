@@ -30,6 +30,7 @@ export default function ShipmentDashboard() {
 
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [displayedShipmentIds, setDisplayedShipmentIds] = useState([]);
     const [showTrack, setShowTrack] = useState(false);
 
     const importExcelPrompt = () => {
@@ -69,10 +70,7 @@ export default function ShipmentDashboard() {
 
     const handleExport = async () => {
         const selected = selectedIds.filter((id) => Number.isInteger(id));
-        const filteredIds = filteredShipments
-            .map((shipment) => shipment?.id)
-            .filter((id) => Number.isInteger(id));
-        const idsToExport = selected.length > 0 ? selected : filteredIds;
+        const idsToExport = selected.length > 0 ? selected : displayedShipmentIds;
         if (idsToExport.length === 0) {
             window.alert('No shipments available to export for the current selection/filter.');
             return;
@@ -259,6 +257,7 @@ export default function ShipmentDashboard() {
                             selectedIds={selectedIds}
                             onSelectionChange={setSelectedIds}
                             selectedShipment={selectedShipment}
+                            onFilteredShipmentsChange={setDisplayedShipmentIds}
                         />
                     )}
 

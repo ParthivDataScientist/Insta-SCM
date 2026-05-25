@@ -578,10 +578,9 @@ class TestExportShipment:
         status_val = status_cell.value
         
         expected_status = (
-            "May 19, 2026 • 12:11 PM\n"
-            "Departed Facility\n"
-            "MUMBAI (BOMBAY)-IND\n"
-            "Shipment has departed from a DHL facility MUMBAI (BOMBAY)-IND"
+            "19.05.2026 : Departed Facility\n"
+            "Shipment has departed from a DHL facility MUMBAI (BOMBAY)-IND\n"
+            "MUMBAI (BOMBAY)-IND ETA: 2026-04-25"
         )
         assert status_val == expected_status
         assert status_cell.alignment.wrap_text is True

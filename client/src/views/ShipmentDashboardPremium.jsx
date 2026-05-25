@@ -34,6 +34,7 @@ export default function ShipmentDashboardPremium() {
     }, []);
 
     const [selectedShipment, setSelectedShipment] = useState(null);
+    const [displayedShipmentIds, setDisplayedShipmentIds] = useState([]);
     const [showTrack, setShowTrack] = useState(false);
     const [showMobileHeaderActions, setShowMobileHeaderActions] = useState(false);
     const [isMobileViewport, setIsMobileViewport] = useState(() => (
@@ -86,10 +87,7 @@ export default function ShipmentDashboardPremium() {
 
     const handleExport = async () => {
         const selected = selectedIds.filter((id) => Number.isInteger(id));
-        const filteredIds = filteredShipments
-            .map((shipment) => shipment?.id)
-            .filter((id) => Number.isInteger(id));
-        const idsToExport = selected.length > 0 ? selected : filteredIds;
+        const idsToExport = selected.length > 0 ? selected : displayedShipmentIds;
         if (idsToExport.length === 0) {
             window.alert('No shipments available to export for the current selection/filter.');
             return;
@@ -408,6 +406,7 @@ export default function ShipmentDashboardPremium() {
                                 onSelectionChange={setSelectedIds}
                                 onSelectAll={handleSelectAll}
                                 selectedShipment={selectedShipment}
+                                onFilteredShipmentsChange={setDisplayedShipmentIds}
                             />
                         </div>
                     </div>

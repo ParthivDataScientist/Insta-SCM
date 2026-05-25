@@ -31,7 +31,6 @@ def run_server():
     )
 
     print("\n>>> ALL SYSTEMS GO. Press Ctrl+C to stop.\n")
-
     # Check for immediate crash
     time.sleep(3)
     if backend.poll() is not None:
