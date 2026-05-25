@@ -1027,12 +1027,14 @@ def export_shipments(
         if not item:
             return False
         
-        country = str(item.destination or item.origin or "").strip().upper()
-        if any(k in country for k in ("USA", "US", "UNITED STATES")):
+        # 1. Explicit country check
+        country = str(getattr(item, "country", "") or "").strip().upper()
+        if country in ("USA", "US", "UNITED STATES"):
             return True
-        if any(k in country for k in ("EUROPE", "EU", "INDIA", "IN")):
+        if country in ("EUROPE", "EU", "INDIA", "IN"):
             return False
-            
+
+        # 2. Fallback to keyword matching
         dest = str(item.destination or "").upper()
         city = str(item.show_city or "").upper()
         recipient = str(item.recipient or "").upper()
@@ -1046,24 +1048,27 @@ def export_shipments(
             'TEXAS', 'NEW ALBANY', 'PORTLAND'
         ]
         
+        fields = (dest, city, recipient, origin, exhibition)
+        matches_us_kw = any(kw in field for kw in us_keywords for field in fields)
+
         import re
-        matches_us = any(
-            kw in field for kw in us_keywords for field in (dest, city, recipient, origin, exhibition)
-        ) or any(
+        matches_us_regex = any(
             re.search(r'\b(US|USA)\b', field) for field in (dest, city, exhibition, origin)
         )
-        return bool(matches_us)
+        return bool(matches_us_kw or matches_us_regex)
 
     def is_europe_shipment(item) -> bool:
         if not item:
             return False
             
-        country = str(item.destination or item.origin or "").strip().upper()
-        if any(k in country for k in ("EUROPE", "EU")):
+        # 1. Explicit country check
+        country = str(getattr(item, "country", "") or "").strip().upper()
+        if country in ("EUROPE", "EU"):
             return True
-        if any(k in country for k in ("USA", "US", "UNITED STATES", "INDIA", "IN")):
+        if country in ("USA", "US", "UNITED STATES", "INDIA", "IN"):
             return False
             
+        # 2. Fallback to keyword matching
         dest = str(item.destination or "").upper()
         city = str(item.show_city or "").upper()
         recipient = str(item.recipient or "").upper()
@@ -1080,24 +1085,27 @@ def export_shipments(
             ' NL', ' DE', ' FR', ' IT', ' ES', ' BE', ' CH', ' AT', ' DK', ' SE', ' NO', ' FI', ' IE', ' PL', ' PT', ' GR'
         ]
         
+        fields = (dest, city, recipient, origin, exhibition)
+        matches_eu_kw = any(kw in field for kw in eu_keywords for field in fields)
+
         import re
-        matches_eu = any(
-            kw in field for kw in eu_keywords for field in (dest, city, recipient, origin, exhibition)
-        ) or any(
+        matches_eu_regex = any(
             re.search(r'\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b', field) for field in (dest, city, exhibition, origin)
         )
-        return bool(matches_eu and not is_usa_shipment(item))
+        return bool((matches_eu_kw or matches_eu_regex) and not is_usa_shipment(item))
 
     def is_india_shipment(item) -> bool:
         if not item:
             return False
             
-        country = str(item.destination or item.origin or "").strip().upper()
-        if any(k in country for k in ("INDIA", "IN")):
+        # 1. Explicit country check
+        country = str(getattr(item, "country", "") or "").strip().upper()
+        if country in ("INDIA", "IN"):
             return True
-        if any(k in country for k in ("USA", "US", "UNITED STATES", "EUROPE", "EU")):
+        if country in ("USA", "US", "UNITED STATES", "EUROPE", "EU"):
             return False
             
+        # 2. Fallback to keyword matching
         dest = str(item.destination or "").upper()
         city = str(item.show_city or "").upper()
         recipient = str(item.recipient or "").upper()
@@ -1110,13 +1118,15 @@ def export_shipments(
             'BIEC', 'PRAGATI', 'MAIDAN', 'HAVELLS', 'WIPRO', 'RELIANCE'
         ]
         
+        fields = (dest, city, recipient, origin, exhibition)
+        matches_in_kw = any(kw in field for kw in in_keywords for field in fields)
+
         import re
-        matches_in = any(
-            kw in field for kw in in_keywords for field in (dest, city, recipient, origin, exhibition)
-        ) or any(
+        matches_in_regex = any(
             re.search(r'\b(IN|IND)\b', field) for field in (dest, city, exhibition, origin)
         )
-        return bool(matches_in and not is_usa_shipment(item) and not is_europe_shipment(item))
+        return bool(matches_in_kw or matches_in_regex) and not is_usa_shipment(item) and not is_europe_shipment(item)
+
 
     def _format_booking_date(raw_value):
         formatted = _safe_date(raw_value)
