@@ -1128,7 +1128,7 @@ def export_shipments(
         )
         return card, _safe_date(c_date_raw)
 
-    def _build_child_latest_from_shipment(child: Shipment):
+    def _build_child_latest_from_shipment(parent: Shipment, child: Shipment):
         eta = child.eta or "Pending"
         if child.history:
             latest = child.history[0]
@@ -1141,6 +1141,11 @@ def export_shipments(
             )
             return card, _safe_date(latest.get("date"))
 
+        c_loc = child.destination or child.origin
+        c_date_raw = child.last_scan_date
+        c_status = child.status
+        c_desc = ""
+
         # Fallback to parent details if child date is missing
         if (not c_date_raw or c_date_raw == "-") and parent and parent.history:
             master_latest = parent.history[0]
@@ -1150,10 +1155,10 @@ def export_shipments(
             c_desc = master_latest.get("description", c_desc)
 
         card = _format_current_status_card(
-            child.last_scan_date,
-            child.status,
-            child.destination or child.origin,
-            "",
+            c_date_raw,
+            c_status,
+            c_loc,
+            c_desc,
             eta
         )
         return card, _safe_date(c_date_raw)
