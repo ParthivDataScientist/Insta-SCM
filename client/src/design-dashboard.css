@@ -8,6 +8,13 @@
 
 .premium-main--design {
     background: #f8fafc;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 16px 24px 16px !important;
+    box-sizing: border-box;
 }
 
 .dark .premium-main--design {

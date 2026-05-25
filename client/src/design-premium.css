@@ -546,8 +546,9 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    height: calc(100vh - 84px);
+    height: 0;
     width: 100%;
+    overflow: hidden;
 }
 
 /* Move the whole page up */
@@ -609,7 +610,7 @@
 
 .shipping-table-panel {
     position: relative;
-    min-height: 420px;
+    min-height: 0;
     overflow: auto !important;
     -webkit-overflow-scrolling: touch;
 }
@@ -623,6 +624,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
