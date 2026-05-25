@@ -4082,4 +4082,123 @@
     z-index: 70 !important;
 }
 
+/* ==========================================================================
+   UI/UX Refinements: Padding, Spacing, and Structural Alignment
+   Stick to standard 4px/8px grid system. No outer viewport scrollbars.
+   ========================================================================== */
+
+/* 1. Top Navigation & Action Bar */
+.shipping-dashboard-header {
+    margin: 0 !important;
+    padding: 16px 24px !important;
+    align-items: center !important;
+}
+
+.shipping-dashboard-header .design-premium-header__inner {
+    align-items: center !important;
+}
+
+.design-premium-header__actions {
+    gap: 16px !important; /* Breathable action buttons */
+}
+
+/* 2. Metric Summary Cards (KPI Blocks) */
+.shipping-dashboard-page .design-dashboard__kpi {
+    min-height: 110px !important;
+    height: 110px !important;
+    padding: 20px 24px !important; /* Balanced premium padding */
+}
+
+.shipping-dashboard-page .design-dashboard__kpi .premium-kpi__meta {
+    gap: 10px !important; /* Increased spacing between label and metric number */
+}
+
+.shipping-dashboard-page .design-dashboard__kpi .premium-kpi__icon {
+    top: 16px !important;
+    right: 16px !important; /* Consistent top-right offset */
+}
+
+/* 3. Table Header & Global Filters */
+.shipping-table thead th {
+    height: auto !important;
+    padding-top: 14px !important;
+    padding-bottom: 14px !important;
+}
+
+.shipping-table .shipment-table__filter-trigger .filter-icon-wrapper {
+    margin-left: 6px !important; /* Prevent hugging the text */
+}
+
+/* 4. Data Rows & Status Badges */
+.shipping-table .design-table__row,
+.shipping-row--child {
+    height: auto !important; /* Allow dynamic growth */
+}
+
+.shipping-table .design-table__td {
+    height: auto !important;
+    max-height: none !important;
+    padding: 16px 12px !important; /* Room to breathe */
+}
+
+.shipping-row--child .design-table__td {
+    height: auto !important;
+    max-height: none !important;
+    padding: 12px 12px !important; /* Tighter padding for child rows nested under master */
+}
+
+/* Column Width Adjustments */
+.shipping-col-id {
+    width: auto !important;
+    min-width: 330px !important; /* Expanded Master Tracking ID column */
+    max-width: 380px !important;
+}
+
+.shipping-col-status {
+    width: auto !important;
+    min-width: 170px !important; /* Expanded Status column to prevent badge truncation */
+    max-width: 200px !important;
+}
+
+/* Allow Master ID Text Expansion */
+.shipment-main-cell {
+    width: 100% !important;
+}
+
+.shipment-main-cell__content {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+/* Dynamic Status Badges without Truncation */
+.shipping-table .shipments-status-pill {
+    max-width: none !important;
+    min-width: 140px !important;
+    min-height: 28px !important;
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 9999px !important;
+}
+
+.shipping-table .shipments-status-pill span {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    display: inline-block !important;
+}
+
+/* Internal Tracking Detail Box in Latest Event Column */
+.shipment-current-status {
+    padding: 12px !important; /* Add padding inside internal tracking detail boxes */
+}
+
+.shipment-current-status__badge {
+    max-width: 140px !important; /* Prevent tracking unavailable text clipping */
+}
+
+
 
