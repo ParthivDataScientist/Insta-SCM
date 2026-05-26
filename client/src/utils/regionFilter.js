@@ -24,7 +24,7 @@ export const isUsaShipment = (item) => {
         'USA', 'UNITED STATES', ' U.S.', ' U.S.A.', ', US', ',US', 'NEW YORK', 'LAS VEGAS', 
         'CHICAGO', 'ORLANDO', 'MIAMI', 'LOS ANGELES', 'SAN FRANCISCO', 'WASHINGTON', 'BOSTON',
         'ATLANTA', 'DALLAS', 'HOUSTON', 'SEATTLE', 'DETROIT', 'OHIO', 'NEVADA', 'FLORIDA', 'CALIFORNIA',
-        'TEXAS', 'NEW ALBANY', 'PORTLAND'
+        'TEXAS', 'NEW ALBANY', 'PORTLAND', 'SAN DIAGO', 'SAN DIEGO', 'ORLENDO'
     ];
     
     const matchesUs = usKeywords.some(kw => 
@@ -65,7 +65,8 @@ export const isEuropeShipment = (item) => {
         'DUSSELDORF', 'MUNICH', 'MUNCHEN', 'FRANKFURT', 'PARIS', 'LONDON', 'AMSTERDAM', 'BRUSSELS', 'MILAN', 
         'MILANO', 'ROME', 'ROMA', 'BARCELONA', 'MADRID', 'GENEVA', 'ZURICH', 'VIENNA', 'COPENHAGEN', 
         'STOCKHOLM', 'OSLO', 'HELSINKI', 'DUBLIN', 'WARSAW', 'LISBON', 'ATHENS', 'BIRMINGHAM', 'MANCHESTER',
-        ' NL', ' DE', ' FR', ' IT', ' ES', ' BE', ' CH', ' AT', ' DK', ' SE', ' NO', ' FI', ' IE', ' PL', ' PT', ' GR'
+        ' NL', ' DE', ' FR', ' IT', ' ES', ' BE', ' CH', ' AT', ' DK', ' SE', ' NO', ' FI', ' IE', ' PL', ' PT', ' GR',
+        'NL-GMBH', 'GMBH', 'GMBH-NL'
     ];
     
     const matchesEu = euKeywords.some(kw => 
@@ -75,10 +76,10 @@ export const isEuropeShipment = (item) => {
         origin.includes(kw) || 
         exhibition.includes(kw)
     ) ||
-    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b/i.test(dest) ||
-    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b/i.test(city) ||
-    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b/i.test(exhibition) ||
-    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b/i.test(origin);
+    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU|NL-GMBH|GMBH|GMBH-NL)\b/i.test(dest) ||
+    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU|NL-GMBH|GMBH|GMBH-NL)\b/i.test(city) ||
+    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU|NL-GMBH|GMBH|GMBH-NL)\b/i.test(exhibition) ||
+    /\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU|NL-GMBH|GMBH|GMBH-NL)\b/i.test(origin);
     
     // Europe shipments should not overlap with US
     return matchesEu && !isUsaShipment(item);

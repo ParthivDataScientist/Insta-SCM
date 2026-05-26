@@ -272,28 +272,7 @@ class DHLService(CarrierService):
                         if p_history and p_raw_status == "Pending" and has_any_segmented_events:
                             # Use status from most recent history event if available
                             p_raw_status = p_history[0]["description"]
-                        
-                        # Synchronize master's newer events into child history if parent has moved
-                        if p_history and data.get("history"):
-                            try:
-                                m_latest_date = data["history"][0].get("date")
-                                p_latest_date = p_history[0].get("date")
-                                if m_latest_date and p_latest_date:
-                                    import pandas as pd
-                                    m_date = pd.to_datetime(m_latest_date)
-                                    p_date = pd.to_datetime(p_latest_date)
-                                    if m_date > p_date:
-                                        newer_scans = []
-                                        for h_item in data["history"]:
-                                            if h_item.get("date"):
-                                                h_date = pd.to_datetime(h_item["date"])
-                                                if h_date > p_date:
-                                                    newer_scans.append(h_item)
-                                        p_history = newer_scans + p_history
-                                        p_raw_status = p_history[0]["description"]
-                            except Exception:
-                                pass
-                                
+
                         p_status = map_dhl_status(p_raw_status) if p_raw_status != "Pending" else "Pending"
                         
                         child_parcels.append({

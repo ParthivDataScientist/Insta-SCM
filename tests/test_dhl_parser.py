@@ -126,3 +126,49 @@ class TestDHLMPSParser:
             assert child["status"] == "Pending"
             assert child["raw_status"] == "Pending"
             assert child["history"] == []
+
+    def test_piece_children_do_not_synchronize_master_newer_scans(self, dhl_service):
+        response = {
+            "shipments": [
+                {
+                    "id": "DHL8880001",
+                    "status": {"status": "delivered"},
+                    "origin": {"address": {"addressLocality": "Mumbai", "countryCode": "IN"}},
+                    "destination": {"address": {"addressLocality": "Dallas", "countryCode": "US"}},
+                    "events": [
+                        {
+                            "description": "Delivered",
+                            "timestamp": "2026-05-14T12:00:00",
+                            "typeCode": "OK",
+                            "location": {"address": {"addressLocality": "Dallas", "countryCode": "US"}},
+                        },
+                        {
+                            "description": "Processed at Cincinnati",
+                            "timestamp": "2026-05-13T10:00:00",
+                            "typeCode": "PL",
+                            "pieceIds": ["JD014600012603871337"],
+                            "location": {"address": {"addressLocality": "Cincinnati Hub", "countryCode": "US"}},
+                        }
+                    ],
+                    "pieces": [
+                        {"trackingNumber": "JD014600012603871337"},
+                        {"trackingNumber": "JD014600012603871338"},
+                    ],
+                }
+            ]
+        }
+
+        result = dhl_service._standardize_response(response, "DHL8880001")
+
+        assert result["is_master"] is True
+        assert result["status"] == "Delivered"
+        assert len(result["child_parcels"]) == 2
+        child = result["child_parcels"][0]
+        
+        # Verify the child is In Transit (from the processed event) and has exactly 1 scan in history (Processed)
+        # It should NOT inherit the master's "Delivered" scan at 2026-05-14T12:00:00.
+        assert child["status"] == "In Transit"
+        assert child["raw_status"] == "Processed at Cincinnati"
+        assert len(child["history"]) == 1
+        assert child["history"][0]["description"] == "Processed at Cincinnati"
+

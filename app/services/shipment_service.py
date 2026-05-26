@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 STUCK_THRESHOLD_DAYS = 2
 STUCK_THRESHOLD_SECONDS = STUCK_THRESHOLD_DAYS * 24 * 60 * 60
 DEFAULT_DHL_SHIPPER = {
-    "company": "Insta Exhibition",
-    "name": "Insta Exhibition",
-    "address1": "1001, 10th Floor, Kohinoor Continental",
-    "address2": "J.B Nagar, Andheri-Kurla Road",
+    "company": "Insta Exhibition Production Site",
+    "name": "Insta House",
+    "address1": "1-A, K.T. Industrial Park",
+    "address2": "Bilal Pada, Goraipada",
     "address3": "",
-    "city": "Mumbai",
-    "postal_code": "400059",
+    "city": "Vasai Road (East), Palghar",
+    "postal_code": "401208",
     "country_code": "IN",
     "country_name": "INDIA",
     "phone": "7977572486",
@@ -327,6 +327,45 @@ def _validate_dhl_booking_configuration() -> Optional[str]:
     return None
 
 
+def _resolve_shipper(payload: dict) -> dict[str, str]:
+    shipper_input = payload.get("shipper")
+    if not shipper_input:
+        return _dhl_shipper_defaults()
+
+    if hasattr(shipper_input, "model_dump"):
+        data = shipper_input.model_dump()
+    elif hasattr(shipper_input, "dict"):
+        data = shipper_input.dict()
+    elif isinstance(shipper_input, dict):
+        data = shipper_input
+    else:
+        data = {}
+
+    if not data or not data.get("address_line1"):
+        return _dhl_shipper_defaults()
+
+    address1, address2, address3 = _dhl_address_lines(
+        data.get("address_line1"),
+        data.get("address_line2"),
+        data.get("address_line3"),
+    )
+
+    return {
+        "company": str(data.get("company_name") or data.get("name") or "Insta Exhibition Production Site").strip(),
+        "name": str(data.get("name") or "Insta House").strip(),
+        "address1": address1,
+        "address2": address2,
+        "address3": address3,
+        "city": str(data.get("city") or "Vasai Road (East), Palghar").strip(),
+        "postal_code": str(data.get("postal_code") or "401208").strip(),
+        "country_code": str(data.get("country_code") or "IN").strip().upper(),
+        "country_name": str(data.get("country_name") or "India").strip(),
+        "phone": str(data.get("phone") or "7977572486").strip(),
+        "state_code": str(data.get("state_code") or "27").strip(),
+        "state_name": str(data.get("state_name") or "Maharashtra").strip(),
+    }
+
+
 def _validate_csbv_commercial_payload(payload: dict) -> Optional[str]:
     shipment_type = _resolve_dhl_shipment_type(payload)
     if shipment_type == DHL_SHIPMENT_TYPE_NORMAL:
@@ -362,13 +401,16 @@ def _build_dhl_rate_payload(payload: dict) -> dict[str, str | int]:
     receiver = payload["receiver"]
     package = payload["package"]
     shipment = payload["shipment"]
-    shipper = _dhl_shipper_defaults()
+    shipper = _resolve_shipper(payload)
     global_code, local_code = _resolve_dhl_product_codes(
         receiver_country=receiver["country_code"],
         requested_global=shipment.get("service_type"),
         requested_local=shipment.get("local_product_code"),
         shipper_country=shipper["country_code"],
     )
+
+    items = package.get("items")
+    pieces = int(package["pieces"])
 
     return {
         "ShipperPostCode": shipper["postal_code"],
@@ -385,16 +427,35 @@ def _build_dhl_rate_payload(payload: dict) -> dict[str, str | int]:
         "NetworkTypeCode": settings.DHL_DEFAULT_NETWORK_TYPE_CODE,
         "toCity": receiver["city"],
         "PaymentAccountNumber": settings.DHL_SHIPPER_ACCOUNT_NUMBER,
-        "pieces": int(package["pieces"]),
-        "ShipPieceWt": str(package["weight_kg"]),
-        "ShipPieceDepth": str(package["length_cm"]),
-        "ShipPieceWidth": str(package["width_cm"]),
-        "ShipPieceHeight": str(package["height_cm"]),
+        "pieces": pieces,
+        "ShipPieceWt": _repeat_piece_value(package["weight_kg"], pieces, items, "weight_kg"),
+        "ShipPieceDepth": _repeat_piece_value(package["length_cm"], pieces, items, "length_cm"),
+        "ShipPieceWidth": _repeat_piece_value(package["width_cm"], pieces, items, "width_cm"),
+        "ShipPieceHeight": _repeat_piece_value(package["height_cm"], pieces, items, "height_cm"),
         "SpecialService": settings.DHL_DEFAULT_SPECIAL_SERVICE,
     }
 
 
-def _repeat_piece_value(value, pieces: int) -> str:
+def _repeat_piece_value(value, pieces: int, items: list = None, key: str = None) -> str:
+    if items and key:
+        vals = []
+        for i in range(pieces):
+            if i < len(items) and items[i]:
+                item = items[i]
+                if hasattr(item, "model_dump"):
+                    item_val = item.model_dump().get(key)
+                elif hasattr(item, "dict"):
+                    item_val = item.dict().get(key)
+                elif isinstance(item, dict):
+                    item_val = item.get(key)
+                else:
+                    item_val = getattr(item, key, None)
+                
+                if item_val is not None:
+                    vals.append(str(item_val).strip())
+                    continue
+            vals.append(str(value).strip())
+        return ",".join(vals)
     token = str(value).strip()
     if pieces <= 1:
         return token
@@ -466,7 +527,7 @@ def _build_dhl_normal_shipment_payload(payload: dict) -> dict[str, str]:
     receiver = payload["receiver"]
     package = payload["package"]
     shipment = payload["shipment"]
-    shipper = _dhl_shipper_defaults()
+    shipper = _resolve_shipper(payload)
     consignee_address1, consignee_address2, consignee_address3 = _dhl_address_lines(
         receiver["address_line1"],
         receiver.get("address_line2"),
@@ -507,10 +568,10 @@ def _build_dhl_normal_shipment_payload(payload: dict) -> dict[str, str]:
         "DutiableDeclaredCurrency": package["declared_currency"],
         "ShipNumberOfPieces": str(package["pieces"]),
         "ShipCurrencyCode": settings.DHL_DEFAULT_SHIP_CURRENCY,
-        "ShipPieceWt": str(package["weight_kg"]),
-        "ShipPieceDepth": str(package["length_cm"]),
-        "ShipPieceWidth": str(package["width_cm"]),
-        "ShipPieceHeight": str(package["height_cm"]),
+        "ShipPieceWt": _repeat_piece_value(package["weight_kg"], max(1, int(package["pieces"])), package.get("items"), "weight_kg"),
+        "ShipPieceDepth": _repeat_piece_value(package["length_cm"], max(1, int(package["pieces"])), package.get("items"), "length_cm"),
+        "ShipPieceWidth": _repeat_piece_value(package["width_cm"], max(1, int(package["pieces"])), package.get("items"), "width_cm"),
+        "ShipPieceHeight": _repeat_piece_value(package["height_cm"], max(1, int(package["pieces"])), package.get("items"), "height_cm"),
         "ShipGlobalProductCode": global_code,
         "ShipLocalProductCode": local_code,
         "ShipContents": shipment["description"],
@@ -540,7 +601,7 @@ def _build_dhl_commercial_shipment_payload(payload: dict, shipment_type: str) ->
     package = payload["package"]
     shipment = payload["shipment"]
     commercial = payload.get("commercial") or {}
-    shipper = _dhl_shipper_defaults()
+    shipper = _resolve_shipper(payload)
     consignee_address1, consignee_address2, consignee_address3 = _dhl_address_lines(
         receiver["address_line1"],
         receiver.get("address_line2"),
@@ -599,10 +660,10 @@ def _build_dhl_commercial_shipment_payload(payload: dict, shipment_type: str) ->
         "DutiableDeclaredCurrency": package["declared_currency"],
         "ShipNumberOfPieces": str(package["pieces"]),
         "ShipCurrencyCode": settings.DHL_DEFAULT_SHIP_CURRENCY,
-        "ShipPieceWt": _repeat_piece_value(package["weight_kg"], pieces),
-        "ShipPieceDepth": _repeat_piece_value(package["length_cm"], pieces),
-        "ShipPieceWidth": _repeat_piece_value(package["width_cm"], pieces),
-        "ShipPieceHeight": _repeat_piece_value(package["height_cm"], pieces),
+        "ShipPieceWt": _repeat_piece_value(package["weight_kg"], pieces, package.get("items"), "weight_kg"),
+        "ShipPieceDepth": _repeat_piece_value(package["length_cm"], pieces, package.get("items"), "length_cm"),
+        "ShipPieceWidth": _repeat_piece_value(package["width_cm"], pieces, package.get("items"), "width_cm"),
+        "ShipPieceHeight": _repeat_piece_value(package["height_cm"], pieces, package.get("items"), "height_cm"),
         "ShipGlobalProductCode": global_code,
         "ShipLocalProductCode": local_code,
         "ShipContents": shipment["description"],
@@ -755,7 +816,7 @@ def _resolve_dhl_product_codes(
 
 
 def _build_dhl_pickup_payload(shipment: Shipment, *, pickup_date: Optional[str], ready_by_time: Optional[str], closing_time: Optional[str]) -> dict[str, str | int]:
-    shipper = _dhl_shipper_defaults()
+    shipper = _resolve_shipper(shipment.booking_payload or {})
     ready = (ready_by_time or settings.DHL_DEFAULT_PICKUP_READY_TIME).strip()
     closing = (closing_time or settings.DHL_DEFAULT_PICKUP_CLOSE_TIME).strip()
     pickup_day = (pickup_date or datetime.now(timezone.utc).date().isoformat()).strip()
@@ -1308,6 +1369,9 @@ def rate_shipment(payload: dict) -> dict:
         "currency": result["currency"],
         "delivery_time": result.get("delivery_time"),
         "service_type": payload["shipment"].get("service_type") or settings.DHL_DEFAULT_PRODUCT_CODE,
+        "shipping_charge": result.get("shipping_charge"),
+        "tax_amount": result.get("tax_amount"),
+        "global_services": result.get("global_services"),
     }
 
 

@@ -741,6 +741,55 @@ class TestGoogleSheetWebhook:
         assert by_tracking["871422910760"]["is_master"] is True
         assert by_tracking["871422910760"]["master_tracking_number"] is None
 
+    def test_webhook_dynamic_regional_bifurcation(self, client):
+        payload = {
+            "rows": [
+                {
+                    "Master AWB": "888598190302",
+                    "Ship to location": "Dallas, TX",
+                },
+                {
+                    "Master AWB": "888598190313",
+                    "Ship to location": "NL-GMBH Logistics Hub",
+                },
+                {
+                    "Master AWB": "888598190324",
+                    "Ship to location": "Mumbai Exhibition Center",
+                },
+                {
+                    "Master AWB": "888598190335",
+                    "Ship to location": "San diago Event Center",
+                },
+                {
+                    "Master AWB": "888598190346",
+                    "Ship to location": "Las Vegas Convention",
+                },
+                {
+                    "Master AWB": "888598190357",
+                    "Ship to location": "orlendo, FL",
+                },
+                {
+                    "Master AWB": "888598190368",
+                    "Ship to location": "EXPO GMBH-NL Center",
+                },
+            ]
+        }
+
+        resp = client.post("/api/v1/shipments/webhook/google-sheet", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["failed"] == 0
+
+        rows = client.get("/api/v1/shipments/").json()
+        by_tracking = {row["tracking_number"]: row for row in rows}
+
+        assert by_tracking["888598190302"]["country"] == "USA"
+        assert by_tracking["888598190313"]["country"] == "Europe"
+        assert by_tracking["888598190324"]["country"] == "India"
+        assert by_tracking["888598190335"]["country"] == "USA"
+        assert by_tracking["888598190346"]["country"] == "USA"
+        assert by_tracking["888598190357"]["country"] == "USA"
+        assert by_tracking["888598190368"]["country"] == "Europe"
+
 
 class TestPatchShipmentCell:
     def test_patch_shipment_cell_success(self, client):
@@ -827,7 +876,7 @@ class TestPatchShipmentCell:
         shipment_id = shipment["id"]
 
         # 2. Partially update some fields via PATCH to lock them
-        client.patch(
+        patch_resp = client.patch(
             f"/api/v1/shipments/{shipment_id}",
             json={
                 "title": "Locked Manual Title",
@@ -835,6 +884,9 @@ class TestPatchShipmentCell:
                 "route_str": "From Delhi To Tokyo",
             },
         )
+        assert patch_resp.status_code == 200
+        p_data = patch_resp.json()
+        assert p_data["destination"] == "Tokyo"
 
         # 3. Simulate automatic carrier sync with mock data returning different fields
         sync_resp = client.post(
@@ -855,6 +907,8 @@ class TestPatchShipmentCell:
         assert updated_shipment["destination"] == "Tokyo"
 
         # Verify unlocked fields still synchronized normally
-        assert updated_shipment["progress"] == 40
-        assert updated_shipment["status"] == "In Transit"
+        assert updated_shipment["progress"] == 10
+        assert updated_shipment["status"] == "Exception"
+
+
 

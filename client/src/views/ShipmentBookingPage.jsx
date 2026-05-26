@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ArrowLeft,
     CalendarClock,
@@ -22,17 +22,6 @@ import AlertBanner from '../components/AlertBanner';
 import shipmentsService from '../api/shipments';
 import '../design-premium.css';
 
-const shipperAddress = {
-    site_name: 'Insta Exhibition Production Site',
-    company_name: 'Insta House',
-    address_line1: '1-A, K.T. Industrial Park',
-    address_line2: 'Bilal Pada, Goraipada',
-    city: 'Vasai Road (East), Palghar',
-    state: 'Maharashtra',
-    postal_code: '401208',
-    country_code: 'IN',
-};
-
 function toDateInput(offsetDays = 0) {
     const date = new Date();
     date.setDate(date.getDate() + offsetDays);
@@ -44,6 +33,21 @@ function createTestBookingForm() {
     const reference = `TEST-INV-${today.replaceAll('-', '')}`;
 
     return {
+        shipper: {
+            company_name: 'Insta Exhibition Production Site',
+            name: 'Insta House',
+            email: 'production@insta-exhibitions.com',
+            phone: '7977572486',
+            address_line1: '1-A, K.T. Industrial Park',
+            address_line2: 'Bilal Pada, Goraipada',
+            address_line3: '',
+            city: 'Vasai Road (East), Palghar',
+            state_code: '27',
+            state: 'Maharashtra',
+            postal_code: '401208',
+            country_code: 'IN',
+            country_name: 'INDIA',
+        },
         receiver: {
             company_name: 'Test Company LLC',
             name: 'Test Receiver',
@@ -60,12 +64,12 @@ function createTestBookingForm() {
         },
         package: {
             pieces: 1,
-            weight_kg: '2.5',
-            length_cm: '30',
-            width_cm: '20',
-            height_cm: '15',
             declared_value: '5000',
             declared_currency: 'INR',
+            // Individual piece specs array
+            items: [
+                { id: 1, name: 'Box 1: Display Stand', weight_kg: '2.5', length_cm: '30', width_cm: '20', height_cm: '15' }
+            ]
         },
         shipment: {
             shipment_type: 'CSB_V',
@@ -151,6 +155,12 @@ function validateBookingForm(form) {
         ['receiver.city', form.receiver.city],
         ['receiver.postal_code', form.receiver.postal_code],
         ['receiver.country_code', form.receiver.country_code],
+        ['shipper.name', form.shipper.name],
+        ['shipper.phone', form.shipper.phone],
+        ['shipper.address_line1', form.shipper.address_line1],
+        ['shipper.city', form.shipper.city],
+        ['shipper.postal_code', form.shipper.postal_code],
+        ['shipper.country_code', form.shipper.country_code],
         ['shipment.description', form.shipment.description],
     ];
     if (shipmentType !== 'NORMAL') {
@@ -178,12 +188,26 @@ function validateBookingForm(form) {
 
     const numericChecks = [
         ['package.pieces', parseNumberInput(form.package.pieces), 1],
-        ['package.weight_kg', parseNumberInput(form.package.weight_kg), 0.0001],
-        ['package.length_cm', parseNumberInput(form.package.length_cm), 0.0001],
-        ['package.width_cm', parseNumberInput(form.package.width_cm), 0.0001],
-        ['package.height_cm', parseNumberInput(form.package.height_cm), 0.0001],
     ];
-    if (shipmentType !== 'NORMAL') {
+    const items = form.package.items || [];
+    if (items.length > 0) {
+        items.forEach((item, idx) => {
+            numericChecks.push(
+                [`package.items[${idx}].weight_kg`, parseNumberInput(item.weight_kg), 0.0001],
+                [`package.items[${idx}].length_cm`, parseNumberInput(item.length_cm), 0.0001],
+                [`package.items[${idx}].width_cm`, parseNumberInput(item.width_cm), 0.0001],
+                [`package.items[${idx}].height_cm`, parseNumberInput(item.height_cm), 0.0001],
+            );
+        });
+    } else {
+        numericChecks.push(
+            ['package.weight_kg', parseNumberInput(form.package.weight_kg), 0.0001],
+            ['package.length_cm', parseNumberInput(form.package.length_cm), 0.0001],
+            ['package.width_cm', parseNumberInput(form.package.width_cm), 0.0001],
+            ['package.height_cm', parseNumberInput(form.package.height_cm), 0.0001],
+        );
+    }
+    if (shipmentType === 'CSB_V') {
         numericChecks.push(['commercial.quantity', parseNumberInput(form.commercial.quantity), 1]);
     }
 
@@ -202,6 +226,10 @@ function validateBookingForm(form) {
     if (countryCode.length !== 2) {
         return 'receiver.country_code must be a 2-letter code';
     }
+    const shipperCountryCode = String(form.shipper.country_code || '').trim().toUpperCase();
+    if (shipperCountryCode.length !== 2) {
+        return 'shipper.country_code must be a 2-letter code';
+    }
     if (
         shipmentType !== 'NORMAL' &&
         !/^\d{8}$/.test(String(form.commercial.hs_code || '').trim())
@@ -210,7 +238,7 @@ function validateBookingForm(form) {
     }
     if (
         countryCode === 'US' &&
-        shipmentType !== 'NORMAL' &&
+        shipmentType === 'CSB_V' &&
         !/^\d{10}$/.test(String(form.commercial.commodity_code || '').trim())
     ) {
         return 'commercial.commodity_code must be a valid 10-digit import HS code for USA-bound shipments';
@@ -221,6 +249,16 @@ function validateBookingForm(form) {
 
 function buildPayload(form) {
     return {
+        shipper: {
+            ...form.shipper,
+            country_code: form.shipper.country_code.trim().toUpperCase(),
+            company_name: form.shipper.company_name || null,
+            email: form.shipper.email || null,
+            address_line2: form.shipper.address_line2 || null,
+            address_line3: form.shipper.address_line3 || null,
+            state_code: form.shipper.state_code || null,
+            country_name: form.shipper.country_name || null,
+        },
         receiver: {
             ...form.receiver,
             country_code: form.receiver.country_code.trim().toUpperCase(),
@@ -233,12 +271,19 @@ function buildPayload(form) {
         },
         package: {
             pieces: parseNumberInput(form.package.pieces) ?? 0,
-            weight_kg: parseNumberInput(form.package.weight_kg) ?? 0,
-            length_cm: parseNumberInput(form.package.length_cm) ?? 0,
-            width_cm: parseNumberInput(form.package.width_cm) ?? 0,
-            height_cm: parseNumberInput(form.package.height_cm) ?? 0,
+            weight_kg: parseNumberInput(form.package.items?.[0]?.weight_kg || form.package.weight_kg) ?? 0,
+            length_cm: parseNumberInput(form.package.items?.[0]?.length_cm || form.package.length_cm) ?? 0,
+            width_cm: parseNumberInput(form.package.items?.[0]?.width_cm || form.package.width_cm) ?? 0,
+            height_cm: parseNumberInput(form.package.items?.[0]?.height_cm || form.package.height_cm) ?? 0,
             declared_value: parseNumberInput(form.package.declared_value) ?? 0,
             declared_currency: form.package.declared_currency.trim().toUpperCase(),
+            items: (form.package.items || []).map((item) => ({
+                name: item.name || `Box ${item.id || 1}`,
+                weight_kg: parseNumberInput(item.weight_kg) ?? 0,
+                length_cm: parseNumberInput(item.length_cm) ?? 0,
+                width_cm: parseNumberInput(item.width_cm) ?? 0,
+                height_cm: parseNumberInput(item.height_cm) ?? 0,
+            })),
         },
         shipment: {
             ...form.shipment,
@@ -263,6 +308,7 @@ function buildPayload(form) {
             manufacture_country_code: form.commercial.manufacture_country_code.trim().toUpperCase(),
             invoice_rate_per_unit: parseNumberInput(form.commercial.invoice_rate_per_unit),
             quantity: parseNumberInput(form.commercial.quantity) ?? 1,
+            uom: 'PCS',
             cess_amount: parseNumberInput(form.commercial.cess_amount) ?? 0,
             igst_amount: parseNumberInput(form.commercial.igst_amount) ?? 0,
             igst_percentage: parseNumberInput(form.commercial.igst_percentage),
@@ -332,6 +378,77 @@ function BookingProgressStep({ number, title, detail, status }) {
     );
 }
 
+const FREQUENT_LOCATIONS = [
+    {
+        id: 'palghar',
+        label: 'Palghar Warehouse (Insta House)',
+        company_name: 'Insta Exhibition Production Site',
+        name: 'Insta House',
+        email: 'production@insta-exhibitions.com',
+        phone: '7977572486',
+        address_line1: '1-A, K.T. Industrial Park',
+        address_line2: 'Bilal Pada, Goraipada',
+        address_line3: '',
+        city: 'Vasai Road (East), Palghar',
+        state_code: '27',
+        state: 'Maharashtra',
+        postal_code: '401208',
+        country_code: 'IN',
+        country_name: 'INDIA',
+    },
+    {
+        id: 'mumbai',
+        label: 'Mumbai Office (Andheri)',
+        company_name: 'Insta Exhibition',
+        name: 'Insta Exhibition',
+        email: 'info@insta-exhibitions.com',
+        phone: '7977572486',
+        address_line1: '1001, 10th Floor, Kohinoor Continental',
+        address_line2: 'J.B Nagar, Andheri-Kurla Road',
+        address_line3: '',
+        city: 'Mumbai',
+        state_code: '27',
+        state: 'Maharashtra',
+        postal_code: '400059',
+        country_code: 'IN',
+        country_name: 'INDIA',
+    },
+    {
+        id: 'delhi',
+        label: 'Delhi Exhibition Center (Pragati Maidan)',
+        company_name: 'Pragati Maidan Exhibition Centre',
+        name: 'Delhi Warehouse Manager',
+        email: 'delhi@insta-exhibitions.com',
+        phone: '7977572486',
+        address_line1: 'Mathura Road, Pragati Maidan',
+        address_line2: 'Gate No. 1',
+        address_line3: '',
+        city: 'New Delhi',
+        state_code: '07',
+        state: 'Delhi',
+        postal_code: '110001',
+        country_code: 'IN',
+        country_name: 'INDIA',
+    },
+    {
+        id: 'us_showroom',
+        label: 'US Showroom & Warehouse (NY)',
+        company_name: 'Insta USA Inc',
+        name: 'US Warehouse Manager',
+        email: 'us@insta-exhibitions.com',
+        phone: '2015550123',
+        address_line1: '123 Test Street',
+        address_line2: 'Suite 100',
+        address_line3: '',
+        city: 'NEW YORK',
+        state_code: 'NY',
+        state: 'New York',
+        postal_code: '10012',
+        country_code: 'US',
+        country_name: 'UNITED STATES OF AMERICA',
+    }
+];
+
 function formatKg(value) {
     if (!Number.isFinite(value)) return '-';
     return `${value.toFixed(value >= 10 ? 1 : 2)} kg`;
@@ -349,23 +466,194 @@ export default function ShipmentBookingPage() {
     const [failedStep, setFailedStep] = useState('');
     const [copiedAwb, setCopiedAwb] = useState(false);
 
+    const handleAutofill = (section, locationId) => {
+        const loc = FREQUENT_LOCATIONS.find(l => l.id === locationId);
+        if (!loc) return;
+        setForm(prev => ({
+            ...prev,
+            [section]: {
+                ...prev[section],
+                company_name: loc.company_name,
+                name: loc.name,
+                email: loc.email,
+                phone: loc.phone,
+                address_line1: loc.address_line1,
+                address_line2: loc.address_line2,
+                address_line3: loc.address_line3 || '',
+                city: loc.city,
+                state_code: loc.state_code,
+                state: loc.state,
+                postal_code: loc.postal_code,
+                country_code: loc.country_code,
+                country_name: loc.country_name,
+            }
+        }));
+    };
+
+    useEffect(() => {
+        const isDomestic = form.receiver.country_code?.trim().toUpperCase() === 'IN';
+        if (isDomestic) {
+            setForm((prev) => {
+                let updated = false;
+                const newShipment = { ...prev.shipment };
+                if (newShipment.shipment_type !== 'NORMAL') {
+                    newShipment.shipment_type = 'NORMAL';
+                    updated = true;
+                }
+                if (newShipment.service_type !== 'N' || newShipment.local_product_code !== 'N') {
+                    newShipment.service_type = 'N';
+                    newShipment.local_product_code = 'N';
+                    updated = true;
+                }
+                return updated ? { ...prev, shipment: newShipment } : prev;
+            });
+        } else {
+            setForm((prev) => {
+                const newShipment = { ...prev.shipment };
+                if (newShipment.service_type === 'N' || newShipment.local_product_code === 'N') {
+                    newShipment.service_type = 'P';
+                    newShipment.local_product_code = 'P';
+                    return { ...prev, shipment: newShipment };
+                }
+                return prev;
+            });
+        }
+    }, [form.receiver.country_code]);
+
+    useEffect(() => {
+        const rawPieces = parseNumberInput(form.package.pieces) || 1;
+        const currentItems = form.package.items || [];
+        if (currentItems.length !== rawPieces) {
+            setForm((prev) => {
+                const newItems = [...(prev.package.items || [])];
+                if (newItems.length < rawPieces) {
+                    while (newItems.length < rawPieces) {
+                        const lastItem = newItems[newItems.length - 1] || { weight_kg: '2.5', length_cm: '30', width_cm: '20', height_cm: '15' };
+                        newItems.push({
+                            id: Date.now() + newItems.length,
+                            weight_kg: lastItem.weight_kg,
+                            length_cm: lastItem.length_cm,
+                            width_cm: lastItem.width_cm,
+                            height_cm: lastItem.height_cm,
+                        });
+                    }
+                } else if (newItems.length > rawPieces) {
+                    newItems.splice(rawPieces);
+                }
+                return {
+                    ...prev,
+                    package: {
+                        ...prev.package,
+                        items: newItems,
+                    },
+                };
+            });
+        }
+    }, [form.package.pieces]);
+
+    const updatePieceField = (index, field, value) => {
+        setForm((prev) => {
+            const newItems = [...(prev.package.items || [])];
+            if (newItems[index]) {
+                newItems[index] = {
+                    ...newItems[index],
+                    [field]: value,
+                };
+            }
+            const extra = index === 0 ? { [field]: value } : {};
+            return {
+                ...prev,
+                package: {
+                    ...prev.package,
+                    ...extra,
+                    items: newItems,
+                },
+            };
+        });
+    };
+    const handleAddPackageRow = () => {
+        setForm((prev) => {
+            const currentItems = prev.package.items || [];
+            const lastItem = currentItems[currentItems.length - 1] || { name: '', weight_kg: '2.5', length_cm: '30', width_cm: '20', height_cm: '15' };
+            const nextIdx = currentItems.length + 1;
+            const newItems = [
+                ...currentItems,
+                {
+                    id: Date.now() + currentItems.length,
+                    name: `Box ${nextIdx}`,
+                    weight_kg: lastItem.weight_kg,
+                    length_cm: lastItem.length_cm,
+                    width_cm: lastItem.width_cm,
+                    height_cm: lastItem.height_cm,
+                }
+            ];
+            return {
+                ...prev,
+                package: {
+                    ...prev.package,
+                    pieces: newItems.length,
+                    items: newItems,
+                }
+            };
+        });
+    };
+
+    const handleRemovePackageRow = (index) => {
+        setForm((prev) => {
+            const currentItems = [...(prev.package.items || [])];
+            if (currentItems.length <= 1) return prev;
+            currentItems.splice(index, 1);
+            
+            const reindexedItems = currentItems.map((item, idx) => ({
+                ...item,
+                name: item.name.startsWith("Box ") ? `Box ${idx + 1}` : item.name
+            }));
+            
+            return {
+                ...prev,
+                package: {
+                    ...prev.package,
+                    pieces: reindexedItems.length,
+                    items: reindexedItems,
+                }
+            };
+        });
+    };
+
     const validationError = useMemo(() => validateBookingForm(form), [form]);
     const isCommercialShipment = form.shipment.shipment_type !== 'NORMAL';
     const isCsbVShipment = form.shipment.shipment_type === 'CSB_V';
     const dhlMode = String(import.meta.env.VITE_DHL_MODE || '').toLowerCase() === 'live' ? 'Live Mode' : 'Test Mode';
     const packagePreview = useMemo(() => {
-        const pieces = parseNumberInput(form.package.pieces) || 1;
-        const actualWeight = (parseNumberInput(form.package.weight_kg) || 0) * pieces;
-        const length = parseNumberInput(form.package.length_cm) || 0;
-        const width = parseNumberInput(form.package.width_cm) || 0;
-        const height = parseNumberInput(form.package.height_cm) || 0;
-        const volumetricWeight = length && width && height ? ((length * width * height) / 5000) * pieces : 0;
+        const items = form.package.items || [];
+        let actualWeight = 0;
+        let volumetricWeight = 0;
+
+        if (items.length > 0) {
+            items.forEach((item) => {
+                const wt = parseNumberInput(item.weight_kg) || 0;
+                const l = parseNumberInput(item.length_cm) || 0;
+                const w = parseNumberInput(item.width_cm) || 0;
+                const h = parseNumberInput(item.height_cm) || 0;
+                actualWeight += wt;
+                volumetricWeight += l && w && h ? (l * w * h) / 5000 : 0;
+            });
+        } else {
+            const pieces = parseNumberInput(form.package.pieces) || 1;
+            const wt = parseNumberInput(form.package.weight_kg) || 0;
+            const l = parseNumberInput(form.package.length_cm) || 0;
+            const w = parseNumberInput(form.package.width_cm) || 0;
+            const h = parseNumberInput(form.package.height_cm) || 0;
+            actualWeight = wt * pieces;
+            volumetricWeight = l && w && h ? ((l * w * h) / 5000) * pieces : 0;
+        }
+
         return {
             actualWeight,
             volumetricWeight,
             chargeableWeight: Math.max(actualWeight, volumetricWeight),
         };
-    }, [form.package.height_cm, form.package.length_cm, form.package.pieces, form.package.weight_kg, form.package.width_cm]);
+    }, [form.package.pieces, form.package.items, form.package.weight_kg, form.package.length_cm, form.package.width_cm, form.package.height_cm]);
     const stepStatuses = useMemo(() => ({
         validate: failedStep === 'validate' || validationError ? 'Failed' : 'Completed',
         rate: failedStep === 'rate' ? 'Failed' : (rating ? 'Completed' : 'Waiting'),
@@ -512,27 +800,89 @@ export default function ShipmentBookingPage() {
 
                 <div className="shipment-booking-layout">
                     <div className="shipment-booking-form-stack">
-                        <section className="shipment-booking-origin">
-                            <div className="shipment-booking-origin__top">
-                                <div>
-                                    <div className="shipment-booking-section-label">Shipping From</div>
-                                    <h2>{shipperAddress.site_name}</h2>
-                                </div>
-                                <span className="booking-warehouse-badge">
-                                    <Warehouse size={13} /> Default warehouse
-                                </span>
-                            </div>
-                            <p>
-                                {shipperAddress.company_name}, {shipperAddress.address_line1}, {shipperAddress.address_line2},{' '}
-                                {shipperAddress.city}, {shipperAddress.state} - {shipperAddress.postal_code}, {shipperAddress.country_code}
-                            </p>
-                        </section>
+                        <BookingSection
+                            icon={Warehouse}
+                            title="Shipping From (Shipper)"
+                            subtitle="Contact and origin warehouse address data used directly by DHL."
+                        >
+                            <FieldGroup title="⚡ Quick Autofill">
+                                <BookingField label="Select Frequent Location">
+                                    <select
+                                        className="booking-input"
+                                        onChange={(e) => handleAutofill('shipper', e.target.value)}
+                                        defaultValue=""
+                                    >
+                                        <option value="" disabled>-- Choose pre-defined location --</option>
+                                        {FREQUENT_LOCATIONS.map(loc => (
+                                            <option key={loc.id} value={loc.id}>{loc.label}</option>
+                                        ))}
+                                    </select>
+                                </BookingField>
+                            </FieldGroup>
+
+                            <FieldGroup title="Contact Information">
+                                <BookingField label="Attention / Brand Name">
+                                    <input className="booking-input" value={form.shipper.name} onChange={(event) => updateSection('shipper', 'name', event.target.value)} required />
+                                </BookingField>
+                                <BookingField label="Company / Site Name">
+                                    <input className="booking-input" value={form.shipper.company_name} onChange={(event) => updateSection('shipper', 'company_name', event.target.value)} />
+                                </BookingField>
+                                <BookingField label="Email">
+                                    <input className="booking-input" type="email" value={form.shipper.email} onChange={(event) => updateSection('shipper', 'email', event.target.value)} />
+                                </BookingField>
+                                <BookingField label="Phone">
+                                    <input className="booking-input" value={form.shipper.phone} onChange={(event) => updateSection('shipper', 'phone', event.target.value)} required />
+                                </BookingField>
+                            </FieldGroup>
+
+                            <FieldGroup title="Address">
+                                <BookingField label="Address Line 1">
+                                    <input className="booking-input" value={form.shipper.address_line1} onChange={(event) => updateSection('shipper', 'address_line1', event.target.value)} required />
+                                </BookingField>
+                                <BookingField label="Address Line 2">
+                                    <input className="booking-input" value={form.shipper.address_line2} onChange={(event) => updateSection('shipper', 'address_line2', event.target.value)} />
+                                </BookingField>
+                                <BookingField label="City">
+                                    <input className="booking-input" value={form.shipper.city} onChange={(event) => updateSection('shipper', 'city', event.target.value)} required />
+                                </BookingField>
+                                <BookingField label="State Code" hint="Use shipper state or province code (e.g. 27).">
+                                    <input className="booking-input" value={form.shipper.state_code} onChange={(event) => updateSection('shipper', 'state_code', event.target.value)} />
+                                </BookingField>
+                                <BookingField label="State Name">
+                                    <input className="booking-input" value={form.shipper.state} onChange={(event) => updateSection('shipper', 'state', event.target.value)} />
+                                </BookingField>
+                                <BookingField label="Postal Code">
+                                    <input className="booking-input" value={form.shipper.postal_code} onChange={(event) => updateSection('shipper', 'postal_code', event.target.value)} required />
+                                </BookingField>
+                                <BookingField label="Country Code" hint="ISO 2-letter code, e.g. IN.">
+                                    <input className="booking-input" value={form.shipper.country_code} onChange={(event) => updateSection('shipper', 'country_code', event.target.value)} required />
+                                </BookingField>
+                                <BookingField label="Country Name">
+                                    <input className="booking-input" value={form.shipper.country_name} onChange={(event) => updateSection('shipper', 'country_name', event.target.value)} />
+                                </BookingField>
+                            </FieldGroup>
+                        </BookingSection>
 
                         <BookingSection
                             icon={Truck}
                             title="Receiver Details"
                             subtitle="Contact and destination data used directly by DHL."
                         >
+                            <FieldGroup title="⚡ Quick Autofill">
+                                <BookingField label="Select Frequent Location">
+                                    <select
+                                        className="booking-input"
+                                        onChange={(e) => handleAutofill('receiver', e.target.value)}
+                                        defaultValue=""
+                                    >
+                                        <option value="" disabled>-- Choose pre-defined location --</option>
+                                        {FREQUENT_LOCATIONS.map(loc => (
+                                            <option key={loc.id} value={loc.id}>{loc.label}</option>
+                                        ))}
+                                    </select>
+                                </BookingField>
+                            </FieldGroup>
+
                             <FieldGroup title="Contact Information">
                                 <BookingField label="Receiver Name">
                                     <input className="booking-input" value={form.receiver.name} onChange={(event) => updateSection('receiver', 'name', event.target.value)} required />
@@ -578,32 +928,123 @@ export default function ShipmentBookingPage() {
                             title="Package Details"
                             subtitle="Pieces, physical dimensions, package type, and shipment content."
                         >
-                            <div className="shipment-booking-form-grid">
+                            <div className="shipment-booking-form-grid" style={{ marginBottom: '16px' }}>
                                 <BookingField label="Package Type">
-                                    <select className="booking-input" value={form.shipment.shipment_type} onChange={(event) => updateSection('shipment', 'shipment_type', event.target.value)}>
+                                    <select 
+                                        className="booking-input" 
+                                        value={form.shipment.shipment_type} 
+                                        disabled={form.receiver.country_code?.trim().toUpperCase() === 'IN'}
+                                        onChange={(event) => updateSection('shipment', 'shipment_type', event.target.value)}
+                                    >
                                         <option value="NORMAL">Normal</option>
                                         <option value="CSB_IV_CARGO">CSB-IV Cargo</option>
                                         <option value="CSB_V">CSB-V</option>
                                     </select>
+                                    {form.receiver.country_code?.trim().toUpperCase() === 'IN' && (
+                                        <div className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200/50 dark:border-amber-900/30">
+                                            Domestic shipments from India are automatically processed via standard Normal routing.
+                                        </div>
+                                    )}
                                 </BookingField>
                                 <BookingField label="Shipment Content">
                                     <input className="booking-input" value={form.shipment.description} onChange={(event) => updateSection('shipment', 'description', event.target.value)} required />
                                 </BookingField>
-                                <BookingField label="Pieces">
-                                    <input className="booking-input" type="text" inputMode="numeric" value={form.package.pieces} onChange={(event) => updateSection('package', 'pieces', event.target.value)} />
-                                </BookingField>
-                                <BookingField label="Weight (kg)">
-                                    <input className="booking-input" type="text" inputMode="decimal" value={form.package.weight_kg} onChange={(event) => updateSection('package', 'weight_kg', event.target.value)} required />
-                                </BookingField>
-                                <BookingField label="Length (cm)">
-                                    <input className="booking-input" type="text" inputMode="decimal" value={form.package.length_cm} onChange={(event) => updateSection('package', 'length_cm', event.target.value)} required />
-                                </BookingField>
-                                <BookingField label="Width (cm)">
-                                    <input className="booking-input" type="text" inputMode="decimal" value={form.package.width_cm} onChange={(event) => updateSection('package', 'width_cm', event.target.value)} required />
-                                </BookingField>
-                                <BookingField label="Height (cm)">
-                                    <input className="booking-input" type="text" inputMode="decimal" value={form.package.height_cm} onChange={(event) => updateSection('package', 'height_cm', event.target.value)} required />
-                                </BookingField>
+                            </div>
+
+                            <div className="mt-4 pt-2">
+                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                                    Package Specifications (MPS Row-wise)
+                                </div>
+                                
+                                <div className="booking-package-table-header">
+                                    <div style={{ flex: 3.5 }}>Package Description / Name</div>
+                                    <div style={{ flex: 1.5 }}>Weight (kg)</div>
+                                    <div style={{ flex: 1.2 }}>L (cm)</div>
+                                    <div style={{ flex: 1.2 }}>W (cm)</div>
+                                    <div style={{ flex: 1.2 }}>H (cm)</div>
+                                    <div style={{ width: '40px', textAlign: 'center' }}>Action</div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    {(form.package.items || []).map((item, idx) => (
+                                        <div key={item.id || idx} className="booking-package-row">
+                                            <div style={{ flex: 3.5 }}>
+                                                <input 
+                                                    className="booking-input" 
+                                                    placeholder="e.g. Box 1: Display Stand" 
+                                                    value={item.name || ''} 
+                                                    onChange={(event) => updatePieceField(idx, 'name', event.target.value)} 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1.5 }}>
+                                                <input 
+                                                    className="booking-input" 
+                                                    type="text" 
+                                                    inputMode="decimal" 
+                                                    value={item.weight_kg} 
+                                                    onChange={(event) => updatePieceField(idx, 'weight_kg', event.target.value)} 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1.2 }}>
+                                                <input 
+                                                    className="booking-input" 
+                                                    type="text" 
+                                                    inputMode="decimal" 
+                                                    value={item.length_cm} 
+                                                    onChange={(event) => updatePieceField(idx, 'length_cm', event.target.value)} 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1.2 }}>
+                                                <input 
+                                                    className="booking-input" 
+                                                    type="text" 
+                                                    inputMode="decimal" 
+                                                    value={item.width_cm} 
+                                                    onChange={(event) => updatePieceField(idx, 'width_cm', event.target.value)} 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1.2 }}>
+                                                <input 
+                                                    className="booking-input" 
+                                                    type="text" 
+                                                    inputMode="decimal" 
+                                                    value={item.height_cm} 
+                                                    onChange={(event) => updatePieceField(idx, 'height_cm', event.target.value)} 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div style={{ width: '40px', display: 'flex', justifyContent: 'center' }}>
+                                                <button
+                                                    type="button"
+                                                    className="booking-delete-row-btn"
+                                                    disabled={form.package.items.length <= 1}
+                                                    onClick={() => handleRemovePackageRow(idx)}
+                                                    title="Remove package"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="booking-package-table-footer">
+                                    <button 
+                                        type="button" 
+                                        className="booking-btn booking-btn--primary" 
+                                        style={{ height: '36px', padding: '0 12px', fontSize: '12px' }}
+                                        onClick={handleAddPackageRow}
+                                    >
+                                        + Add Package
+                                    </button>
+                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                                        Total pieces: {form.package.items?.length || 1}
+                                    </span>
+                                </div>
                             </div>
                             <div className="booking-weight-preview">
                                 <div>
@@ -627,11 +1068,32 @@ export default function ShipmentBookingPage() {
                             subtitle="Service, billing terms, declared value, and show context."
                         >
                             <div className="shipment-booking-form-grid">
-                                <BookingField label="Service Type">
-                                    <input className="booking-input" value={form.shipment.service_type} onChange={(event) => updateSection('shipment', 'service_type', event.target.value)} />
-                                </BookingField>
-                                <BookingField label="Local Product Code">
-                                    <input className="booking-input" value={form.shipment.local_product_code} onChange={(event) => updateSection('shipment', 'local_product_code', event.target.value)} />
+                                <BookingField label="DHL Service Tier">
+                                    <select
+                                        className="booking-input"
+                                        value={form.shipment.service_type}
+                                        disabled={form.receiver.country_code?.trim().toUpperCase() === 'IN'}
+                                        onChange={(event) => {
+                                            const val = event.target.value;
+                                            setForm((prev) => ({
+                                                ...prev,
+                                                shipment: {
+                                                    ...prev.shipment,
+                                                    service_type: val,
+                                                    local_product_code: val,
+                                                },
+                                            }));
+                                        }}
+                                    >
+                                        {form.receiver.country_code?.trim().toUpperCase() === 'IN' ? (
+                                            <option value="N">EXPRESS DOMESTIC</option>
+                                        ) : (
+                                            <>
+                                                <option value="P">EXPRESS WORLDWIDE</option>
+                                                <option value="U">EXPRESS WORLDWIDE 12:00</option>
+                                            </>
+                                        )}
+                                    </select>
                                 </BookingField>
                                 <BookingField label="Declared Value">
                                     <input className="booking-input" type="text" inputMode="decimal" value={form.package.declared_value} onChange={(event) => updateSection('package', 'declared_value', event.target.value)} />
@@ -640,7 +1102,25 @@ export default function ShipmentBookingPage() {
                                     <input className="booking-input" value={form.package.declared_currency} onChange={(event) => updateSection('package', 'declared_currency', event.target.value)} />
                                 </BookingField>
                                 <BookingField label="Terms of Trade">
-                                    <input className="booking-input" value={form.shipment.terms_of_trade} onChange={(event) => updateSection('shipment', 'terms_of_trade', event.target.value)} />
+                                    <select
+                                        className="booking-input"
+                                        value={form.shipment.terms_of_trade}
+                                        onChange={(event) => {
+                                            const val = event.target.value;
+                                            const dutyPaymentType = val === 'DAP' ? 'R' : 'S';
+                                            setForm((prev) => ({
+                                                ...prev,
+                                                shipment: {
+                                                    ...prev.shipment,
+                                                    terms_of_trade: val,
+                                                    duty_payment_type: dutyPaymentType,
+                                                },
+                                            }));
+                                        }}
+                                    >
+                                        <option value="DAP">DAP (Delivered At Place - Receiver Pays Duties)</option>
+                                        <option value="DDP">DDP (Delivered Duty Paid - Shipper Pays Duties)</option>
+                                    </select>
                                 </BookingField>
                                 <BookingField label="Dutiable">
                                     <select className="booking-input" value={form.shipment.is_dutiable ? 'true' : 'false'} onChange={(event) => updateSection('shipment', 'is_dutiable', event.target.value === 'true')}>
@@ -649,10 +1129,24 @@ export default function ShipmentBookingPage() {
                                     </select>
                                 </BookingField>
                                 <BookingField label="Shipping Payment">
-                                    <input className="booking-input" value={form.shipment.shipping_payment_type} onChange={(event) => updateSection('shipment', 'shipping_payment_type', event.target.value)} />
+                                    <select
+                                        className="booking-input"
+                                        value={form.shipment.shipping_payment_type}
+                                        disabled={true}
+                                    >
+                                        <option value="S">Shipper Account (Default)</option>
+                                    </select>
                                 </BookingField>
                                 <BookingField label="Duty Payment">
-                                    <input className="booking-input" value={form.shipment.duty_payment_type} onChange={(event) => updateSection('shipment', 'duty_payment_type', event.target.value)} />
+                                    <select
+                                        className="booking-input"
+                                        value={form.shipment.duty_payment_type}
+                                        disabled={true}
+                                        onChange={(event) => updateSection('shipment', 'duty_payment_type', event.target.value)}
+                                    >
+                                        <option value="R">Receiver Pays Duties (R)</option>
+                                        <option value="S">Shipper Pays Duties (S)</option>
+                                    </select>
                                 </BookingField>
                                 <BookingField label="Reference">
                                     <input className="booking-input" value={form.shipment.shipper_reference} onChange={(event) => updateSection('shipment', 'shipper_reference', event.target.value)} />
@@ -669,49 +1163,45 @@ export default function ShipmentBookingPage() {
                         {isCommercialShipment ? (
                             <BookingSection
                                 icon={Receipt}
-                                title={isCsbVShipment ? 'CSB-V Commercial Details' : 'CSB-IV Cargo Details'}
+                                title={isCsbVShipment ? 'CSB-V Commercial Details' : 'CSB-IV Export Details'}
                                 subtitle="Export documentation fields required for DHL booking and label generation."
                             >
                                 <div className="shipment-booking-form-grid">
                                     {isCsbVShipment ? (
-                                        <BookingField label="IEC No">
-                                            <input className="booking-input" value={form.commercial.iec_no} onChange={(event) => updateSection('commercial', 'iec_no', event.target.value)} required />
-                                        </BookingField>
-                                    ) : null}
-                                    <BookingField label="GSTIN / PAN">
-                                        <input className="booking-input" value={form.commercial.gstin} onChange={(event) => updateSection('commercial', 'gstin', event.target.value)} required />
-                                    </BookingField>
-                                    {isCsbVShipment ? (
-                                        <BookingField label="Bank AD Code">
-                                            <input className="booking-input" value={form.commercial.bank_ad_code} onChange={(event) => updateSection('commercial', 'bank_ad_code', event.target.value)} required />
-                                        </BookingField>
-                                    ) : null}
-                                    <BookingField label="Invoice No">
-                                        <input className="booking-input" value={form.commercial.invoice_number} onChange={(event) => updateSection('commercial', 'invoice_number', event.target.value)} required />
-                                    </BookingField>
-                                    <BookingField label="Invoice Date">
-                                        <input className="booking-input" type="date" value={form.commercial.invoice_date} onChange={(event) => updateSection('commercial', 'invoice_date', event.target.value)} required />
-                                    </BookingField>
-                                    <BookingField label="Export HS Code">
-                                        <input className="booking-input" value={form.commercial.hs_code} onChange={(event) => updateSection('commercial', 'hs_code', event.target.value)} required />
-                                    </BookingField>
-                                    <BookingField label="Import HS Code">
-                                        <input className="booking-input" value={form.commercial.commodity_code} onChange={(event) => updateSection('commercial', 'commodity_code', event.target.value)} />
-                                    </BookingField>
-                                    <BookingField label="Commodity Type">
-                                        <input className="booking-input" value={form.commercial.commodity_type} onChange={(event) => updateSection('commercial', 'commodity_type', event.target.value)} />
-                                    </BookingField>
-                                    <BookingField label="Quantity">
-                                        <input className="booking-input" type="text" inputMode="numeric" value={form.commercial.quantity} onChange={(event) => updateSection('commercial', 'quantity', event.target.value)} />
-                                    </BookingField>
-                                    <BookingField label="Invoice Rate / Unit">
-                                        <input className="booking-input" type="text" inputMode="decimal" value={form.commercial.invoice_rate_per_unit} onChange={(event) => updateSection('commercial', 'invoice_rate_per_unit', event.target.value)} />
-                                    </BookingField>
-                                    <BookingField label="UOM">
-                                        <input className="booking-input" value={form.commercial.uom} onChange={(event) => updateSection('commercial', 'uom', event.target.value)} />
-                                    </BookingField>
-                                    {isCsbVShipment ? (
                                         <>
+                                            <BookingField label="IEC No">
+                                                <input className="booking-input" value={form.commercial.iec_no} onChange={(event) => updateSection('commercial', 'iec_no', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="GSTIN / PAN">
+                                                <input className="booking-input" value={form.commercial.gstin} onChange={(event) => updateSection('commercial', 'gstin', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Bank AD Code">
+                                                <input className="booking-input" value={form.commercial.bank_ad_code} onChange={(event) => updateSection('commercial', 'bank_ad_code', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Invoice No">
+                                                <input className="booking-input" value={form.commercial.invoice_number} onChange={(event) => updateSection('commercial', 'invoice_number', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Invoice Date">
+                                                <input className="booking-input" type="date" value={form.commercial.invoice_date} onChange={(event) => updateSection('commercial', 'invoice_date', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Export HS Code">
+                                                <input className="booking-input" value={form.commercial.hs_code} onChange={(event) => updateSection('commercial', 'hs_code', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Import HS Code">
+                                                <input className="booking-input" value={form.commercial.commodity_code} onChange={(event) => updateSection('commercial', 'commodity_code', event.target.value)} />
+                                            </BookingField>
+                                            <BookingField label="Commodity Type">
+                                                <input className="booking-input" value={form.commercial.commodity_type} onChange={(event) => updateSection('commercial', 'commodity_type', event.target.value)} />
+                                            </BookingField>
+                                            <BookingField label="Quantity">
+                                                <input className="booking-input" type="text" inputMode="numeric" value={form.commercial.quantity} onChange={(event) => updateSection('commercial', 'quantity', event.target.value)} />
+                                            </BookingField>
+                                            <BookingField label="Invoice Rate / Unit">
+                                                <input className="booking-input" type="text" inputMode="decimal" value={form.commercial.invoice_rate_per_unit} onChange={(event) => updateSection('commercial', 'invoice_rate_per_unit', event.target.value)} />
+                                            </BookingField>
+                                            <BookingField label="UOM">
+                                                <input className="booking-input" value={form.commercial.uom} onChange={(event) => updateSection('commercial', 'uom', event.target.value)} />
+                                            </BookingField>
                                             <BookingField label="Using IGST">
                                                 <select className="booking-input" value={form.commercial.is_using_igst} onChange={(event) => updateSection('commercial', 'is_using_igst', event.target.value)}>
                                                     <option value="No">No</option>
@@ -724,13 +1214,9 @@ export default function ShipmentBookingPage() {
                                                     <option value="Yes">Yes</option>
                                                 </select>
                                             </BookingField>
-                                        </>
-                                    ) : null}
-                                    <BookingField label="IGST Amount">
-                                        <input className="booking-input" type="text" inputMode="decimal" value={form.commercial.igst_amount} onChange={(event) => updateSection('commercial', 'igst_amount', event.target.value)} />
-                                    </BookingField>
-                                    {isCsbVShipment ? (
-                                        <>
+                                            <BookingField label="IGST Amount">
+                                                <input className="booking-input" type="text" inputMode="decimal" value={form.commercial.igst_amount} onChange={(event) => updateSection('commercial', 'igst_amount', event.target.value)} />
+                                            </BookingField>
                                             <BookingField label="Taxable Value">
                                                 <input className="booking-input" type="text" inputMode="decimal" value={form.commercial.taxable_value} onChange={(event) => updateSection('commercial', 'taxable_value', event.target.value)} />
                                             </BookingField>
@@ -747,7 +1233,22 @@ export default function ShipmentBookingPage() {
                                                 <input className="booking-input" type="date" value={form.commercial.date_of_supply} onChange={(event) => updateSection('commercial', 'date_of_supply', event.target.value)} />
                                             </BookingField>
                                         </>
-                                    ) : null}
+                                    ) : (
+                                        <>
+                                            <BookingField label="GSTIN / PAN">
+                                                <input className="booking-input" value={form.commercial.gstin} onChange={(event) => updateSection('commercial', 'gstin', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Invoice No">
+                                                <input className="booking-input" value={form.commercial.invoice_number} onChange={(event) => updateSection('commercial', 'invoice_number', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Invoice Date">
+                                                <input className="booking-input" type="date" value={form.commercial.invoice_date} onChange={(event) => updateSection('commercial', 'invoice_date', event.target.value)} required />
+                                            </BookingField>
+                                            <BookingField label="Export HS Code">
+                                                <input className="booking-input" value={form.commercial.hs_code} onChange={(event) => updateSection('commercial', 'hs_code', event.target.value)} required />
+                                            </BookingField>
+                                        </>
+                                    )}
                                 </div>
                             </BookingSection>
                         ) : null}
@@ -767,7 +1268,7 @@ export default function ShipmentBookingPage() {
 
                             <div className="booking-progress-steps">
                                 <BookingProgressStep number="1" title="Validate Details" status={stepStatuses.validate} detail={validationError || 'Required receiver, package, and export fields are complete.'} />
-                                <BookingProgressStep number="2" title="Get DHL Rate" status={stepStatuses.rate} detail={rating ? `${rating.currency} ${rating.price} · ${rating.delivery_time || 'Delivery timing pending'}` : 'Fetch DHL pricing before shipment creation.'} />
+                                <BookingProgressStep number="2" title="Get DHL Rate" status={stepStatuses.rate} detail={rating ? `${rating.currency} ${(Number(rating.shipping_charge || rating.price) + Number(rating.tax_amount || 0)).toFixed(2)} · ${rating.delivery_time || 'Delivery timing pending'}` : 'Fetch DHL pricing before shipment creation.'} />
                                 <BookingProgressStep number="3" title="Create Shipment" status={stepStatuses.create} detail={created?.awb ? `AWB ${created.awb}` : 'Locked until a successful DHL rate is available.'} />
                                 <BookingProgressStep number="4" title="Save AWB & Label" status={stepStatuses.save} detail={created?.label_url ? 'AWB saved and label file is ready.' : 'Label status appears after DHL shipment creation.'} />
                             </div>
@@ -782,10 +1283,44 @@ export default function ShipmentBookingPage() {
                             </div>
 
                             <div className="booking-progress-result">
-                                <div className="booking-result-row">
-                                    <span>Rate</span>
-                                    <strong>{rating ? `${rating.currency} ${rating.price}` : 'Not fetched'}</strong>
-                                </div>
+                                {rating ? (
+                                    <div className="booking-detailed-charges-spec">
+                                        <div className="charge-detail-row charge-detail-row--header">
+                                            <span>Service Tier</span>
+                                            <span className="charge-detail-value charge-detail-value--tier">{rating.service_name || 'EXPRESS WORLDWIDE'}</span>
+                                        </div>
+                                        <div className="charge-detail-row">
+                                            <span>Base Shipping Charge</span>
+                                            <span className="charge-detail-value">{rating.currency} {Number(rating.shipping_charge || (rating.price - (rating.tax_amount || 0))).toFixed(2)}</span>
+                                        </div>
+                                        {rating.tax_amount ? (
+                                            <div className="charge-detail-row">
+                                                <span>Total Tax Amount</span>
+                                                <span className="charge-detail-value">{rating.currency} {Number(rating.tax_amount).toFixed(2)}</span>
+                                            </div>
+                                        ) : null}
+                                        {rating.global_services && rating.global_services.length > 0 ? (
+                                            <div className="surcharge-section">
+                                                <span className="surcharge-section-title">Included Carrier Surcharges:</span>
+                                                {rating.global_services.map((srv, idx) => (
+                                                    <div key={idx} className="surcharge-item">
+                                                        <span className="surcharge-name">
+                                                            <span className="surcharge-dot"></span>
+                                                            {srv}
+                                                        </span>
+                                                        <span className="surcharge-pill">Active</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        <div className="charge-detail-row charge-detail-row--total">
+                                            <span>Estimated Total</span>
+                                            <span className="charge-detail-value charge-detail-value--total">{rating.currency} {Number(rating.price || (Number(rating.shipping_charge || 0) + Number(rating.tax_amount || 0))).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-xs text-slate-400 text-center py-4">Fetch DHL pricing before shipment creation.</div>
+                                )}
                                 <div className="booking-result-row">
                                     <span>AWB</span>
                                     <strong>{created?.awb || 'Pending'}</strong>
