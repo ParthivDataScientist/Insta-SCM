@@ -774,6 +774,10 @@
     border-radius: 20px;
     box-shadow: 0 4px 24px rgba(15, 23, 42, 0.02);
     margin-bottom: 8px;
+    overflow: auto;
+}
+
+.shipping-dashboard-page .design-dashboard__table-shell {
     overflow: hidden;
 }
 
