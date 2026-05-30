@@ -278,6 +278,21 @@ class ShipmentReceiverInput(BaseModel):
         return value.strip().upper()
 
 
+class ShipmentPieceInput(BaseModel):
+    weight_kg: float = Field(gt=0, le=9999)
+    length_cm: float = Field(gt=0, le=999)
+    width_cm: float = Field(gt=0, le=999)
+    height_cm: float = Field(gt=0, le=999)
+
+
+class SinglePackageItemInput(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=120)
+    weight_kg: float = Field(gt=0, le=9999)
+    length_cm: float = Field(gt=0, le=999)
+    width_cm: float = Field(gt=0, le=999)
+    height_cm: float = Field(gt=0, le=999)
+
+
 class ShipmentPackageInput(BaseModel):
     pieces: int = Field(default=1, ge=1, le=999)
     weight_kg: float = Field(gt=0, le=9999)
@@ -286,6 +301,7 @@ class ShipmentPackageInput(BaseModel):
     height_cm: float = Field(gt=0, le=999)
     declared_value: float = Field(default=0, ge=0, le=99999999)
     declared_currency: str = Field(default="USD", min_length=3, max_length=3)
+    items: Optional[List[SinglePackageItemInput]] = None
 
     @field_validator("declared_currency")
     @classmethod
@@ -350,6 +366,7 @@ class ShipmentCommercialInput(BaseModel):
 
 class ShipmentBookingRequest(BaseModel):
     receiver: ShipmentReceiverInput
+    shipper: Optional[ShipmentReceiverInput] = None
     package: ShipmentPackageInput
     shipment: ShipmentBookingInput
     commercial: Optional[ShipmentCommercialInput] = None
@@ -362,6 +379,9 @@ class ShipmentRateResponse(BaseModel):
     currency: str
     delivery_time: Optional[str] = None
     service_type: Optional[str] = None
+    shipping_charge: Optional[float] = None
+    tax_amount: Optional[float] = None
+    global_services: Optional[List[str]] = None
 
 
 class ShipmentCreateResponse(BaseModel):

@@ -774,6 +774,10 @@
     border-radius: 20px;
     box-shadow: 0 4px 24px rgba(15, 23, 42, 0.02);
     margin-bottom: 8px;
+    overflow: auto;
+}
+
+.shipping-dashboard-page .design-dashboard__table-shell {
     overflow: hidden;
 }
 
@@ -4244,6 +4248,251 @@
     background: #334155 !important;
     color: #f8fafc !important;
 }
+
+/* Detailed Pricing Breakdown styling */
+.booking-detailed-charges-spec {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dark .booking-detailed-charges-spec {
+    background: #0f172a;
+    border-color: #1e293b;
+}
+
+.charge-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #475569;
+}
+
+.dark .charge-detail-row {
+    color: #94a3b8;
+}
+
+.charge-detail-row--header {
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 1px dashed #cbd5e1;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+}
+
+.dark .charge-detail-row--header {
+    color: #cbd5e1;
+    border-color: #334155;
+}
+
+.charge-detail-row--total {
+    font-size: 15px;
+    font-weight: 900;
+    color: #0f172a;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+    margin-top: 4px;
+}
+
+.dark .charge-detail-row--total {
+    color: #ffffff;
+    border-color: #1e293b;
+}
+
+.charge-detail-value {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.dark .charge-detail-value {
+    color: #cbd5e1;
+}
+
+.charge-detail-value--tier {
+    color: #2563eb;
+}
+
+.dark .charge-detail-value--tier {
+    color: #60a5fa;
+}
+
+.charge-detail-value--total {
+    font-size: 16px;
+    color: #2563eb;
+}
+
+.dark .charge-detail-value--total {
+    color: #3b82f6;
+}
+
+.surcharge-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+    margin-top: 4px;
+}
+
+.dark .surcharge-section {
+    border-color: #1e293b;
+}
+
+.surcharge-section-title {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: 0.05em;
+}
+
+.dark .surcharge-section-title {
+    color: #64748b;
+}
+
+.surcharge-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.dark .surcharge-item {
+    color: #94a3b8;
+}
+
+.surcharge-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.surcharge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #94a3b8;
+}
+
+.surcharge-pill {
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.dark .surcharge-pill {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+}
+
+/* --- Dynamic MPS Package Table Styles --- */
+.booking-package-table-header {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 750;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.dark .booking-package-table-header {
+    background: #0f172a;
+    color: #94a3b8;
+}
+
+.booking-package-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 12px;
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    transition: all 0.2s ease;
+}
+
+.dark .booking-package-row {
+    border-color: #1e293b;
+    background: #1e293b/40;
+}
+
+.booking-package-row:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+.dark .booking-package-row:hover {
+    border-color: #334155;
+}
+
+.booking-package-table-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding: 4px 4px 0;
+}
+
+.booking-delete-row-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #fee2e2;
+    background: #fef2f2;
+    color: #ef4444;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.booking-delete-row-btn:hover:not(:disabled) {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
+}
+
+.booking-delete-row-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #cbd5e1;
+}
+
+.dark .booking-delete-row-btn {
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.dark .booking-delete-row-btn:disabled {
+    background: #0f172a;
+    border-color: #1e293b;
+    color: #475569;
+}
+
 
 
 

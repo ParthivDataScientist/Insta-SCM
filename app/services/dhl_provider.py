@@ -500,26 +500,7 @@ class DHLProvider:
                     if not p_history and not has_any_segmented_events:
                         p_history = history
                     
-                    # Determine piece-specific current status, date, location
                     if p_history and has_any_segmented_events:
-                        # Synchronize master's newer events into child history if parent has moved
-                        if history and history[0].get("date") and p_history[0].get("date"):
-                            try:
-                                m_date = datetime.fromisoformat(history[0]["date"].replace("Z", "+00:00"))
-                                p_date = datetime.fromisoformat(p_history[0]["date"].replace("Z", "+00:00"))
-                                if m_date > p_date:
-                                    newer_scans = []
-                                    for h_item in history:
-                                        if h_item.get("date"):
-                                            try:
-                                                h_date = datetime.fromisoformat(h_item["date"].replace("Z", "+00:00"))
-                                                if h_date > p_date:
-                                                    newer_scans.append(h_item)
-                                            except Exception:
-                                                pass
-                                    p_history = newer_scans + p_history
-                            except Exception:
-                                pass
                         p_desc = p_history[0]["description"]
                         p_bucket = p_history[0]["status"]
                         p_last_date = p_history[0]["date"]

@@ -136,12 +136,15 @@ def test_create_shipment_sends_empty_tags_for_wcf_methods(monkeypatch):
 
 
 def test_dhl_shipper_address_lines_are_limited(monkeypatch):
+    from app.services.shipment_service import DEFAULT_DHL_SHIPPER
     monkeypatch.setattr(
         "app.services.shipment_service.settings.DHL_SHIPPER_ADDRESS1",
         "1001, 10th Floor, Kohinoor Continental, J.B Nagar, Andheri-Kurla Road",
     )
     monkeypatch.setattr("app.services.shipment_service.settings.DHL_SHIPPER_ADDRESS2", "")
     monkeypatch.setattr("app.services.shipment_service.settings.DHL_SHIPPER_ADDRESS3", "")
+    monkeypatch.setitem(DEFAULT_DHL_SHIPPER, "address2", "")
+    monkeypatch.setitem(DEFAULT_DHL_SHIPPER, "address3", "")
 
     shipper = _dhl_shipper_defaults()
 

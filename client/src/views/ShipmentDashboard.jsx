@@ -178,7 +178,7 @@ export default function ShipmentDashboard() {
                 activeNav="dashboard"
                 header={header}
                 showGlobalDate={false}
-                mainClassName="premium-main--design"
+                mainClassName="premium-main--design premium-main--shipping"
                 pageClassName="design-dashboard-page"
                 sidebarOverlay
             >

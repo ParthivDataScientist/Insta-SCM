@@ -6,10 +6,10 @@ import { useTheme } from '../../contexts/ThemeContext';
 import GlobalDateRangePicker from '../GlobalDateRangePicker';
 
 const NAV_ITEMS = [
-    // { to: '/design', label: 'Design', icon: PenTool, key: 'design' },
-    // { to: '/projects', label: 'Projects', icon: Briefcase, key: 'projects' },
-    // { to: '/stages', label: 'Stages', icon: Layout, key: 'stages' },
-    // { to: '/project-officer', label: 'Project Officer', icon: RefreshCw, key: 'projectOfficer' },
+    { to: '/design', label: 'Design', icon: PenTool, key: 'design' },
+    { to: '/projects', label: 'Projects', icon: Briefcase, key: 'projects' },
+    { to: '/stages', label: 'Stages', icon: Layout, key: 'stages' },
+    { to: '/project-officer', label: 'Project Officer', icon: RefreshCw, key: 'projectOfficer' },
     { to: '/dashboard', label: 'Shipments', icon: Truck, key: 'dashboard' },
     { to: '/storage', label: 'Storage', icon: Archive, key: 'storage' },
 ];

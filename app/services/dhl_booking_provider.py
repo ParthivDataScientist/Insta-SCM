@@ -321,17 +321,30 @@ class DHLBookingProvider:
             ],
         )
 
-        amount = self._extract_number(amount_text)
+        shipping_charge = self._extract_number(amount_text)
         tax_amount = self._extract_number(tax_text)
+        amount = shipping_charge
         if amount is not None and tax_amount is not None and "totalamount" not in payload.lower():
             amount += tax_amount
         if amount is None:
             return {"error": "Unable to parse DHL rate amount"}
 
+        global_services = []
+        for node in root.iter():
+            if _local_name(node.tag).lower() == "globalservicename":
+                val = _text(node.text)
+                if val:
+                    global_services.append(val)
+        seen = set()
+        global_services = [x for x in global_services if not (x in seen or seen.add(x))]
+
         return {
             "price": amount,
             "currency": currency or self._default_quote_currency(),
             "delivery_time": delivery or None,
+            "shipping_charge": shipping_charge,
+            "tax_amount": tax_amount or 0.0,
+            "global_services": global_services,
         }
 
     def _parse_quote_text(self, payload: str) -> dict[str, Any]:
@@ -356,6 +369,9 @@ class DHLBookingProvider:
             "price": amount,
             "currency": currency_match.group(1) if currency_match else self._default_quote_currency(),
             "delivery_time": delivery_match.group(1) if delivery_match else None,
+            "shipping_charge": amount,
+            "tax_amount": 0.0,
+            "global_services": [],
         }
 
     def _parse_quote_xmlish_text(self, payload: str) -> dict[str, Any]:
@@ -380,17 +396,30 @@ class DHLBookingProvider:
             ["DeliveryDate", "DeliveryDateTime", "EstimatedDeliveryDate", "TransitDays", "DeliveryTime"],
         )
 
-        amount = self._extract_number(amount_text)
+        shipping_charge = self._extract_number(amount_text)
         tax_amount = self._extract_number(tax_text)
+        amount = shipping_charge
         if amount is None:
             return {"error": "Unable to parse DHL rate amount"}
         if tax_amount is not None and "totalamount" not in payload.lower():
             amount += tax_amount
 
+        global_services = re.findall(
+            r"<(?:[^:<>]+:)?GlobalServiceName(?:\s[^>]*)?>(.*?)</(?:[^:<>]+:)?GlobalServiceName>",
+            payload,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        global_services = [html.unescape(_text(val)) for val in global_services if _text(val)]
+        seen = set()
+        global_services = [x for x in global_services if not (x in seen or seen.add(x))]
+
         return {
             "price": amount,
             "currency": currency or self._default_quote_currency(),
             "delivery_time": delivery or None,
+            "shipping_charge": shipping_charge,
+            "tax_amount": tax_amount or 0.0,
+            "global_services": global_services,
         }
 
     def _find_xmlish_text(self, payload: str, names: list[str]) -> str:

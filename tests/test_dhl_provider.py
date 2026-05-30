@@ -272,3 +272,46 @@ def test_dhl_provider_to_status_bucket_text_fallback_delivered():
     assert provider._to_status_bucket("arrived at delivery facility") == "In Transit"
     assert provider._to_status_bucket("out for delivery") == "Out for Delivery"
     assert provider._to_status_bucket("attempted delivery") == "Exception"
+
+
+def test_dhl_provider_piece_events_isolated():
+    provider = DHLProvider()
+    payload = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        "<AWBInfo>"
+        "  <EstimatedDeliveryDate>2026-05-15T12:00:00</EstimatedDeliveryDate>"
+        "  <ShipmentEvent>"
+        "    <Date>2026-05-14</Date>"
+        "    <Time>12:00:00</Time>"
+        "    <EventCode>OK</EventCode>"
+        "    <Description>Shipment delivered</Description>"
+        "    <ServiceAreaDescription>IRVING, TX, US</ServiceAreaDescription>"
+        "  </ShipmentEvent>"
+        "  <PieceInfo>"
+        "    <PieceID>JD014600012565061255</PieceID>"
+        "    <PieceEvent>"
+        "      <Date>2026-05-13</Date>"
+        "      <Time>10:00:00</Time>"
+        "      <EventCode>PL</EventCode>"
+        "      <Description>Processed at facility</Description>"
+        "      <ServiceAreaDescription>MUMBAI, IN</ServiceAreaDescription>"
+        "    </PieceEvent>"
+        "  </PieceInfo>"
+        "</AWBInfo>"
+    )
+
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(payload)
+    result = provider._parse_awb_info_payload(root)
+
+    assert result is not None
+    assert result["status"] == "Delivered"
+    assert len(result["child_parcels"]) == 1
+    child = result["child_parcels"][0]
+
+    # Child should be Processed, raw status "Processed at facility", and have exactly 1 history event
+    assert child["status"] == "Processed"
+    assert child["raw_status"] == "Processed at facility"
+    assert len(child["history"]) == 1
+    assert child["history"][0]["description"] == "Processed at facility"
+

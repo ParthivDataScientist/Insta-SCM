@@ -757,6 +757,53 @@ async def import_excel(
     }
 
 
+def classify_country_by_ship_to_location(ship_to_location: Optional[str]) -> str:
+    if not ship_to_location:
+        return "India"
+    
+    loc = str(ship_to_location).strip().upper()
+    
+    # 1. USA Cities (Hardcoded)
+    usa_cities = ["DALLAS", "SAN DIAGO", "SAN DIEGO", "LAS VEGAS", "LOS ANGELES", "ORLENDO", "ORLANDO"]
+    if any(city in loc for city in usa_cities):
+        return "USA"
+        
+    # 2. Europe Entities (Hardcoded)
+    import re
+    eu_tokens = {"NL", "NL-GMBH", "GMBH", "GMBH-NL", "UK"}
+    tokens = set(re.split(r'[^A-Z0-9-]', loc))
+    if any(tok in tokens for tok in eu_tokens) or any(term in loc for term in ["GMBH", "NL-GMBH", "GMBH-NL"]):
+        return "Europe"
+        
+    # 3. India (Hardcoded)
+    if any(city in loc for city in ["MUMBAI", "BOMBAY", "INDIA"]):
+        return "India"
+        
+    # 4. Fallback to full USA/Europe keyword sets
+    us_keywords = [
+        'USA', 'UNITED STATES', ' U.S.', ' U.S.A.', 'US', 'NEW YORK', 
+        'CHICAGO', 'MIAMI', 'SAN FRANCISCO', 'WASHINGTON', 'BOSTON', 'ATLANTA', 
+        'HOUSTON', 'SEATTLE', 'DETROIT', 'OHIO', 'NEVADA', 'FLORIDA', 'CALIFORNIA', 
+        'TEXAS', 'NEW ALBANY', 'PORTLAND'
+    ]
+    if any(kw in loc for kw in us_keywords) or any(re.search(rf'\b{kw}\b', loc) for kw in ['US', 'USA']):
+        return "USA"
+        
+    eu_keywords = [
+        'GERMANY', 'DEUTSCHLAND', 'FRANCE', 'UNITED KINGDOM', 'GREAT BRITAIN', 'UK', 'U.K.',
+        'ITALY', 'ITALIA', 'SPAIN', 'ESPANA', 'NETHERLANDS', 'HOLLAND', 'BELGIUM', 'SWITZERLAND', 'AUSTRIA',
+        'DENMARK', 'SWEDEN', 'NORWAY', 'FINLAND', 'IRELAND', 'POLAND', 'PORTUGAL', 'GREECE', 'EUROPE', 'EU',
+        'DUSSELDORF', 'MUNICH', 'MUNCHEN', 'FRANKFURT', 'PARIS', 'LONDON', 'AMSTERDAM', 'BRUSSELS', 'MILAN', 
+        'MILANO', 'ROME', 'ROMA', 'BARCELONA', 'MADRID', 'GENEVA', 'ZURICH', 'VIENNA', 'COPENHAGEN', 
+        'STOCKHOLM', 'OSLO', 'HELSINKI', 'DUBLIN', 'WARSAW', 'LISBON', 'ATHENS', 'BIRMINGHAM', 'MANCHESTER',
+        'NL', 'DE', 'FR', 'IT', 'ES', 'BE', 'CH', 'AT', 'DK', 'SE', 'NO', 'FI', 'IE', 'PL', 'PT', 'GR'
+    ]
+    if any(kw in loc for kw in eu_keywords) or any(re.search(rf'\b{kw}\b', loc) for kw in ['UK', 'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'DK', 'SE', 'NO', 'FI', 'IE', 'PL', 'PT', 'GR', 'EU']):
+        return "Europe"
+        
+    return "India"
+
+
 async def _process_webhook_payload(payload: WebhookPayload, db: Session):
     # Phase 1: Collect metadata and run concurrent network lookups without DB session
     tasks = []
@@ -777,6 +824,8 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
             continue
 
         carrier_name = detect_carrier(tracking_number)
+        resolved_country = classify_country_by_ship_to_location(row.ship_to_location)
+
         row_info = {
             "tracking_number": tracking_number,
             "carrier_name": carrier_name,
@@ -794,7 +843,7 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
             "remarks": row.remarks,
             "master_to_use": master_to_use,
             "is_master": is_master,
-            "country": row.country,
+            "country": resolved_country,
         }
         row_metadata.append(row_info)
 
@@ -1046,7 +1095,7 @@ def export_shipments(
             'USA', 'UNITED STATES', ' U.S.', ' U.S.A.', ', US', ',US', 'NEW YORK', 'LAS VEGAS', 
             'CHICAGO', 'ORLANDO', 'MIAMI', 'LOS ANGELES', 'SAN FRANCISCO', 'WASHINGTON', 'BOSTON',
             'ATLANTA', 'DALLAS', 'HOUSTON', 'SEATTLE', 'DETROIT', 'OHIO', 'NEVADA', 'FLORIDA', 'CALIFORNIA',
-            'TEXAS', 'NEW ALBANY', 'PORTLAND'
+            'TEXAS', 'NEW ALBANY', 'PORTLAND', 'SAN DIAGO', 'SAN DIEGO', 'ORLENDO'
         ]
         
         fields = (dest, city, recipient, origin, exhibition)
@@ -1083,7 +1132,8 @@ def export_shipments(
             'DUSSELDORF', 'MUNICH', 'MUNCHEN', 'FRANKFURT', 'PARIS', 'LONDON', 'AMSTERDAM', 'BRUSSELS', 'MILAN', 
             'MILANO', 'ROME', 'ROMA', 'BARCELONA', 'MADRID', 'GENEVA', 'ZURICH', 'VIENNA', 'COPENHAGEN', 
             'STOCKHOLM', 'OSLO', 'HELSINKI', 'DUBLIN', 'WARSAW', 'LISBON', 'ATHENS', 'BIRMINGHAM', 'MANCHESTER',
-            ' NL', ' DE', ' FR', ' IT', ' ES', ' BE', ' CH', ' AT', ' DK', ' SE', ' NO', ' FI', ' IE', ' PL', ' PT', ' GR'
+            ' NL', ' DE', ' FR', ' IT', ' ES', ' BE', ' CH', ' AT', ' DK', ' SE', ' NO', ' FI', ' IE', ' PL', ' PT', ' GR',
+            'NL-GMBH', 'GMBH', 'GMBH-NL'
         ]
         
         fields = (dest, city, recipient, origin, exhibition)
@@ -1091,7 +1141,7 @@ def export_shipments(
 
         import re
         matches_eu_regex = any(
-            re.search(r'\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU)\b', field) for field in (dest, city, exhibition, origin)
+            re.search(r'\b(UK|GB|DE|FR|IT|ES|NL|BE|CH|AT|DK|SE|NO|FI|IE|PL|PT|GR|EU|NL-GMBH|GMBH|GMBH-NL)\b', field) for field in (dest, city, exhibition, origin)
         )
         return bool((matches_eu_kw or matches_eu_regex) and not is_usa_shipment(item))
 
@@ -1592,7 +1642,7 @@ def patch_shipment_cell(
             parsed_destination = None
             
             import re
-            parts = re.split(r'\s*(?:->|→|to)\s*', route_val, flags=re.IGNORECASE)
+            parts = re.split(r'\s*(?:->|→|\bto\b)\s*', route_val, flags=re.IGNORECASE)
             
             if parts and len(parts) >= 2:
                 # Remove leading 'From ' if present
