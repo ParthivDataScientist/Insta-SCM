@@ -102,19 +102,19 @@ def _ensure_project_schema_compatibility() -> list[str]:
         }
 
     user_columns = {}
-    if "user" in inspector.get_table_names():
+    if "users" in inspector.get_table_names():
         user_columns = {
             column["name"]
-            for column in inspector.get_columns("user")
+            for column in inspector.get_columns("users")
         }
     
     user_ddl = {
-        "mfa_secret": 'ALTER TABLE "user" ADD COLUMN mfa_secret VARCHAR',
-        "mfa_enabled": 'ALTER TABLE "user" ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE',
-        "failed_login_attempts": 'ALTER TABLE "user" ADD COLUMN failed_login_attempts INTEGER DEFAULT 0',
-        "locked_until": 'ALTER TABLE "user" ADD COLUMN locked_until TIMESTAMP',
-        "reset_token": 'ALTER TABLE "user" ADD COLUMN reset_token VARCHAR',
-        "reset_token_expires": 'ALTER TABLE "user" ADD COLUMN reset_token_expires TIMESTAMP',
+        "mfa_secret": 'ALTER TABLE "users" ADD COLUMN mfa_secret VARCHAR',
+        "mfa_enabled": 'ALTER TABLE "users" ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE',
+        "failed_login_attempts": 'ALTER TABLE "users" ADD COLUMN failed_login_attempts INTEGER DEFAULT 0',
+        "locked_until": 'ALTER TABLE "users" ADD COLUMN locked_until TIMESTAMP',
+        "reset_token": 'ALTER TABLE "users" ADD COLUMN reset_token VARCHAR',
+        "reset_token_expires": 'ALTER TABLE "users" ADD COLUMN reset_token_expires TIMESTAMP',
     }
 
     with engine.begin() as connection:
@@ -167,7 +167,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
         for col_name, ddl in user_ddl.items():
             if col_name not in user_columns:
                 connection.execute(text(ddl))
-                applied_changes.append(f"user.{col_name}")
+                applied_changes.append(f"users.{col_name}")
 
     return applied_changes
 
