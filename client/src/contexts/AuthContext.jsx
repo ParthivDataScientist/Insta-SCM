@@ -11,22 +11,20 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Verify session on mount (Bypassed for now)
+    // Verify session on mount
     const verifySession = useCallback(async () => {
         setLoading(true);
         try {
-            // Bypass Authentication for now - Grant free access
-            // const userData = await authService.getCurrentUser();
-            const userData = {
-                id: 1,
-                email: "admin@insta-scm.com",
-                role: "ADMIN",
-                full_name: "Admin User",
-                is_active: true
-            };
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                setUser(null);
+                return;
+            }
+            const userData = await authService.getCurrentUser();
             setUser(userData);
         } catch (err) {
             setUser(null);
+            localStorage.removeItem('access_token');
         } finally {
             setLoading(false);
         }

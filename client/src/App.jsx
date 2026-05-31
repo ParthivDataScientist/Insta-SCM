@@ -49,7 +49,7 @@ export default function App() {
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/forgot-password" element={<ForgotPassword />} />
                                 <Route path="/reset-password" element={<ResetPassword />} />
-                                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                                <Route path="/" element={<Navigate to="/login" replace />} />
                                 <Route path="/design" element={<ProtectedRoute><DesignDashboard /></ProtectedRoute>} />
                                 <Route path="/storage" element={<ProtectedRoute><StoragePremium /></ProtectedRoute>} />
                                 <Route path="/projects" element={<ProtectedRoute><ProjectsDashboardPremium /></ProtectedRoute>} />
@@ -59,7 +59,7 @@ export default function App() {
                                 <Route path="/timeline" element={<Navigate to="/project-officer" replace />} />
                                 <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
                                 <Route path="/shipments/new" element={<ProtectedRoute><ShipmentBookingPage /></ProtectedRoute>} />
-                                <Route path="/*" element={<Navigate to="/dashboard" replace />} />
+                                <Route path="/*" element={<Navigate to="/login" replace />} />
                             </Routes>
                         </GlobalDateRangeProvider>
                     </BrowserRouter>

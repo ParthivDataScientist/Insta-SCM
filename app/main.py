@@ -54,6 +54,8 @@ async def lifespan(app: FastAPI):
             
             _backfill_project_canonical_fields()
             
+        _ensure_default_admin()
+            
         logger.info(
             "application_startup_complete",
             extra={"event": "application_startup_complete"},
@@ -202,6 +204,31 @@ def _backfill_project_canonical_fields() -> None:
 
         if changed:
             session.commit()
+
+
+def _ensure_default_admin() -> None:
+    """Create default admin user if not present."""
+    from app.core.auth import get_password_hash
+    from sqlmodel import Session, select
+    from app.models.user import User
+    try:
+        with Session(engine) as session:
+            admin = session.exec(select(User).where(User.email == "admin@example.com")).first()
+            if not admin:
+                admin = User(
+                    full_name="Admin",
+                    email="admin@example.com",
+                    hashed_password=get_password_hash("admin123"),
+                    role="ADMIN",
+                    is_active=True
+                )
+                session.add(admin)
+                session.commit()
+                logger.info("default_admin_created", extra={"event": "default_admin_created"})
+            else:
+                logger.info("default_admin_already_exists", extra={"event": "default_admin_already_exists"})
+    except Exception as e:
+        logger.error("ensure_default_admin_failed", extra={"event": "ensure_default_admin_failed", "error": str(e)}, exc_info=True)
 
 
 app = FastAPI(
