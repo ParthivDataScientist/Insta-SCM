@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useShipments } from '../hooks/useShipments';
@@ -62,18 +62,6 @@ export default function ShipmentDashboardPremium() {
 
         return { total, transit, delivered, exceptions };
     }, [activeSheetTab, shipments]);
-
-    const refreshTrackingRef = useRef(refreshTracking);
-    useEffect(() => {
-        refreshTrackingRef.current = refreshTracking;
-    }, [refreshTracking]);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            refreshTrackingRef.current();
-        }, 2000);
-        return () => clearTimeout(timer);
-    }, []);
 
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [displayedShipmentIds, setDisplayedShipmentIds] = useState([]);

@@ -687,24 +687,24 @@ const ShipmentTableSkeleton = () => (
     <>
         {Array.from({ length: 7 }).map((_, rowIndex) => (
             <tr className="design-table__row shipping-row shipment-skeleton-row" key={`shipment-skeleton-${rowIndex}`}>
-                <td className="design-table__td shipping-col-check"><span className="shipment-skeleton-box shipment-skeleton-check" /></td>
-                <td className="design-table__td shipping-col-id">
+                <td className="design-table__td shipping-col-check px-2 py-2 sm:px-4 sm:py-3"><span className="shipment-skeleton-box shipment-skeleton-check" /></td>
+                <td className="design-table__td shipping-col-id px-2 py-2 sm:px-4 sm:py-3">
                     <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
                     <div className="shipment-skeleton-line shipment-skeleton-line--small" />
                 </td>
-                <td className="design-table__td shipping-col-status"><div className="shipment-skeleton-pill" /></td>
-                <td className="design-table__td shipping-col-current">
+                <td className="design-table__td shipping-col-status px-2 py-2 sm:px-4 sm:py-3"><div className="shipment-skeleton-pill" /></td>
+                <td className="design-table__td shipping-col-current px-2 py-2 sm:px-4 sm:py-3">
                     <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
                     <div className="shipment-skeleton-line shipment-skeleton-line--medium" />
                 </td>
-                <td className="design-table__td shipping-col-eta"><div className="shipment-skeleton-line shipment-skeleton-line--medium" /></td>
-                <td className="design-table__td shipping-col-show-date"><div className="shipment-skeleton-line shipment-skeleton-line--medium" /></td>
-                <td className="design-table__td shipping-col-carrier"><div className="shipment-skeleton-line shipment-skeleton-line--small" /></td>
-                <td className="design-table__td shipping-col-route">
+                <td className="design-table__td shipping-col-eta px-2 py-2 sm:px-4 sm:py-3"><div className="shipment-skeleton-line shipment-skeleton-line--medium" /></td>
+                <td className="design-table__td shipping-col-show-date px-2 py-2 sm:px-4 sm:py-3"><div className="shipment-skeleton-line shipment-skeleton-line--medium" /></td>
+                <td className="design-table__td shipping-col-carrier px-2 py-2 sm:px-4 sm:py-3"><div className="shipment-skeleton-line shipment-skeleton-line--small" /></td>
+                <td className="design-table__td shipping-col-route px-2 py-2 sm:px-4 sm:py-3">
                     <div className="shipment-skeleton-line shipment-skeleton-line--medium" />
                     <div className="shipment-skeleton-line shipment-skeleton-line--small" />
                 </td>
-                <td className="design-table__td shipping-col-actions"><div className="shipment-skeleton-actions" /></td>
+                <td className="design-table__td shipping-col-actions px-2 py-2 sm:px-4 sm:py-3"><div className="shipment-skeleton-actions" /></td>
             </tr>
         ))}
     </>
@@ -1053,13 +1053,15 @@ const ShipmentTable = ({
                                     <div className="shipment-skeleton-line shipment-skeleton-line--medium" />
                                     <div className="shipment-skeleton-line shipment-skeleton-line--wide" />
                                 </article>
-                            )) : sortedGroups.map(({ master, childRows, masterKey }) => (
-                                <article
-                                    key={`mobile-${masterKey}`}
-                                    className={`shipment-mobile-card ${isUpcomingBookingDate(master.booking_date) ? 'shipment-mobile-card--upcoming' : ''}`}
-                                    onClick={() => handleViewMaster(master)}
-                                >
-                                    <div className="shipment-mobile-card__top">
+                            )) : sortedGroups.map(({ master, childRows, masterKey }) => {
+                                const isMasterActive = selectedShipment?.id === master.id && selectedShipment?.is_master !== false;
+                                return (
+                                    <article
+                                        key={`mobile-${masterKey}`}
+                                        className={`shipment-mobile-card ${isUpcomingBookingDate(master.booking_date) ? 'shipment-mobile-card--upcoming' : ''} ${isMasterActive ? 'active-card bg-blue-50 border-2 border-blue-500' : ''}`}
+                                        onClick={() => handleViewMaster(master)}
+                                    >
+                                        <div className="shipment-mobile-card__top">
                                         <div className="shipment-mobile-card__title-wrap">
                                             <h3 className="shipment-mobile-card__client">
                                                 {master.recipient || master.project_client_name || 'Unknown Client'}
@@ -1113,11 +1115,12 @@ const ShipmentTable = ({
                                         ) : null}
                                     </div>
                                 </article>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 
-                    <div className="shipment-table-desktop">
+                    <div className="shipment-table-desktop overflow-x-auto">
                         <table className="design-table shipping-table">
                     <colgroup>
                         <col className="shipping-col-check" />
@@ -1132,7 +1135,7 @@ const ShipmentTable = ({
                     </colgroup>
                     <thead className="design-table__thead">
                         <tr>
-                            <th className="design-table__th design-table__th--left shipping-col-check">
+                            <th className="design-table__th design-table__th--left shipping-col-check px-2 py-2 sm:px-4 sm:py-3">
                                 <button 
                                     type="button" 
                                     className={`custom-checkbox ${isAllSelected ? 'checked' : ''} ${isIndeterminate ? 'indeterminate' : ''}`} 
@@ -1146,61 +1149,37 @@ const ShipmentTable = ({
                                 </button>
                             </th>
 
-                            <FilterPopover title="Master Tracking ID" className="shipping-col-id" isActive={Boolean(idSearch)} onClear={() => setIdSearch('')}>
-                                <div className="fp-search">
-                                    <Search size={14} className="fps-icon" />
-                                    <input
-                                        placeholder="Search tracking, items, recipient..."
-                                        value={idSearch}
-                                        onChange={(event) => setIdSearch(event.target.value)}
-                                    />
-                                </div>
-                            </FilterPopover>
+                            <th className="design-table__th design-table__th--left shipping-col-id px-2 py-2 sm:px-4 sm:py-3">
+                                Tracking ID
+                            </th>
 
-                            <FilterPopover title="Status" className="shipping-col-status" isActive={statusFilter.length > 0} onClear={() => setStatusFilter([])}>
-                                <div className="fp-check-list">
-                                    {allStatuses.length === 0 ? <div className="fp-empty">No data</div> : allStatuses.map((status) => (
-                                        <label key={status} className="fp-check-item">
-                                            <span className={`custom-checkbox ${statusFilter.includes(status) ? 'checked' : ''}`}>
-                                                {statusFilter.includes(status) ? <Check size={10} /> : null}
-                                            </span>
-                                            <input
-                                                type="checkbox"
-                                                className="fp-check-input"
-                                                checked={statusFilter.includes(status)}
-                                                onChange={() => toggleArrayItem(statusFilter, setStatusFilter, status)}
-                                            />
-                                            <span className="fp-label">{status}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </FilterPopover>
+                            <th className="design-table__th design-table__th--left shipping-col-status px-2 py-2 sm:px-4 sm:py-3">
+                                Status
+                            </th>
 
-                            <SortHeader title="Latest Event" className="shipping-col-current" sortKey="current" sortConfig={sortConfig} onSort={handleSort} />
-                            <SortHeader title="Date" className="shipping-col-eta" sortKey="eta" sortConfig={sortConfig} onSort={handleSort} />
-                            <SortHeader title="Show Date" className="shipping-col-show-date" sortKey="showDate" sortConfig={sortConfig} onSort={handleSort} />
+                            <th className="design-table__th design-table__th--left shipping-col-current px-2 py-2 sm:px-4 sm:py-3">
+                                Latest Event
+                            </th>
 
-                            <FilterPopover title="Carrier" className="shipping-col-carrier" isActive={carrierFilter.length > 0} onClear={() => setCarrierFilter([])}>
-                                <div className="fp-check-list">
-                                    {allCarriers.length === 0 ? <div className="fp-empty">No data</div> : allCarriers.map((carrier) => (
-                                        <label key={carrier} className="fp-check-item">
-                                            <span className={`custom-checkbox ${carrierFilter.includes(carrier) ? 'checked' : ''}`}>
-                                                {carrierFilter.includes(carrier) ? <Check size={10} /> : null}
-                                            </span>
-                                            <input
-                                                type="checkbox"
-                                                className="fp-check-input"
-                                                checked={carrierFilter.includes(carrier)}
-                                                onChange={() => toggleArrayItem(carrierFilter, setCarrierFilter, carrier)}
-                                            />
-                                            <span className="fp-label">{carrier}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </FilterPopover>
+                            <th className="design-table__th design-table__th--left shipping-col-eta px-2 py-2 sm:px-4 sm:py-3">
+                                Date
+                            </th>
 
-                            <SortHeader title="Route" className="shipping-col-route" sortKey="route" sortConfig={sortConfig} onSort={handleSort} />
-                            <th className="design-table__th design-table__th--left shipping-col-actions">Actions</th>
+                            <th className="design-table__th design-table__th--left shipping-col-show-date px-2 py-2 sm:px-4 sm:py-3">
+                                Show Date
+                            </th>
+
+                            <th className="design-table__th design-table__th--left shipping-col-carrier px-2 py-2 sm:px-4 sm:py-3">
+                                Carrier
+                            </th>
+
+                            <th className="design-table__th design-table__th--left shipping-col-route px-2 py-2 sm:px-4 sm:py-3">
+                                Route
+                            </th>
+
+                            <th className="design-table__th design-table__th--left shipping-col-actions px-2 py-2 sm:px-4 sm:py-3">
+                                Actions
+                            </th>
                         </tr>
                     </thead>
 
@@ -1221,13 +1200,13 @@ const ShipmentTable = ({
 
                             return (
                                 <Fragment key={masterKey}>
-                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${masterHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''} ${isMasterActive ? 'active-row' : ''}`} onClick={() => handleViewMaster(master)}>
-                                        <td className="design-table__td shipping-col-check" onClick={(event) => handleSelectMaster(event, master.id)}>
+                                    <tr className={`design-table__row shipping-row ${isSelected ? 'shipping-row--selected bg-blue-50/70' : ''} ${masterHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${masterHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''} ${isMasterActive ? 'active-row bg-blue-50 border-l-4 border-blue-600' : ''}`} onClick={() => handleViewMaster(master)}>
+                                        <td className="design-table__td shipping-col-check px-2 py-2 sm:px-4 sm:py-3" onClick={(event) => handleSelectMaster(event, master.id)}>
                                             <span className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
                                                 {isSelected ? <Check size={10} /> : null}
                                             </span>
                                         </td>
-                                        <td className="design-table__td shipping-col-id">
+                                        <td className="design-table__td shipping-col-id px-2 py-2 sm:px-4 sm:py-3">
                                             <div className="shipment-main-cell">
                                                 {hasChildren ? (
                                                     <button
@@ -1295,7 +1274,7 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-status">
+                                        <td className="design-table__td shipping-col-status px-2 py-2 sm:px-4 sm:py-3">
                                             <div className="shipment-status-cell">
                                                 <StatusBadge status={master.status} />
                                                 {master.status !== 'Delivered' && master.progress != null ? (
@@ -1304,7 +1283,7 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-current">
+                                        <td className="design-table__td shipping-col-current px-2 py-2 sm:px-4 sm:py-3">
                                             <div className="shipment-current-status" title={masterStatusTitle}>
                                                 <div className="shipment-current-status__top">
                                                     <span className="shipment-current-status__badge">{displayValue(masterEventHeadline.status)}</span>
@@ -1316,7 +1295,7 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-eta" onDoubleClick={(event) => startEditing(event, master, 'estimated_delivery')}>
+                                        <td className="design-table__td shipping-col-eta px-2 py-2 sm:px-4 sm:py-3" onDoubleClick={(event) => startEditing(event, master, 'estimated_delivery')}>
                                             <div className="shipment-date-cell">
                                                 {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'estimated_delivery' ? (
                                                     <input
@@ -1349,7 +1328,7 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-show-date" onDoubleClick={(event) => startEditing(event, master, 'show_date')}>
+                                        <td className="design-table__td shipping-col-show-date px-2 py-2 sm:px-4 sm:py-3" onDoubleClick={(event) => startEditing(event, master, 'show_date')}>
                                             <div className="shipment-date-cell">
                                                 {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'show_date' ? (
                                                     <input
@@ -1381,11 +1360,11 @@ const ShipmentTable = ({
                                             </div>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-carrier">
+                                        <td className="design-table__td shipping-col-carrier px-2 py-2 sm:px-4 sm:py-3">
                                             <span className="carrier-cell">{displayValue(master.carrier)}</span>
                                         </td>
 
-                                        <td className="design-table__td shipping-col-route" onDoubleClick={(event) => startEditing(event, master, 'route_str')}>
+                                        <td className="design-table__td shipping-col-route px-2 py-2 sm:px-4 sm:py-3" onDoubleClick={(event) => startEditing(event, master, 'route_str')}>
                                             {activeEditCell?.rowId === master.id && activeEditCell?.fieldName === 'route_str' ? (
                                                 <input
                                                     type="text"
@@ -1424,7 +1403,7 @@ const ShipmentTable = ({
                                             )}
                                         </td>
 
-                                        <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
+                                        <td className="design-table__td action-cell shipping-col-actions px-2 py-2 sm:px-4 sm:py-3" onClick={(event) => event.stopPropagation()}>
                                             <div className="action-cell__inner">
                                                 <button type="button" className="track-btn" onClick={() => handleViewMaster(master)}>Track</button>
                                                 <RowActionMenu
@@ -1453,12 +1432,12 @@ const ShipmentTable = ({
                                         return (
                                         <tr
                                             key={child.__rowKey}
-                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${childHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''} ${isChildActive ? 'active-row' : ''}`}
+                                            className={`design-table__row shipping-row shipping-row--child ${childHasUpcomingShow ? 'shipping-row--upcoming-show' : ''} ${childHasUpcomingBooking ? 'shipping-row--upcoming-booking' : ''} ${isChildActive ? 'active-row bg-blue-50 border-l-4 border-blue-600' : ''}`}
                                             onClick={() => onSelectShipment(toChildSelectionPayload(child, master))}
                                         >
-                                            <td className="design-table__td shipping-col-check" />
+                                            <td className="design-table__td shipping-col-check px-2 py-2 sm:px-4 sm:py-3" />
 
-                                            <td className="design-table__td shipping-col-id">
+                                            <td className="design-table__td shipping-col-id px-2 py-2 sm:px-4 sm:py-3">
                                                 <div className="shipment-main-cell nested-cell">
                                                     <span className="hierarchy-connector" />
                                                     <span className="tid-icon child-icon">
@@ -1506,11 +1485,11 @@ const ShipmentTable = ({
                                                 </div>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-status">
+                                            <td className="design-table__td shipping-col-status px-2 py-2 sm:px-4 sm:py-3">
                                                 <StatusBadge status={child.status || master.status} />
                                             </td>
 
-                                            <td className="design-table__td shipping-col-current">
+                                            <td className="design-table__td shipping-col-current px-2 py-2 sm:px-4 sm:py-3">
                                                 <div className="shipment-current-status shipment-current-status--child" title={childStatusTitle}>
                                                     <div className="shipment-current-status__top">
                                                         <span className="shipment-current-status__badge">{displayValue(childEventHeadline.status)}</span>
@@ -1522,7 +1501,7 @@ const ShipmentTable = ({
                                                 </div>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-eta" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'estimated_delivery')}>
+                                            <td className="design-table__td shipping-col-eta px-2 py-2 sm:px-4 sm:py-3" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'estimated_delivery')}>
                                                 <div className="shipment-date-cell shipment-date-cell--child">
                                                     {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'estimated_delivery' && child.id != null ? (
                                                         <input
@@ -1553,7 +1532,7 @@ const ShipmentTable = ({
                                                 </div>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-show-date" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'show_date')}>
+                                            <td className="design-table__td shipping-col-show-date px-2 py-2 sm:px-4 sm:py-3" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'show_date')}>
                                                 <div className="shipment-date-cell shipment-date-cell--child">
                                                     {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'show_date' && child.id != null ? (
                                                         <input
@@ -1585,11 +1564,11 @@ const ShipmentTable = ({
                                                 </div>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-carrier">
+                                            <td className="design-table__td shipping-col-carrier px-2 py-2 sm:px-4 sm:py-3">
                                                 <span className="carrier-cell carrier-cell--child">{displayValue(child.carrier || master.carrier)}</span>
                                             </td>
 
-                                            <td className="design-table__td shipping-col-route" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'route_str')}>
+                                            <td className="design-table__td shipping-col-route px-2 py-2 sm:px-4 sm:py-3" onDoubleClick={(event) => child.id != null && startEditing(event, child, 'route_str')}>
                                                 {activeEditCell?.rowId === child.id && activeEditCell?.fieldName === 'route_str' && child.id != null ? (
                                                     <input
                                                         type="text"
@@ -1622,7 +1601,7 @@ const ShipmentTable = ({
                                                 )}
                                             </td>
 
-                                            <td className="design-table__td action-cell shipping-col-actions" onClick={(event) => event.stopPropagation()}>
+                                            <td className="design-table__td action-cell shipping-col-actions px-2 py-2 sm:px-4 sm:py-3" onClick={(event) => event.stopPropagation()}>
                                                 <div className="action-cell__inner">
                                                     <button
                                                         type="button"
