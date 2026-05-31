@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal } from 'lucide-react';
+import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw, Bell, MoreHorizontal, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useShipments } from '../hooks/useShipments';
+import { useAuth } from '../contexts/AuthContext';
 import ShipmentTable from '../components/ShipmentTable';
 import TrackModal from '../components/TrackModal';
 import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
@@ -16,6 +17,7 @@ import { isUsaShipment, isEuropeShipment, isIndiaShipment } from '../utils/regio
 
 export default function ShipmentDashboardPremium() {
     const navigate = useNavigate();
+    const { logout } = useAuth();
     const {
         shipments, stats, loading, refreshing, error, loadData, filteredShipments,
         filter, setFilter, setSearchQuery, searchQuery, setCarrierFilter, setDateFilter,
@@ -125,7 +127,7 @@ export default function ShipmentDashboardPremium() {
         await exportExcel(idsToExport);
     };
 
-    const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen }) => (
+    const header = ({ toggleSidebar, sidebarOverlay, sidebarOpen, logout }) => (
         <>
             {sidebarOverlay ? (
                 <button
@@ -249,6 +251,16 @@ export default function ShipmentDashboardPremium() {
                                 <Bell size={18} />
                                 <span className="design-premium-icon-btn__badge"></span>
                             </button>
+
+                            <button
+                                type="button"
+                                className="design-premium-icon-btn design-premium-icon-btn--danger"
+                                onClick={logout}
+                                title="Logout"
+                                style={{ color: '#ef4444' }}
+                            >
+                                <LogOut size={18} />
+                            </button>
                         </div>
                     </div>
                 </header>
@@ -335,6 +347,17 @@ export default function ShipmentDashboardPremium() {
                             <X size={16} /> Clear Filters
                         </button>
                     ) : null}
+                    <button
+                        type="button"
+                        className="shipping-mobile-action shipping-mobile-action--danger"
+                        style={{ color: '#ef4444' }}
+                        onClick={() => {
+                            if (logout) logout();
+                            setShowMobileHeaderActions(false);
+                        }}
+                    >
+                        <LogOut size={16} /> Logout
+                    </button>
                 </div>
             </section>
         </>

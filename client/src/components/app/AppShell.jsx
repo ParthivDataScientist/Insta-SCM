@@ -86,13 +86,35 @@ export default function AppShell({
                         </div>
                     </div>
 
-                    <nav className="premium-sidebar__nav">
+                    <nav className="premium-sidebar__nav" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {nav.map(({ to, label, icon: Icon, key }) => (
                             <Link key={key} to={to} className={`premium-nav-link${activeNav === key ? ' is-active' : ''}`}>
                                 <Icon size={16} />
                                 <span>{label}</span>
                             </Link>
                         ))}
+                        <button
+                            type="button"
+                            className="premium-nav-link premium-nav-link--logout"
+                            onClick={logout}
+                            style={{ 
+                                marginTop: 'auto', 
+                                border: 'none', 
+                                background: 'none', 
+                                width: '100%', 
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '12px 14px',
+                                borderRadius: '16px',
+                                color: '#f87171'
+                            }}
+                        >
+                            <LogOut size={16} />
+                            <span>Logout</span>
+                        </button>
                     </nav>
                 </aside>
 
@@ -126,9 +148,9 @@ export default function AppShell({
                                 <button type="button" className="premium-icon-button" onClick={toggleTheme} title="Toggle theme">
                                     {isDark ? <Sun size={16} /> : <Moon size={16} />}
                                 </button>
-                                {/* <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
+                                <button type="button" className="premium-icon-button premium-icon-button--danger" onClick={logout} title="Logout">
                                     <LogOut size={16} />
-                                </button> */}
+                                </button>
                             </div>
                         </header>
                     )}

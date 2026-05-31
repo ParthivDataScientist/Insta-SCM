@@ -687,15 +687,41 @@
     transform: none !important; /* Force reset of any dashboard-wide scaling */
 }
 
-/* Remove scaling on active state as it makes the active card look bigger/different */
+/* Tactile Active state styles for KPI cards */
 .shipping-dashboard-page .design-dashboard__kpi.is-active {
-    transform: none !important; 
-    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
-    border-color: rgba(37, 99, 235, 0.2) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
 }
 
-.shipping-dashboard-page .design-dashboard__kpi.is-active::before {
-    height: 6px !important; /* Maintain the same height bar */
+/* Individual KPI active state border and background glow colors */
+.shipping-dashboard-page .design-dashboard__kpi--all.is-active {
+    border: 2px solid #475569 !important;
+    background: rgba(71, 85, 105, 0.03) !important;
+    box-shadow: 0 10px 25px -5px rgba(71, 85, 105, 0.15) !important;
+}
+
+.shipping-dashboard-page .design-dashboard__kpi--pending.is-active {
+    border: 2px solid #2563eb !important;
+    background: rgba(37, 99, 235, 0.03) !important;
+    box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.15) !important;
+}
+
+.shipping-dashboard-page .design-dashboard__kpi--won.is-active {
+    border: 2px solid #10b981 !important;
+    background: rgba(16, 185, 129, 0.03) !important;
+    box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.15) !important;
+}
+
+.shipping-dashboard-page .design-dashboard__kpi--lost.is-active {
+    border: 2px solid #ef4444 !important;
+    background: rgba(239, 68, 68, 0.03) !important;
+    box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Haptic scale-down on active click press */
+.shipping-dashboard-page .design-dashboard__kpi:active {
+    transform: scale(0.97) !important;
+    transition: transform 0.08s ease !important;
 }
 
 /* Rounded top accent bar matching reference image profile */

@@ -82,7 +82,20 @@ export const AuthProvider = ({ children }) => {
         try {
             return await authService.register(userData);
         } catch (err) {
-            const message = err.response?.data?.detail || "Registration failed.";
+            let message = "Registration failed.";
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                if (Array.isArray(detail)) {
+                    message = detail.map(d => d.msg || d.message).join(", ");
+                    message = message.replace(/Value error,\s*/g, '');
+                } else if (typeof detail === 'string') {
+                    message = detail;
+                } else if (typeof detail === 'object') {
+                    message = detail.message || JSON.stringify(detail);
+                }
+            } else if (err.message) {
+                message = err.message;
+            }
             throw new Error(message);
         }
     };

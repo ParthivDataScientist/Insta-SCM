@@ -145,6 +145,9 @@ const Register = () => {
                                     <span style={{ color: strengthColor }}>{strengthLabel}</span>
                                 </div>
                             )}
+                            <small className="password-hint" style={{ display: 'block', marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+                                Must be at least 8 characters, with 1 uppercase, 1 lowercase, 1 number, and 1 special character (@$!%*?&_).
+                            </small>
                         </div>
 
                         <div className="input-group">
