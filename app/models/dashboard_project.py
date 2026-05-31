@@ -24,7 +24,7 @@ class ProjectAuditLog(SQLModel, table=True):
     change_type: str = Field(default="UPDATE") # e.g., STAGE_CHANGE, DATE_CHANGE
     prev_state: dict[str, Any] = Field(default={}, sa_column=Column(JSON))
     new_state: dict[str, Any] = Field(default={}, sa_column=Column(JSON))
-    changed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    changed_by_id: Optional[int] = Field(default=None, foreign_key="users.id")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_type=DateTime(timezone=True),
@@ -73,7 +73,7 @@ class DashboardProject(AuditMixin, table=True):
     # Manager Assignment
     manager_id: Optional[int] = Field(
         default=None, 
-        foreign_key="user.id",
+        foreign_key="users.id",
         description="Reference to the managing User."
     )
     
@@ -108,7 +108,7 @@ class ProjectLink(AuditMixin, table=True):
     link_type: str = Field(default="other", index=True, description="drive, autocad, render, or other")
     label: str = Field(description="Human-readable link label.")
     url: str = Field(description="Validated external URL.")
-    created_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    created_by: Optional[int] = Field(default=None, foreign_key="users.id")
 
     project: Optional[DashboardProject] = Relationship(back_populates="project_links")
 
@@ -141,6 +141,6 @@ class ProjectResource(AuditMixin, table=True):
         description="Serialized file payload (data URL) for lightweight file storage.",
     )
     mime_type: Optional[str] = Field(default=None, description="Uploaded file MIME type.")
-    created_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    created_by: Optional[int] = Field(default=None, foreign_key="users.id")
 
     project: Optional[DashboardProject] = Relationship(back_populates="project_resources")
