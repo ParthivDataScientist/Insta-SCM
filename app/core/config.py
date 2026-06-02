@@ -161,6 +161,13 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT == "development":
             origins.extend(["http://127.0.0.1:5173", "http://localhost:5173"])
         
+        # Universal multi-tenant SaaS deployment origins
+        origins.extend([
+            "https://gord1an.vercel.app",
+            "https://insta-exhibition-scm.vercel.app",
+            "https://insta-exhibition-scm-git-main-parthivdatascientists-projects.vercel.app"
+        ])
+        
         # Add frontend base URL if it's different
         if self.FRONTEND_BASE_URL not in origins:
             origins.append(self.FRONTEND_BASE_URL)
