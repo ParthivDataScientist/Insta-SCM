@@ -38,7 +38,7 @@ def login(
     # Check tenant ID match during login
     from app.api.deps import get_tenant_id
     req_tenant_id = get_tenant_id(request)
-    if user.email == "admin@example.com":
+    if user.email in ["admin@example.com", "admin@example"]:
         pass
     else:
         if user.tenant_id != req_tenant_id:
@@ -64,16 +64,18 @@ def login(
     db.add(user)
     db.commit()
 
+    session_tenant_id = req_tenant_id if user.email in ["admin@example.com", "admin@example"] else user.tenant_id
+
     if user.mfa_enabled:
         # Generate a temporary MFA token valid for 5 mins
         mfa_token = create_access_token(
-            subject=str(user.id), expires_delta=timedelta(minutes=5), tenant_id=user.tenant_id
+            subject=str(user.id), expires_delta=timedelta(minutes=5), tenant_id=session_tenant_id
         )
         return {"requires_mfa": True, "mfa_token": mfa_token}
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        subject=str(user.id), expires_delta=access_token_expires, tenant_id=user.tenant_id
+        subject=str(user.id), expires_delta=access_token_expires, tenant_id=session_tenant_id
     )
 
     response.set_cookie(
@@ -114,7 +116,7 @@ def verify_mfa(request: Request, mfa_data: MFAVerify, response: Response, db: Se
         
     from app.api.deps import get_tenant_id
     req_tenant_id = get_tenant_id(request)
-    if user.email == "admin@example.com":
+    if user.email in ["admin@example.com", "admin@example"]:
         pass
     else:
         if user.tenant_id != req_tenant_id:
@@ -129,9 +131,10 @@ def verify_mfa(request: Request, mfa_data: MFAVerify, response: Response, db: Se
         db.add(user)
         db.commit()
 
+    session_tenant_id = req_tenant_id if user.email in ["admin@example.com", "admin@example"] else user.tenant_id
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        subject=str(user.id), expires_delta=access_token_expires, tenant_id=user.tenant_id
+        subject=str(user.id), expires_delta=access_token_expires, tenant_id=session_tenant_id
     )
 
     response.set_cookie(

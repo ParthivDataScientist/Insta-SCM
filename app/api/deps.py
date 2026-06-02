@@ -55,7 +55,7 @@ def get_current_user(
         
     # Cross-reference dynamic tenant checks
     req_tenant_id = get_tenant_id(request)
-    if user.email == "admin@example.com":
+    if user.email in ["admin@example.com", "admin@example"]:
         pass
     else:
         if token_tenant_id and token_tenant_id != req_tenant_id:

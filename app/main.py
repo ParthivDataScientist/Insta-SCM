@@ -119,13 +119,13 @@ def _ensure_project_schema_compatibility() -> list[str]:
         }
     
     user_ddl = {
-        "mfa_secret": 'ALTER TABLE "user" ADD COLUMN mfa_secret VARCHAR',
-        "mfa_enabled": 'ALTER TABLE "user" ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE',
-        "failed_login_attempts": 'ALTER TABLE "user" ADD COLUMN failed_login_attempts INTEGER DEFAULT 0',
-        "locked_until": 'ALTER TABLE "user" ADD COLUMN locked_until TIMESTAMP',
-        "reset_token": 'ALTER TABLE "user" ADD COLUMN reset_token VARCHAR',
-        "reset_token_expires": 'ALTER TABLE "user" ADD COLUMN reset_token_expires TIMESTAMP',
-        "tenant_id": 'ALTER TABLE "user" ADD COLUMN tenant_id VARCHAR DEFAULT \'gordian\'',
+        "mfa_secret": 'ALTER TABLE "users" ADD COLUMN mfa_secret VARCHAR',
+        "mfa_enabled": 'ALTER TABLE "users" ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE',
+        "failed_login_attempts": 'ALTER TABLE "users" ADD COLUMN failed_login_attempts INTEGER DEFAULT 0',
+        "locked_until": 'ALTER TABLE "users" ADD COLUMN locked_until TIMESTAMP',
+        "reset_token": 'ALTER TABLE "users" ADD COLUMN reset_token VARCHAR',
+        "reset_token_expires": 'ALTER TABLE "users" ADD COLUMN reset_token_expires TIMESTAMP',
+        "tenant_id": 'ALTER TABLE "users" ADD COLUMN tenant_id VARCHAR DEFAULT \'gordian\'',
     }
 
     with engine.begin() as connection:
@@ -226,26 +226,43 @@ def _backfill_project_canonical_fields() -> None:
 
 
 def _ensure_default_admin() -> None:
-    """Create default admin user if not present."""
+    """Create default admin users if not present."""
     from app.core.auth import get_password_hash
     from sqlmodel import Session, select
     from app.models.user import User
     try:
         with Session(engine) as session:
-            admin = session.exec(select(User).where(User.email == "admin@example.com")).first()
-            if not admin:
-                admin = User(
+            # 1. Seed admin@example.com
+            admin_com = session.exec(select(User).where(User.email == "admin@example.com")).first()
+            if not admin_com:
+                admin_com = User(
                     full_name="Admin",
                     email="admin@example.com",
                     hashed_password=get_password_hash("admin123"),
                     role="ADMIN",
                     is_active=True
                 )
-                session.add(admin)
+                session.add(admin_com)
                 session.commit()
                 logger.info("default_admin_created", extra={"event": "default_admin_created"})
             else:
                 logger.info("default_admin_already_exists", extra={"event": "default_admin_already_exists"})
+
+            # 2. Seed admin@example
+            admin_lit = session.exec(select(User).where(User.email == "admin@example")).first()
+            if not admin_lit:
+                admin_lit = User(
+                    full_name="Admin",
+                    email="admin@example",
+                    hashed_password=get_password_hash("admin123"),
+                    role="ADMIN",
+                    is_active=True
+                )
+                session.add(admin_lit)
+                session.commit()
+                logger.info("admin_literal_created", extra={"event": "admin_literal_created"})
+            else:
+                logger.info("admin_literal_already_exists", extra={"event": "admin_literal_already_exists"})
     except Exception as e:
         logger.error("ensure_default_admin_failed", extra={"event": "ensure_default_admin_failed", "error": str(e)}, exc_info=True)
 
@@ -281,12 +298,16 @@ def admin_db_init():
     """Manual trigger to create database tables. Useful for fresh deployments or after cleaning DB."""
     try:
         SQLModel.metadata.create_all(engine)
+        changes = _ensure_project_schema_compatibility()
+        _backfill_project_canonical_fields()
+        _ensure_default_admin()
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         return {
             "status": "success", 
             "message": "Database schema synchronization complete.",
-            "tables_found": tables
+            "tables_found": tables,
+            "migrations_applied": changes
         }
     except Exception as e:
         logger.error(f"Manual DB init failed: {str(e)}")

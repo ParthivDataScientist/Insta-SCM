@@ -169,7 +169,7 @@ const Login = () => {
                                     <div className="input-wrapper">
                                         <Mail size={18} className="input-icon" style={{ color: emailFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined }} />
                                         <input
-                                            type="email"
+                                            type="text"
                                             placeholder="Enter your email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
