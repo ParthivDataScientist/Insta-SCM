@@ -115,6 +115,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
         "locked_until": 'ALTER TABLE "user" ADD COLUMN locked_until TIMESTAMP',
         "reset_token": 'ALTER TABLE "user" ADD COLUMN reset_token VARCHAR',
         "reset_token_expires": 'ALTER TABLE "user" ADD COLUMN reset_token_expires TIMESTAMP',
+        "tenant_id": 'ALTER TABLE "user" ADD COLUMN tenant_id VARCHAR DEFAULT \'gordian\'',
     }
 
     with engine.begin() as connection:
@@ -306,7 +307,8 @@ def admin_reseed(session: Session = Depends(get_session)):
                             full_name=pm_name,
                             email=f"{pm_name.lower().replace(' ', '.')}@example.com",
                             hashed_password="TEMP_PLACEHOLDER", # Should be updated later via auth system
-                            role="PROJECT_MANAGER"
+                            role="PROJECT_MANAGER",
+                            tenant_id="insta"
                         )
                         session.add(manager_user)
                         session.commit()

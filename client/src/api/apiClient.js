@@ -24,6 +24,20 @@ apiClient.interceptors.request.use((config) => {
         config.headers['Authorization'] = `Bearer ${token}`;
     }
     
+    // Parse tenant ID from the URL path, fallback to localStorage
+    const pathParts = window.location.pathname.split('/');
+    let tenantId = 'gordian';
+    if (pathParts.includes('insta')) {
+        tenantId = 'insta';
+        localStorage.setItem('tenant_id', 'insta');
+    } else {
+        const storedTenant = localStorage.getItem('tenant_id');
+        if (storedTenant) {
+            tenantId = storedTenant;
+        }
+    }
+    config.headers['X-Tenant-ID'] = tenantId;
+    
     return config;
 }, (error) => {
     return Promise.reject(error);

@@ -15,18 +15,16 @@ export const AuthProvider = ({ children }) => {
     const verifySession = useCallback(async () => {
         setLoading(true);
         try {
-            // Bypass Authentication for now - Grant free access
-            // const userData = await authService.getCurrentUser();
-            const userData = {
-                id: 1,
-                email: "admin@insta-scm.com",
-                role: "ADMIN",
-                full_name: "Admin User",
-                is_active: true
-            };
-            setUser(userData);
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                const userData = await authService.getCurrentUser();
+                setUser(userData);
+            } else {
+                setUser(null);
+            }
         } catch (err) {
             setUser(null);
+            localStorage.removeItem('access_token');
         } finally {
             setLoading(false);
         }
@@ -78,18 +76,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     /**
-     * Registration handler
-     */
-    const register = async (userData) => {
-        try {
-            return await authService.register(userData);
-        } catch (err) {
-            const message = err.response?.data?.detail || "Registration failed.";
-            throw new Error(message);
-        }
-    };
-
-    /**
      * Logout handler
      */
     const logout = async () => {
@@ -104,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, verifyMfa, logout, register, loading }}>
+        <AuthContext.Provider value={{ user, login, verifyMfa, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

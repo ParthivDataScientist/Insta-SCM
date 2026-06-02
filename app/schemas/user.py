@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     mfa_enabled: bool = False
+    tenant_id: str
 
 class Token(BaseModel):
     access_token: Optional[str] = None

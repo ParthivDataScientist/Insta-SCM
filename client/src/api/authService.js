@@ -22,13 +22,6 @@ const authService = {
         return response.data;
     },
 
-    /**
-     * Registers a new user.
-     */
-    register: async (userData) => {
-        const response = await apiClient.post('/api/v1/auth/register', userData);
-        return response.data;
-    },
 
     /**
      * Verifies current session and returns user profile.

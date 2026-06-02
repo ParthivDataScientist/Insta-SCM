@@ -2,7 +2,7 @@ import json
 from datetime import date as py_date
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select, func, text
 from sqlalchemy.exc import IntegrityError
 import logging
@@ -598,7 +598,7 @@ def get_timeline_data(session: Session = Depends(get_session)):
         return []
 
 @router.post("/managers")
-def create_manager(manager_data: dict, session: Session = Depends(get_session)):
+def create_manager(request: Request, manager_data: dict, session: Session = Depends(get_session)):
     """Create a new user with the PROJECT_MANAGER role."""
     name = manager_data.get("name")
     if not name:
@@ -612,12 +612,16 @@ def create_manager(manager_data: dict, session: Session = Depends(get_session)):
     if existing:
         return {"id": existing.id, "full_name": existing.full_name}
 
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+
     new_user = User(
         full_name=name,
         email=email,
         hashed_password=get_password_hash(secrets.token_urlsafe(32)), # Placeholder for Gantt-created managers
         role="PROJECT_MANAGER",
-        is_active=True
+        is_active=True,
+        tenant_id=tenant_id
     )
     session.add(new_user)
     session.commit()
