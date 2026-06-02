@@ -8,7 +8,7 @@ import logging
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, Request
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import AliasChoices, BaseModel, Field
@@ -272,6 +272,7 @@ def _save_sheet_row_without_live_tracking(
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
     country: Optional[str] = None,
+    tenant_id: Optional[str] = "gordian",
     commit: bool = True,
 ) -> Optional[dict]:
     """
@@ -312,8 +313,10 @@ def _save_sheet_row_without_live_tracking(
             is_master=bool(is_master),
             child_parcels=[],
             country=country,
+            tenant_id=tenant_id,
         )
     else:
+        shipment.tenant_id = tenant_id
         shipment.carrier = carrier
         shipment.status = shipment.status or "Tracking Unavailable"
         shipment.lifecycle_state = shipment.lifecycle_state or "TRACKING_UNAVAILABLE"
@@ -367,13 +370,15 @@ def _serialize_shipment(db: Session, shipment: Shipment) -> ShipmentResponse:
     return ShipmentResponse(**payload)
 
 
-def _validate_project_reference(db: Session, project_id: Optional[int]) -> Optional[DashboardProject]:
+def _validate_project_reference(db: Session, project_id: Optional[int], tenant_id: str) -> Optional[DashboardProject]:
     if project_id is None:
         return None
 
     project = db.get(DashboardProject, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Linked project not found")
+    if project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: Linked project belongs to another tenant")
     return project
 
 
@@ -439,11 +444,14 @@ async def preview_dhl_shipment(
 @router.post("/rate", response_model=ShipmentRateResponse, status_code=200)
 def rate_dhl_shipment(
     body: ShipmentBookingRequest,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     if body.shipment.project_id is not None:
-        _validate_project_reference(db, body.shipment.project_id)
+        _validate_project_reference(db, body.shipment.project_id, tenant_id)
 
     result = rate_shipment(body.model_dump(mode="json"))
     if "error" in result:
@@ -454,13 +462,16 @@ def rate_dhl_shipment(
 @router.post("/create", response_model=ShipmentCreateResponse, status_code=201)
 def create_dhl_shipment(
     body: ShipmentBookingRequest,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     if body.shipment.project_id is not None:
-        _validate_project_reference(db, body.shipment.project_id)
+        _validate_project_reference(db, body.shipment.project_id, tenant_id)
 
-    result = create_shipment(body.model_dump(mode="json"), db)
+    result = create_shipment(body.model_dump(mode="json"), db, tenant_id=tenant_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -494,12 +505,15 @@ async def track_shipment(
         description="Carrier tracking number (uppercase alphanumeric, 8-50 chars)",
     ),
     body: TrackRequest = ...,
+    request: Request = ...,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """Track a shipment via carrier API and save/update in DB."""
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     if body.project_id is not None:
-        _validate_project_reference(db, body.project_id)
+        _validate_project_reference(db, body.project_id, tenant_id)
     result = await track_and_save(
         tracking_number=tracking_number.upper(),
         recipient=body.recipient,
@@ -511,6 +525,7 @@ async def track_shipment(
         cs=body.cs,
         no_of_box=body.no_of_box,
         project_id=body.project_id,
+        tenant_id=tenant_id,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -521,7 +536,7 @@ async def track_shipment(
 # Batch import from Excel - uses BackgroundTasks so the response is immediate
 # ---------------------------------------------------------------------------
 
-async def _process_excel_import(contents: bytes, db: Session):
+async def _process_excel_import(contents: bytes, db: Session, tenant_id: str):
     """Parse Excel rows and track each shipment, supporting Master/Child vertical nesting logic."""
     df = pd.read_excel(io.BytesIO(contents))
     # Normalize column names for easier lookup
@@ -555,7 +570,9 @@ async def _process_excel_import(contents: bytes, db: Session):
         if project_ids_in_sheet:
             valid_project_ids = set(
                 db.exec(
-                    select(DashboardProject.id).where(DashboardProject.id.in_(list(project_ids_in_sheet)))
+                    select(DashboardProject.id)
+                    .where(DashboardProject.id.in_(list(project_ids_in_sheet)))
+                    .where(DashboardProject.tenant_id == tenant_id)
                 ).all()
             )
 
@@ -673,6 +690,7 @@ async def _process_excel_import(contents: bytes, db: Session):
                     master_tracking_number=row_info["master_to_use"],
                     is_master=row_info["is_master"],
                     country=row_info.get("country"),
+                    tenant_id=tenant_id,
                     commit=False,
                 )
                 if fallback_res:
@@ -728,6 +746,7 @@ async def _process_excel_import(contents: bytes, db: Session):
 
 @router.post("/import-excel", status_code=200)
 async def import_excel(
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
@@ -736,6 +755,8 @@ async def import_excel(
     Import shipments from an Excel file (.xlsx/.xls).
     Expected columns: tracking_number, name (optional), show_date (optional)
     """
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     if not (file.filename or "").lower().endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Invalid file format. Upload an .xlsx or .xls file.")
 
@@ -743,7 +764,7 @@ async def import_excel(
     if len(contents) > MAX_EXCEL_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 5 MB.")
 
-    result = await _process_excel_import(contents, db)
+    result = await _process_excel_import(contents, db, tenant_id=tenant_id)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -804,7 +825,7 @@ def classify_country_by_ship_to_location(ship_to_location: Optional[str]) -> str
     return "India"
 
 
-async def _process_webhook_payload(payload: WebhookPayload, db: Session):
+async def _process_webhook_payload(payload: WebhookPayload, db: Session, tenant_id: str):
     # Phase 1: Collect metadata and run concurrent network lookups without DB session
     tasks = []
     row_metadata = []
@@ -901,6 +922,7 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
                     master_tracking_number=row_info["master_to_use"],
                     is_master=row_info["is_master"],
                     country=row_info.get("country"),
+                    tenant_id=tenant_id,
                     commit=False,
                 )
                 if fallback_res:
@@ -954,6 +976,7 @@ async def _process_webhook_payload(payload: WebhookPayload, db: Session):
 @router.post("/webhook/google-sheet", status_code=200)
 async def google_sheet_webhook(
     payload: WebhookPayload,
+    request: Request,
     db: Session = Depends(get_session),
     # Optional API key for Google Apps Script to authenticate
     _key: str = Depends(verify_api_key),
@@ -962,7 +985,9 @@ async def google_sheet_webhook(
     Webhook to receive batch imports from Google Sheet.
     Implements Vertical Logic for Master/Child AWBs.
     """
-    result = await _process_webhook_payload(payload, db)
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    result = await _process_webhook_payload(payload, db, tenant_id=tenant_id)
     return {
         "status": "completed",
         "success": result["success"],
@@ -974,6 +999,7 @@ async def google_sheet_webhook(
 
 @router.get("/export-excel")
 def export_shipments(
+    request: Request,
     shipment_ids: Optional[str] = Query(
         default=None,
         description="Comma-separated shipment IDs to export. If omitted, exports all active shipments.",
@@ -984,6 +1010,8 @@ def export_shipments(
     """Export shipments to Excel with requested formatting."""
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     from datetime import date, datetime, timedelta
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
 
     requested_ids: list[int] = []
     if shipment_ids:
@@ -998,7 +1026,7 @@ def export_shipments(
             raise HTTPException(status_code=400, detail="No valid shipment ids provided for export")
 
     # Fetch non-archived shipments; optionally scoped to requested ids.
-    statement = select(Shipment).where(Shipment.is_archived == False)
+    statement = select(Shipment).where(Shipment.is_archived == False).where(Shipment.tenant_id == tenant_id)
     if requested_ids:
         statement = statement.where(Shipment.id.in_(requested_ids))
     shipments = db.exec(statement).all()
@@ -1555,9 +1583,11 @@ def export_shipments(
 # ---------------------------------------------------------------------------
 
 @router.get("/stats")
-def shipment_stats(db: Session = Depends(get_session)):
+def shipment_stats(request: Request, db: Session = Depends(get_session)):
     """Return counts by status for the dashboard stat cards (SQL aggregation)."""
-    return get_stats(db)
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    return get_stats(db, tenant_id=tenant_id)
 
 
 @router.post("/refresh", status_code=200)
@@ -1580,34 +1610,59 @@ async def refresh_shipments(
 
 @router.get("/", response_model=List[ShipmentResponse])
 def list_shipments(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_session),
 ):
     """List active (non-archived) shipments."""
-    shipments = db.exec(select(Shipment).where(Shipment.is_archived == False).offset(skip).limit(limit)).all()
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    shipments = db.exec(
+        select(Shipment)
+        .where(Shipment.is_archived == False)
+        .where(Shipment.tenant_id == tenant_id)
+        .offset(skip)
+        .limit(limit)
+    ).all()
     return [_serialize_shipment(db, shipment) for shipment in shipments]
 
 
 @router.get("/archived", response_model=List[ShipmentResponse])
 def list_archived_shipments(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """List archived shipments (Storage)."""
-    shipments = db.exec(select(Shipment).where(Shipment.is_archived == True).offset(skip).limit(limit)).all()
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    shipments = db.exec(
+        select(Shipment)
+        .where(Shipment.is_archived == True)
+        .where(Shipment.tenant_id == tenant_id)
+        .offset(skip)
+        .limit(limit)
+    ).all()
     return [_serialize_shipment(db, shipment) for shipment in shipments]
 
 
 @router.patch("/{shipment_id:int}/archive", response_model=ShipmentResponse)
 def archive_shipment(
     shipment_id: int,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """Toggle the archive status of a shipment."""
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    shipment = db.get(Shipment, shipment_id)
+    if not shipment or shipment.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
+
     from app.services.shipment_service import toggle_archive
     updated = toggle_archive(shipment_id, db)
     if not updated:
@@ -1619,6 +1674,7 @@ def archive_shipment(
 def patch_shipment_cell(
     shipment_id: int,
     update_data: ShipmentUpdateCell,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
@@ -1626,9 +1682,11 @@ def patch_shipment_cell(
     Partially update a shipment's cells (spreadsheet-style CRUD).
     Sets the manual_lock flag to True to protect manual edits from being overwritten by automatic syncs.
     """
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     shipment_record = db.get(Shipment, shipment_id)
-    if not shipment_record:
-        raise HTTPException(status_code=404, detail="Shipment not found")
+    if not shipment_record or shipment_record.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
 
     data = update_data.model_dump(exclude_unset=True)
 
@@ -1692,6 +1750,7 @@ def patch_shipment_cell(
 @router.get("/mps/{shipment_id:int}", response_model=MPSDetailResponse)
 def get_mps_detail(
     shipment_id: int,
+    request: Request,
     db: Session = Depends(get_session),
 ):
     """
@@ -1699,9 +1758,11 @@ def get_mps_detail(
     aggregated summary of all child parcels and their individual statuses.
     Returns 404 if not found, 400 if the shipment is not an MPS master.
     """
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     shipment = db.get(Shipment, shipment_id)
-    if not shipment:
-        raise HTTPException(status_code=404, detail="Shipment not found")
+    if not shipment or shipment.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
     if not shipment.is_master:
         raise HTTPException(
             status_code=400,
@@ -1711,21 +1772,31 @@ def get_mps_detail(
 
 
 @router.get("/{shipment_id:int}", response_model=ShipmentResponse)
-def get_shipment(shipment_id: int, db: Session = Depends(get_session)):
+def get_shipment(shipment_id: int, request: Request, db: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     shipment = db.get(Shipment, shipment_id)
-    if not shipment:
-        raise HTTPException(status_code=404, detail="Shipment not found")
+    if not shipment or shipment.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
     return _serialize_shipment(db, shipment)
 
 
 @router.get("/project/{project_id}", response_model=List[ShipmentResponse])
 def list_project_shipments(
     project_id: int,
+    request: Request,
     db: Session = Depends(get_session),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    project = db.get(DashboardProject, project_id)
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: Linked project does not belong to this tenant.")
+
     shipments = db.exec(
         select(Shipment)
         .where(Shipment.project_id == project_id)
+        .where(Shipment.tenant_id == tenant_id)
         .where(Shipment.is_archived == False)
     ).all()
     return [_serialize_shipment(db, shipment) for shipment in shipments]
@@ -1738,9 +1809,16 @@ def list_project_shipments(
 @router.delete("/{shipment_id:int}", status_code=200)
 def delete_shipment(
     shipment_id: int,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    shipment = db.get(Shipment, shipment_id)
+    if not shipment or shipment.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
+
     from app.services.shipment_service import batch_delete
 
     result = batch_delete([shipment_id], db)
@@ -1766,10 +1844,17 @@ def delete_shipment(
 @router.post("/batch/archive", status_code=200)
 def batch_archive_shipments(
     body: BatchRequest,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """Batch update archive status for multiple shipments."""
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    shipments = db.exec(select(Shipment).where(Shipment.id.in_(body.shipment_ids))).all()
+    if any(s.tenant_id != tenant_id for s in shipments):
+        raise HTTPException(status_code=403, detail="Forbidden: Access denied to one or more shipments.")
+
     from app.services.shipment_service import batch_update_archive
     if body.archive is None:
         raise HTTPException(status_code=400, detail="Missing 'archive' boolean in request body")
@@ -1779,9 +1864,16 @@ def batch_archive_shipments(
 @router.post("/batch/delete", status_code=200)
 def batch_delete_shipments(
     body: BatchRequest,
+    request: Request,
     db: Session = Depends(get_session),
     _key: str = Depends(verify_api_key),
 ):
     """Batch delete multiple shipments."""
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    shipments = db.exec(select(Shipment).where(Shipment.id.in_(body.shipment_ids))).all()
+    if any(s.tenant_id != tenant_id for s in shipments):
+        raise HTTPException(status_code=403, detail="Forbidden: Access denied to one or more shipments.")
+
     from app.services.shipment_service import batch_delete
     return batch_delete(body.shipment_ids, db)

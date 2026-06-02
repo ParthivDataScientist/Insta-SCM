@@ -5,6 +5,7 @@ from sqlalchemy import Column, DateTime, JSON, func
 
 
 class ShipmentBase(SQLModel):
+    tenant_id: str = Field(default="gordian", index=True, description="Tenant identification slug (e.g., gordian, insta)")
     tracking_number: str = Field(index=True, unique=True)
     carrier: str
     status: str = "Unknown"

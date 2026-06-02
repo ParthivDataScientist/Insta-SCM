@@ -4,6 +4,7 @@ import { DndContext, PointerSensor, useDraggable, useSensor, useSensors } from '
 import { CSS } from '@dnd-kit/utilities';
 import { Check, PanelLeft, PanelRightClose, PanelRightOpen, Plus, Search, UserSquare2, X, Bell } from 'lucide-react';
 import AppShell from '../components/app/AppShell';
+import AppLogo from '../components/app/AppLogo';
 import AlertBanner from '../components/AlertBanner';
 import TimelineHeader from '../components/GanttTimeline/TimelineHeader';
 import ManagerRow from '../components/GanttTimeline/ManagerRow';
@@ -520,7 +521,7 @@ export default function ManagerTimelinePremium() {
                 ) : null}
 
                 <div className="design-premium-header__brand" style={{ marginRight: '16px' }}>
-                    <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                    <AppLogo className="design-premium-header__logo" />
                 </div>
 
                 <div className="design-premium-header__search-container">

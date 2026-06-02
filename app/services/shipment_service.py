@@ -1057,6 +1057,7 @@ def save_shipment_to_db(
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
     country: Optional[str] = None,
+    tenant_id: Optional[str] = "gordian",
     commit: bool = True,
 ) -> dict:
     tracking_number = (tracking_number or "").strip().upper()
@@ -1104,11 +1105,13 @@ def save_shipment_to_db(
             is_master=is_master if is_master is not None else result.get("is_master", False),
             child_parcels=result.get("child_parcels", []),
             country=country,
+            tenant_id=tenant_id,
         )
         logger.info("Created new shipment record for %s (%s)", tracking_number, carrier_name)
     else:
         shipment.status = result.get("status", shipment.status)
         shipment.lifecycle_state = _derive_lifecycle_state(shipment.status)
+        shipment.tenant_id = tenant_id
 
         is_locked = getattr(shipment, "manual_lock", False)
 
@@ -1201,6 +1204,7 @@ def save_shipment_to_db(
                     else:
                         child_shipment.last_scan_date = child_data.get("last_date") or child_shipment.last_scan_date
                     
+                    child_shipment.tenant_id = shipment.tenant_id
                     db.add(child_shipment)
                     logger.info("Propagated update from master %s to child row %s", tracking_number, child_tn)
 
@@ -1233,6 +1237,7 @@ async def track_and_save(
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
     country: Optional[str] = None,
+    tenant_id: Optional[str] = "gordian",
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -1347,6 +1352,7 @@ async def track_and_save(
         is_master=is_master,
         destination=destination,
         country=country,
+        tenant_id=tenant_id,
         commit=True,
     )
 
@@ -1375,7 +1381,7 @@ def rate_shipment(payload: dict) -> dict:
     }
 
 
-def create_shipment(payload: dict, db: Session) -> dict:
+def create_shipment(payload: dict, db: Session, tenant_id: Optional[str] = "gordian") -> dict:
     config_error = _validate_dhl_booking_configuration()
     if config_error:
         return {"error": config_error}
@@ -1451,9 +1457,11 @@ def create_shipment(payload: dict, db: Session) -> dict:
             booking_payload=payload,
             project_id=shipment_input.get("project_id"),
             pickup_status=None,
+            tenant_id=tenant_id,
         )
         logger.info("Created booked DHL shipment row awb=%s", awb)
     else:
+        existing.tenant_id = tenant_id
         existing.awb = awb
         existing.carrier = "DHL"
         existing.status = "BOOKED"
@@ -1552,11 +1560,12 @@ def schedule_pickup(
     }
 
 
-def get_stats(db: Session) -> dict:
+def get_stats(db: Session, tenant_id: Optional[str] = None) -> dict:
     """
     Return counts for main shipments and total child parcels.
     A 'main' shipment is either an MPS master or a standalone parcel.
     """
+    from sqlalchemy import case
     # Simple inclusive count of all non-archived shipments to match the main list view
     main_query = select(
         func.count().label("total"),
@@ -1564,15 +1573,20 @@ def get_stats(db: Session) -> dict:
         func.sum(case((Shipment.status.in_(["In Transit", "Out for Delivery"]), 1), else_=0)).label("transit"),
         func.sum(case((Shipment.status == "Exception", 1), else_=0)).label("exceptions"),
     ).where(Shipment.is_archived == False)
+    if tenant_id:
+        main_query = main_query.where(Shipment.tenant_id == tenant_id)
     main_result = db.exec(main_query).one()
 
     # Child parcel counts (summing the JSON arrays from master records)
     # We use a simple select and sum in Python here for JSON compatibility across DBs,
     # or we can try to use SQL func if we're sure about the JSON structure.
     # Given the small scale, fetching masters and summing is safer.
-    masters = db.exec(select(Shipment).where(
+    masters_query = select(Shipment).where(
         (Shipment.is_master == True) & (Shipment.is_archived == False)
-    )).all()
+    )
+    if tenant_id:
+        masters_query = masters_query.where(Shipment.tenant_id == tenant_id)
+    masters = db.exec(masters_query).all()
     
     child_total = 0
     child_delivered = 0

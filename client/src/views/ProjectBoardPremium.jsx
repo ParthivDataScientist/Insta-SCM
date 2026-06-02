@@ -5,6 +5,7 @@ import { Menu, Search, Bell } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import AppShell from '../components/app/AppShell';
+import AppLogo from '../components/app/AppLogo';
 import AlertBanner from '../components/AlertBanner';
 import KanbanColumn from '../components/KanbanColumn';
 import ProjectKanbanCard from '../components/ProjectKanbanCard';
@@ -205,7 +206,7 @@ export default function ProjectBoardPremium() {
             <header className="design-premium-header">
                 <div className="design-premium-header__inner">
                     <div className="design-premium-header__brand">
-                        <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                        <AppLogo className="design-premium-header__logo" />
                     </div>
                     
                     <div className="design-premium-header__search-container">

@@ -7,6 +7,7 @@ import DesignTableSkeleton from '../components/DesignTableSkeleton';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
 import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import AppShell from '../components/app/AppShell';
+import AppLogo from '../components/app/AppLogo';
 import KpiCard from '../components/app/KpiCard';
 import '../design-dashboard.css';
 
@@ -79,7 +80,7 @@ export default function DesignDashboard() {
                 <div className="design-premium-header__inner">
                     
                     <div className="design-premium-header__brand">
-                        <img src="/logo.jpg" alt="App Logo" className="design-premium-header__logo" />
+                        <AppLogo className="design-premium-header__logo" />
                     </div>
 
                     <div className="design-premium-header__search-container">

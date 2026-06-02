@@ -538,6 +538,7 @@ def _project_matches_search(project: DashboardProject, query: str, awbs: Iterabl
 def _filter_design_projects(
     session: Session,
     *,
+    tenant_id: str,
     status: Optional[str] = None,
     client_id: Optional[int] = None,
     client_name: Optional[str] = None,
@@ -547,7 +548,7 @@ def _filter_design_projects(
     start_date: Optional[py_date] = None,
     end_date: Optional[py_date] = None,
 ) -> tuple[list[DashboardProject], dict[int, list[str]]]:
-    projects = session.exec(select(DashboardProject)).all()
+    projects = session.exec(select(DashboardProject).where(DashboardProject.tenant_id == tenant_id)).all()
     awb_map = _build_awb_map(session)
     desired_status = _normalize_status_value(status) if status and status.lower() != "all" else None
     desired_city = (city or "").strip().lower()
@@ -582,12 +583,15 @@ def _filter_design_projects(
 
 @router.get("/stats")
 def get_project_stats(
+    request: Request,
     session: Session = Depends(get_session),
     start_date: Optional[py_date] = None,
     end_date: Optional[py_date] = None,
     date_context: str = Query(default="execution"),
 ):
-    projects = session.exec(select(DashboardProject)).all()
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    projects = session.exec(select(DashboardProject).where(DashboardProject.tenant_id == tenant_id)).all()
     projects = [
         project
         for project in projects
@@ -600,7 +604,11 @@ def get_project_stats(
     ]
     execution_projects = [project for project in projects if _is_won_project(project.stage)]
     branches = {project.branch for project in execution_projects if project.branch}
-    pm_count = session.exec(select(func.count(User.id)).where(User.role == "PROJECT_MANAGER")).one()
+    pm_count = session.exec(
+        select(func.count(User.id))
+        .where(User.role == "PROJECT_MANAGER")
+        .where(User.tenant_id == tenant_id)
+    ).one()
 
     return {
         "total": len(execution_projects),
@@ -613,6 +621,7 @@ def get_project_stats(
 
 @router.get("/designs/stats")
 def get_design_stats(
+    request: Request,
     session: Session = Depends(get_session),
     status: Optional[str] = None,
     client_id: Optional[int] = None,
@@ -623,8 +632,11 @@ def get_design_stats(
     start_date: Optional[py_date] = None,
     end_date: Optional[py_date] = None,
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     projects, _ = _filter_design_projects(
         session,
+        tenant_id=tenant_id,
         status=status,
         client_id=client_id,
         client_name=client_name,
@@ -660,6 +672,7 @@ def get_crm_design_feed():
 
 @router.get("/designs", response_model=List[DashboardProjectRead])
 def get_design_projects(
+    request: Request,
     session: Session = Depends(get_session),
     status: Optional[str] = None,
     client_id: Optional[int] = None,
@@ -670,8 +683,11 @@ def get_design_projects(
     start_date: Optional[py_date] = None,
     end_date: Optional[py_date] = None,
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     projects, awb_map = _filter_design_projects(
         session,
+        tenant_id=tenant_id,
         status=status,
         client_id=client_id,
         client_name=client_name,
@@ -685,11 +701,15 @@ def get_design_projects(
 
 
 @router.post("/crm/designs/sync")
-def sync_crm_design_feed(session: Session = Depends(get_session)):
+def sync_crm_design_feed(request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     upserted = 0
     crm_project_ids = [record["crm_project_id"] for record in CRM_DESIGN_FEED]
     existing_projects = session.exec(
-        select(DashboardProject).where(DashboardProject.crm_project_id.in_(crm_project_ids))
+        select(DashboardProject)
+        .where(DashboardProject.tenant_id == tenant_id)
+        .where(DashboardProject.crm_project_id.in_(crm_project_ids))
     ).all()
     project_map = {p.crm_project_id: p for p in existing_projects if p.crm_project_id}
 
@@ -702,6 +722,7 @@ def sync_crm_design_feed(session: Session = Depends(get_session)):
                 crm_project_id=crm_record["crm_project_id"],
                 project_name=crm_record["project_name"],
                 board_stage="TBC",
+                tenant_id=tenant_id,
             )
 
         payload = dict(crm_record)
@@ -718,10 +739,12 @@ def sync_crm_design_feed(session: Session = Depends(get_session)):
 
 
 @router.post("/designs/{project_id}/win", response_model=DashboardProjectRead)
-def convert_design_to_project(project_id: int, session: Session = Depends(get_session)):
+def convert_design_to_project(project_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     _apply_design_state(project, {"status": "won", "stage": "Win"})
     project.board_stage = project.board_stage or "TBC"
@@ -734,6 +757,7 @@ def convert_design_to_project(project_id: int, session: Session = Depends(get_se
 
 @router.get("/", response_model=List[DashboardProjectRead])
 def get_projects(
+    request: Request,
     session: Session = Depends(get_session),
     stage: Optional[str] = None,
     scope: str = Query(default="execution"),
@@ -741,7 +765,9 @@ def get_projects(
     end_date: Optional[py_date] = None,
     date_context: str = Query(default="execution"),
 ):
-    projects = session.exec(select(DashboardProject)).all()
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    projects = session.exec(select(DashboardProject).where(DashboardProject.tenant_id == tenant_id)).all()
     awb_map = _build_awb_map(session)
 
     if scope == "execution":
@@ -770,9 +796,14 @@ def get_projects(
 
 
 @router.post("/", response_model=DashboardProjectRead)
-def create_project(project_in: DashboardProjectCreate, session: Session = Depends(get_session)):
+def create_project(project_in: DashboardProjectCreate, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     payload = project_in.model_dump(exclude_unset=True)
-    project = DashboardProject(project_name=payload.get("project_name") or "Untitled Project")
+    project = DashboardProject(
+        project_name=payload.get("project_name") or "Untitled Project",
+        tenant_id=tenant_id,
+    )
     _apply_design_state(project, payload)
     session.add(project)
     try:
@@ -791,10 +822,12 @@ def create_project(project_in: DashboardProjectCreate, session: Session = Depend
 
 
 @router.put("/{project_id}", response_model=DashboardProjectRead)
-def update_project(project_id: int, project_in: DashboardProjectUpdate, session: Session = Depends(get_session)):
+def update_project(project_id: int, project_in: DashboardProjectUpdate, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     audit_fields = [
         "stage",
@@ -840,15 +873,17 @@ def update_project(project_id: int, project_in: DashboardProjectUpdate, session:
 
 
 @router.patch("/{project_id}", response_model=DashboardProjectRead)
-def patch_project(project_id: int, project_in: DashboardProjectUpdate, session: Session = Depends(get_session)):
-    return update_project(project_id, project_in, session)
+def patch_project(project_id: int, project_in: DashboardProjectUpdate, request: Request, session: Session = Depends(get_session)):
+    return update_project(project_id, project_in, request, session)
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int, session: Session = Depends(get_session)):
+def delete_project(project_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     active_shipments = session.exec(
         select(Shipment).where(
@@ -871,10 +906,12 @@ def delete_project(project_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/{project_id}/links", response_model=List[ProjectLinkRead])
-def get_project_links(project_id: int, session: Session = Depends(get_session)):
+def get_project_links(project_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     links = session.exec(
         select(ProjectLink)
@@ -888,11 +925,14 @@ def get_project_links(project_id: int, session: Session = Depends(get_session)):
 def create_project_link(
     project_id: int,
     payload: ProjectLinkCreate,
+    request: Request,
     session: Session = Depends(get_session),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     duplicate = session.exec(
         select(ProjectLink).where(
@@ -920,8 +960,14 @@ def update_project_link(
     project_id: int,
     link_id: int,
     payload: ProjectLinkUpdate,
+    request: Request,
     session: Session = Depends(get_session),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    project = session.get(DashboardProject, project_id)
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
     link = session.get(ProjectLink, link_id)
     if not link or link.project_id != project_id:
         raise HTTPException(status_code=404, detail="Project link not found")
@@ -948,7 +994,12 @@ def update_project_link(
 
 
 @router.delete("/{project_id}/links/{link_id}")
-def delete_project_link(project_id: int, link_id: int, session: Session = Depends(get_session)):
+def delete_project_link(project_id: int, link_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    project = session.get(DashboardProject, project_id)
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
     link = session.get(ProjectLink, link_id)
     if not link or link.project_id != project_id:
         raise HTTPException(status_code=404, detail="Project link not found")
@@ -959,10 +1010,12 @@ def delete_project_link(project_id: int, link_id: int, session: Session = Depend
 
 
 @router.get("/{project_id}/resources/{resource_type}", response_model=List[ProjectResourceEntryRead])
-def get_project_resources(project_id: int, resource_type: str, session: Session = Depends(get_session)):
+def get_project_resources(project_id: int, resource_type: str, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     normalized_resource_type = _normalize_resource_type(resource_type)
     return _get_project_resource_entries(session, project_id, normalized_resource_type)
@@ -973,11 +1026,14 @@ def create_project_resource_version(
     project_id: int,
     resource_type: str,
     payload: ProjectResourceVersionCreate,
+    request: Request,
     session: Session = Depends(get_session),
 ):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     project = session.get(DashboardProject, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
 
     normalized_resource_type = _normalize_resource_type(resource_type)
     entry_key = payload.entry_key or uuid4().hex
@@ -1050,7 +1106,12 @@ def create_project_resource_version(
 
 
 @router.delete("/{project_id}/resources/{resource_id}")
-def delete_project_resource_version(project_id: int, resource_id: int, session: Session = Depends(get_session)):
+def delete_project_resource_version(project_id: int, resource_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    project = session.get(DashboardProject, project_id)
+    if not project or project.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this project.")
     resource = session.get(ProjectResource, resource_id)
     if not resource or resource.project_id != project_id:
         raise HTTPException(status_code=404, detail="Project resource not found")
@@ -1066,8 +1127,13 @@ def delete_project_resource_version(project_id: int, resource_id: int, session: 
 
 
 @router.get("/manager/{manager_id}", response_model=List[DashboardProjectRead])
-def get_manager_projects(manager_id: int, session: Session = Depends(get_session)):
-    query = select(DashboardProject).where(DashboardProject.manager_id == manager_id)
+def get_manager_projects(manager_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    query = select(DashboardProject).where(
+        DashboardProject.manager_id == manager_id,
+        DashboardProject.tenant_id == tenant_id
+    )
     awb_map = _build_awb_map(session)
     projects = [project for project in session.exec(query).all() if _is_won_project(project.stage)]
     return [_serialize_project(project, awb_map) for project in projects]
@@ -1076,6 +1142,7 @@ def get_manager_projects(manager_id: int, session: Session = Depends(get_session
 @router.get("/availability-check")
 def check_availability(
     start_date: py_date,
+    request: Request,
     end_date: Optional[py_date] = None,
     manager_id: Optional[int] = None,
     project_id: Optional[int] = None,
@@ -1092,7 +1159,9 @@ def check_availability(
             )
         }
 
-    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER")).all()
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    managers = session.exec(select(User).where(User.role == "PROJECT_MANAGER").where(User.tenant_id == tenant_id)).all()
     manager_ids = [manager.id for manager in managers if manager.id is not None]
 
     return get_managers_availability(
@@ -1105,12 +1174,15 @@ def check_availability(
 
 
 @router.get("/timeline")
-def get_timeline_data(session: Session = Depends(get_session)):
+def get_timeline_data(request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     try:
         stmt = (
             select(User, DashboardProject)
             .join(DashboardProject, User.id == DashboardProject.manager_id, isouter=True)
             .where(User.role == "PROJECT_MANAGER")
+            .where(User.tenant_id == tenant_id)
         )
         results = session.exec(stmt).all()
         manager_groups = defaultdict(lambda: {"manager": None, "allocations": []})
@@ -1121,6 +1193,7 @@ def get_timeline_data(session: Session = Depends(get_session)):
 
             if (
                 project is not None
+                and project.tenant_id == tenant_id
                 and _is_won_project(project.stage)
             ):
                 manager_groups[manager.id]["allocations"].append(
@@ -1160,6 +1233,7 @@ def get_timeline_data(session: Session = Depends(get_session)):
         unassigned_stmt = (
             select(DashboardProject)
             .where(DashboardProject.manager_id == None)
+            .where(DashboardProject.tenant_id == tenant_id)
         )
         unassigned_projects = [project for project in session.exec(unassigned_stmt).all() if _is_won_project(project.stage)]
         if unassigned_projects:
@@ -1254,12 +1328,17 @@ def create_manager(request: Request, manager_data: dict, session: Session = Depe
 
 
 @router.delete("/managers/{manager_id}")
-def delete_manager(manager_id: int, session: Session = Depends(get_session)):
+def delete_manager(manager_id: int, request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
     user = session.get(User, manager_id)
-    if not user:
+    if not user or user.tenant_id != tenant_id:
         raise HTTPException(status_code=404, detail="Manager not found")
 
-    projects = session.exec(select(DashboardProject).where(DashboardProject.manager_id == manager_id)).all()
+    projects = session.exec(select(DashboardProject).where(
+        DashboardProject.manager_id == manager_id,
+        DashboardProject.tenant_id == tenant_id
+    )).all()
     for project in projects:
         project.manager_id = None
         session.add(project)
@@ -1270,12 +1349,21 @@ def delete_manager(manager_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/pm-list")
-def get_pm_list(session: Session = Depends(get_session)):
-    users = session.exec(select(User).where(User.role == "PROJECT_MANAGER").order_by(User.full_name.asc())).all()
+def get_pm_list(request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    users = session.exec(
+        select(User)
+        .where(User.role == "PROJECT_MANAGER")
+        .where(User.tenant_id == tenant_id)
+        .order_by(User.full_name.asc())
+    ).all()
     return [{"id": user.id, "full_name": user.full_name} for user in users]
 
 
 @router.get("/client-list")
-def get_client_list(session: Session = Depends(get_session)):
-    clients = session.exec(select(Client)).all()
+def get_client_list(request: Request, session: Session = Depends(get_session)):
+    from app.api.deps import get_tenant_id
+    tenant_id = get_tenant_id(request)
+    clients = session.exec(select(Client).where(Client.tenant_id == tenant_id)).all()
     return [{"id": client.id, "name": client.name} for client in clients]

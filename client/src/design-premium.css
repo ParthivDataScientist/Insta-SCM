@@ -32,14 +32,14 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    background: #0f172a;
+    background: transparent;
     border-radius: 12px;
     flex-shrink: 0;
     margin-right: 4px;
 }
 
 .dark .design-premium-header__brand {
-    background: #0f172a;
+    background: transparent;
 }
 
 .design-premium-header__logo {

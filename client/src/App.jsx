@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -43,7 +43,93 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
+const GordianProtectedRoute = ({ children }) => {
+    const { user, loading } = useAuth();
+    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+
+    if (!user) {
+        const pathParts = window.location.pathname.split('/');
+        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
+        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
+        return <Navigate to={loginPath} replace />;
+    }
+
+    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
+    if (activeTenant !== 'insta') {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+};
+
+const RootRedirect = () => {
+    const { user, loading } = useAuth();
+    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+
+    if (!user) {
+        const pathParts = window.location.pathname.split('/');
+        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
+        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
+        return <Navigate to={loginPath} replace />;
+    }
+
+    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
+    if (activeTenant === 'insta') {
+        return <Navigate to="/design" replace />;
+    } else {
+        return <Navigate to="/dashboard" replace />;
+    }
+};
+
 export default function App() {
+    useEffect(() => {
+        const handlePathChange = () => {
+            const pathParts = window.location.pathname.split('/');
+            let tenant = 'gordian';
+            if (pathParts.includes('insta')) {
+                tenant = 'insta';
+            } else {
+                const storedTenant = localStorage.getItem('tenant_id');
+                if (storedTenant) {
+                    tenant = storedTenant;
+                }
+            }
+            
+            const isInsta = tenant === 'insta';
+            document.title = isInsta 
+                ? "Insta Exhibition SCM — Logistics" 
+                : "Gordian SCM & Logistics";
+                
+            let link = document.querySelector("link[rel~='icon']");
+            if (link) {
+                link.type = isInsta ? "image/jpeg" : "image/svg+xml";
+                link.href = isInsta ? "/logo.jpg" : "/gordian.svg";
+            }
+        };
+
+        handlePathChange();
+        window.addEventListener('popstate', handlePathChange);
+        
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+        
+        history.pushState = function() {
+            originalPushState.apply(this, arguments);
+            handlePathChange();
+        };
+        
+        history.replaceState = function() {
+            originalReplaceState.apply(this, arguments);
+            handlePathChange();
+        };
+        
+        return () => {
+            window.removeEventListener('popstate', handlePathChange);
+            history.pushState = originalPushState;
+            history.replaceState = originalReplaceState;
+        };
+    }, []);
+
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
@@ -56,14 +142,14 @@ export default function App() {
                                 <Route path="/:tenant" element={<Navigate to="/:tenant/login" replace />} />
                                 {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
                                 {/* <Route path="/reset-password" element={<ResetPassword />} /> */}
-                                <Route path="/" element={<Navigate to="/design" replace />} />
-                                <Route path="/design" element={<ProtectedRoute><DesignDashboard /></ProtectedRoute>} />
+                                <Route path="/" element={<RootRedirect />} />
+                                <Route path="/design" element={<GordianProtectedRoute><DesignDashboard /></GordianProtectedRoute>} />
                                 <Route path="/storage" element={<ProtectedRoute><StoragePremium /></ProtectedRoute>} />
-                                <Route path="/projects" element={<ProtectedRoute><ProjectsDashboardPremium /></ProtectedRoute>} />
-                                <Route path="/stages" element={<ProtectedRoute><ProjectBoardPremium /></ProtectedRoute>} />
-                                <Route path="/board" element={<Navigate to="/stages" replace />} />
-                                <Route path="/project-officer" element={<ProtectedRoute><ManagerTimelinePremium /></ProtectedRoute>} />
-                                <Route path="/timeline" element={<Navigate to="/project-officer" replace />} />
+                                <Route path="/projects" element={<GordianProtectedRoute><ProjectsDashboardPremium /></GordianProtectedRoute>} />
+                                <Route path="/stages" element={<GordianProtectedRoute><ProjectBoardPremium /></GordianProtectedRoute>} />
+                                <Route path="/board" element={<GordianProtectedRoute><Navigate to="/stages" replace /></GordianProtectedRoute>} />
+                                <Route path="/project-officer" element={<GordianProtectedRoute><ManagerTimelinePremium /></GordianProtectedRoute>} />
+                                <Route path="/timeline" element={<GordianProtectedRoute><Navigate to="/project-officer" replace /></GordianProtectedRoute>} />
                                 <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
                                 <Route path="/shipments/new" element={<ProtectedRoute><ShipmentBookingPage /></ProtectedRoute>} />
                                 <Route path="/*" element={<Navigate to="/login" replace />} />

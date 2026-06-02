@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import GlobalDateRangePicker from '../GlobalDateRangePicker';
+import AppLogo from './AppLogo';
 
 const NAV_ITEMS = [
     { to: '/design', label: 'Design', icon: PenTool, key: 'design' },
@@ -33,7 +34,15 @@ export default function AppShell({
     const { theme, isDark, toggleTheme } = useTheme();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const nav = useMemo(() => NAV_ITEMS, []);
+    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
+    const isInsta = activeTenant === 'insta';
+
+    const nav = useMemo(() => {
+        if (!isInsta) {
+            return NAV_ITEMS.filter((item) => item.key === 'dashboard' || item.key === 'storage');
+        }
+        return NAV_ITEMS;
+    }, [isInsta]);
     const headerOverrideProps = useMemo(
         () => ({
             theme,
@@ -55,36 +64,36 @@ export default function AppShell({
         .filter(Boolean)
         .join(' ');
 
-    return (
-        <div
-            className={`${theme} premium-app`}
-            data-sidebar-state={sidebarOverlay ? (sidebarOpen ? 'open' : 'closed') : undefined}
-        >
-            {sidebarOverlay && sidebarOpen ? (
-                <button
-                    type="button"
-                    className="premium-sidebar-backdrop"
-                    aria-label="Close navigation"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            ) : null}
-            <div className={shellClass}>
-                <aside className="premium-sidebar" id="app-primary-sidebar">
-                    <div className="premium-sidebar__brand">
-                        <button
-                            type="button"
-                            className="premium-sidebar__close"
-                            aria-label="Close sidebar"
-                            onClick={() => setSidebarOpen(false)}
-                        >
-                            <X size={16} />
-                        </button>
-                        <img src="/logo.jpg" alt="Insta SCM" className="premium-sidebar__logo" />
-                        <div>
-                            <div className="premium-sidebar__title">Insta SCM</div>
-                            <div className="premium-sidebar__subtitle">Design to delivery</div>
+        return (
+            <div
+                className={`${theme} premium-app`}
+                data-sidebar-state={sidebarOverlay ? (sidebarOpen ? 'open' : 'closed') : undefined}
+            >
+                {sidebarOverlay && sidebarOpen ? (
+                    <button
+                        type="button"
+                        className="premium-sidebar-backdrop"
+                        aria-label="Close navigation"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                ) : null}
+                <div className={shellClass}>
+                    <aside className="premium-sidebar" id="app-primary-sidebar">
+                        <div className="premium-sidebar__brand">
+                            <button
+                                type="button"
+                                className="premium-sidebar__close"
+                                aria-label="Close sidebar"
+                                onClick={() => setSidebarOpen(false)}
+                            >
+                                <X size={16} />
+                            </button>
+                            <AppLogo className="premium-sidebar__logo" />
+                            <div>
+                                <div className="premium-sidebar__title">{isInsta ? "Insta SCM" : "Gordian"}</div>
+                                <div className="premium-sidebar__subtitle">{isInsta ? "Design to delivery" : "Unified Logistics Control"}</div>
+                            </div>
                         </div>
-                    </div>
 
                     <nav className="premium-sidebar__nav" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {nav.map(({ to, label, icon: Icon, key }) => (

@@ -3,6 +3,7 @@ import { Building2, FolderKanban, PanelLeft, Search, Users, Workflow, X, MapPin,
 import { useProjects } from '../hooks/useProjects';
 import ProjectTable from '../components/ProjectTable';
 import AppShell from '../components/app/AppShell';
+import AppLogo from '../components/app/AppLogo';
 import KpiCard from '../components/app/KpiCard';
 import AlertBanner from '../components/AlertBanner';
 import GlobalDateRangePicker from '../components/GlobalDateRangePicker';
@@ -152,7 +153,7 @@ export default function ProjectsDashboardPremium() {
             <header className="design-premium-header">
                 <div className="design-premium-header__inner">
                     <div className="design-premium-header__brand" style={{ marginRight: '16px' }}>
-                        <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                        <AppLogo className="design-premium-header__logo" />
                     </div>
 
                     <div className="design-premium-header__search-container">

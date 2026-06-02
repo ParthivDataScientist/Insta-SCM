@@ -8,6 +8,7 @@ import TrackModal from '../components/TrackModal';
 import ShipmentDetailPanel from '../components/ShipmentDetailPanel';
 import ShipmentSidePanel from '../components/ShipmentSidePanel';
 import AppShell from '../components/app/AppShell';
+import AppLogo from '../components/app/AppLogo';
 import KpiCard from '../components/app/KpiCard';
 import PremiumDateRangePicker from '../components/PremiumDateRangePicker';
 import AlertBanner from '../components/AlertBanner';
@@ -184,7 +185,7 @@ export default function ShipmentDashboardPremium() {
                 <header className="design-premium-header shipping-dashboard-header">
                     <div className="design-premium-header__inner shipping-dashboard-header__inner">
                         <div className="design-premium-header__brand design-premium-header__brand--offset">
-                            <img src="/logo.jpg" alt="Insta-SCM Logo" className="design-premium-header__logo" />
+                            <AppLogo className="design-premium-header__logo" />
                         </div>
 
                         <div className="design-premium-header__search-container">
