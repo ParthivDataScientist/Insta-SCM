@@ -33,7 +33,7 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
     if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-    
+
     if (!user) {
         const pathParts = window.location.pathname.split('/');
         const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
@@ -66,7 +66,7 @@ export default function App() {
                                 <Route path="/timeline" element={<Navigate to="/project-officer" replace />} />
                                 <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
                                 <Route path="/shipments/new" element={<ProtectedRoute><ShipmentBookingPage /></ProtectedRoute>} />
-                                <Route path="/*" element={<Navigate to="/design" replace />} />
+                                <Route path="/*" element={<Navigate to="/login" replace />} />
                             </Routes>
                         </GlobalDateRangeProvider>
                     </BrowserRouter>

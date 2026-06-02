@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Verify session on mount (Bypassed for now)
+    // Verify session on mount
     const verifySession = useCallback(async () => {
         setLoading(true);
         try {
@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
             }
         } catch (err) {
             setUser(null);
+            localStorage.removeItem('access_token');
             localStorage.removeItem('access_token');
         } finally {
             setLoading(false);
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }) => {
             if (data.access_token) {
                 localStorage.setItem('access_token', data.access_token);
             }
-            
+
             const userData = await authService.getCurrentUser();
             setUser(userData);
             return { success: true, user: userData };

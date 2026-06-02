@@ -54,6 +54,8 @@ async def lifespan(app: FastAPI):
             
             _backfill_project_canonical_fields()
             
+        _ensure_default_admin()
+            
         logger.info(
             "application_startup_complete",
             extra={"event": "application_startup_complete"},
@@ -102,10 +104,10 @@ def _ensure_project_schema_compatibility() -> list[str]:
         }
 
     user_columns = {}
-    if "user" in inspector.get_table_names():
+    if "users" in inspector.get_table_names():
         user_columns = {
             column["name"]
-            for column in inspector.get_columns("user")
+            for column in inspector.get_columns("users")
         }
     
     user_ddl = {
@@ -168,7 +170,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
         for col_name, ddl in user_ddl.items():
             if col_name not in user_columns:
                 connection.execute(text(ddl))
-                applied_changes.append(f"user.{col_name}")
+                applied_changes.append(f"users.{col_name}")
 
     return applied_changes
 
@@ -203,6 +205,31 @@ def _backfill_project_canonical_fields() -> None:
 
         if changed:
             session.commit()
+
+
+def _ensure_default_admin() -> None:
+    """Create default admin user if not present."""
+    from app.core.auth import get_password_hash
+    from sqlmodel import Session, select
+    from app.models.user import User
+    try:
+        with Session(engine) as session:
+            admin = session.exec(select(User).where(User.email == "admin@example.com")).first()
+            if not admin:
+                admin = User(
+                    full_name="Admin",
+                    email="admin@example.com",
+                    hashed_password=get_password_hash("admin123"),
+                    role="ADMIN",
+                    is_active=True
+                )
+                session.add(admin)
+                session.commit()
+                logger.info("default_admin_created", extra={"event": "default_admin_created"})
+            else:
+                logger.info("default_admin_already_exists", extra={"event": "default_admin_already_exists"})
+    except Exception as e:
+        logger.error("ensure_default_admin_failed", extra={"event": "ensure_default_admin_failed", "error": str(e)}, exc_info=True)
 
 
 app = FastAPI(

@@ -7,12 +7,14 @@
 export const isUsaShipment = (item) => {
     if (!item) return false;
     
-    // 1. Explicit country column check
     const country = String(item.country || '').trim().toUpperCase();
-    if (country === 'USA' || country === 'US' || country === 'UNITED STATES') return true;
-    if (country === 'EUROPE' || country === 'EU' || country === 'INDIA' || country === 'IN') return false; // Other explicit regions
     
-    // 2. Fallback to keyword matching
+    // 1. If explicit country column is filled, use it exclusively
+    if (country) {
+        return country === 'USA' || country === 'US' || country === 'UNITED STATES';
+    }
+    
+    // 2. Otherwise, fallback to keyword matching ONLY if country column is empty
     const dest = String(item.destination || '').toUpperCase();
     const city = String(item.show_city || '').toUpperCase();
     const recipient = String(item.recipient || '').toUpperCase();
@@ -45,12 +47,14 @@ export const isUsaShipment = (item) => {
 export const isEuropeShipment = (item) => {
     if (!item) return false;
 
-    // 1. Explicit country column check
     const country = String(item.country || '').trim().toUpperCase();
-    if (country === 'EUROPE' || country === 'EU') return true;
-    if (country === 'USA' || country === 'US' || country === 'UNITED STATES' || country === 'INDIA' || country === 'IN') return false; // Other explicit regions
     
-    // 2. Fallback to keyword matching
+    // 1. If explicit country column is filled, use it exclusively
+    if (country) {
+        return country === 'EUROPE' || country === 'EU' || country === 'UK' || country === 'UNITED KINGDOM';
+    }
+    
+    // 2. Otherwise, fallback to keyword matching ONLY if country column is empty
     const dest = String(item.destination || '').toUpperCase();
     const city = String(item.show_city || '').toUpperCase();
     const recipient = String(item.recipient || '').toUpperCase();
@@ -88,12 +92,14 @@ export const isEuropeShipment = (item) => {
 export const isIndiaShipment = (item) => {
     if (!item) return false;
 
-    // 1. Explicit country column check
     const country = String(item.country || '').trim().toUpperCase();
-    if (country === 'INDIA' || country === 'IN') return true;
-    if (country === 'USA' || country === 'US' || country === 'UNITED STATES' || country === 'EUROPE' || country === 'EU') return false; // Other explicit regions
     
-    // 2. Fallback to keyword matching
+    // 1. If explicit country column is filled, use it exclusively
+    if (country) {
+        return country === 'INDIA' || country === 'IN';
+    }
+    
+    // 2. Otherwise, fallback to keyword matching ONLY if country column is empty
     const dest = String(item.destination || '').toUpperCase();
     const city = String(item.show_city || '').toUpperCase();
     const recipient = String(item.recipient || '').toUpperCase();

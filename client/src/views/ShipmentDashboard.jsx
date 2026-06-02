@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Truck, Package, CheckCircle, AlertTriangle, Search, X, PanelLeft, Menu, Plus, Download, FileSpreadsheet, Archive, Trash2, RefreshCw } from 'lucide-react';
 import { useShipments } from '../hooks/useShipments';
 import ShipmentTable from '../components/ShipmentTable';
@@ -16,18 +16,6 @@ export default function ShipmentDashboard() {
         deleteShipment, archiveShipment, batchDelete, batchArchive, importExcel, refreshTracking, exportExcel,
         updateShipment,
     } = useShipments();
-
-    const hasAutoRefreshed = useRef(false);
-
-    useEffect(() => {
-        if (!hasAutoRefreshed.current) {
-            hasAutoRefreshed.current = true;
-            const timer = setTimeout(() => {
-                refreshTracking();
-            }, 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [refreshTracking]);
 
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);

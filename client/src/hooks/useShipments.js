@@ -25,10 +25,31 @@ export function useShipments() {
         return err?.response?.data?.detail || err?.message || 'Something went wrong';
     }, []);
 
+    const clearCache = useCallback(() => {
+        sessionStorage.removeItem('shipments_active');
+        sessionStorage.removeItem('shipments_archived');
+        sessionStorage.removeItem('shipments_stats');
+    }, []);
+
     const loadData = useCallback(async (includeArchived = null, options = {}) => {
-        const { silent = false } = options;
+        const { silent = false, forceRefresh = false } = options;
         const archivedState = includeArchived !== null ? includeArchived : isArchivedView;
-        if (includeArchived !== null) setIsArchivedView(includeArchived);
+        if (includeArchived !== null) setIsArchivedView(archivedState);
+        
+        const shipmentsCacheKey = archivedState ? 'shipments_archived' : 'shipments_active';
+        const statsCacheKey = 'shipments_stats';
+
+        if (!forceRefresh) {
+            const cachedShipments = sessionStorage.getItem(shipmentsCacheKey);
+            const cachedStats = sessionStorage.getItem(statsCacheKey);
+            if (cachedShipments && cachedStats) {
+                setShipments(JSON.parse(cachedShipments));
+                setStats(JSON.parse(cachedStats));
+                setLoading(false);
+                setError(null);
+                return;
+            }
+        }
         
         if (!silent) setLoading(true);
         setError(null);
@@ -37,6 +58,9 @@ export function useShipments() {
                 archivedState ? shipmentsService.fetchArchivedShipments() : shipmentsService.fetchShipments(),
                 shipmentsService.fetchStats(),
             ]);
+
+            sessionStorage.setItem(shipmentsCacheKey, JSON.stringify(shipmentsData));
+            sessionStorage.setItem(statsCacheKey, JSON.stringify(statsData));
 
             setShipments(shipmentsData);
             setStats(statsData);
@@ -51,6 +75,7 @@ export function useShipments() {
     useEffect(() => { loadData(false); }, [loadData]); // Initial load default to dashboard
 
     const archiveShipment = useCallback(async (id) => {
+        clearCache();
         // Optimistic Update
         setShipments(prev => prev.filter(s => s.id !== id));
         try {
@@ -60,11 +85,12 @@ export function useShipments() {
         } catch (err) {
             setError(getErrorMessage(err));
             console.error('Failed to archive shipment:', err);
-            loadData(); // Rollback on error
+            loadData(null, { forceRefresh: true }); // Rollback on error
         }
-    }, [getErrorMessage, loadData]);
+    }, [getErrorMessage, loadData, clearCache]);
 
     const deleteShipment = useCallback(async (id) => {
+        clearCache();
         setError(null);
         try {
             const result = await shipmentsService.deleteShipment(id);
@@ -76,11 +102,12 @@ export function useShipments() {
         } catch (err) {
             setError(getErrorMessage(err));
             console.error('Failed to delete shipment:', err);
-            loadData(); // Recovery
+            loadData(null, { forceRefresh: true }); // Recovery
         }
-    }, [getErrorMessage, loadData]);
+    }, [getErrorMessage, loadData, clearCache]);
 
     const batchArchive = useCallback(async (ids, archive) => {
+        clearCache();
         // Optimistic Update
         setShipments(prev => prev.filter(s => !ids.includes(s.id)));
         try {
@@ -88,11 +115,12 @@ export function useShipments() {
             shipmentsService.fetchStats().then(setStats).catch(console.error);
         } catch (err) {
             setError(getErrorMessage(err));
-            loadData();
+            loadData(null, { forceRefresh: true });
         }
-    }, [getErrorMessage, loadData]);
+    }, [getErrorMessage, loadData, clearCache]);
 
     const batchDelete = useCallback(async (ids) => {
+        clearCache();
         setError(null);
         try {
             const result = await shipmentsService.batchDeleteShipments(ids);
@@ -104,23 +132,24 @@ export function useShipments() {
         } catch (err) {
             setError(getErrorMessage(err));
             console.error('Failed to batch delete shipments:', err);
-            loadData();
+            loadData(null, { forceRefresh: true });
         }
-    }, [getErrorMessage, loadData]);
+    }, [getErrorMessage, loadData, clearCache]);
 
     const importExcel = useCallback(async (file) => {
+        clearCache();
         setLoading(true);
         setError(null);
         try {
             await shipmentsService.importExcel(file);
-            await loadData();
+            await loadData(null, { forceRefresh: true });
         } catch (err) {
             setError(getErrorMessage(err));
             console.error('Failed to import Excel file:', err);
         } finally {
             setLoading(false);
         }
-    }, [getErrorMessage, loadData]);
+    }, [getErrorMessage, loadData, clearCache]);
 
     const refreshTracking = useCallback(async (shipmentIds = null) => {
         setRefreshing(true);
@@ -130,7 +159,7 @@ export function useShipments() {
                 includeChildren: true,
                 timeoutMs: 120000,
             });
-            await loadData(null, { silent: true });
+            await loadData(null, { silent: true, forceRefresh: true });
             if (result.failed > 0) {
                 const message = `Refreshed ${result.refreshed} shipment(s), but ${result.failed} could not be re-synced.`;
                 setError(message);
@@ -231,10 +260,11 @@ export function useShipments() {
     }, [getErrorMessage]);
 
     const updateShipment = useCallback((updatedShipment) => {
+        clearCache();
         setShipments((prev) =>
             prev.map((s) => (s.id === updatedShipment.id ? updatedShipment : s))
         );
-    }, []);
+    }, [clearCache]);
 
     return {
         shipments,
