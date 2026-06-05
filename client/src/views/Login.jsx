@@ -37,9 +37,10 @@ const Login = () => {
 
     useEffect(() => {
         if (user) {
-            navigate('/dashboard');
+            const target = isInsta ? '/design' : '/dashboard';
+            navigate(target);
         }
-    }, [user, navigate]);
+    }, [user, navigate, isInsta]);
 
     useEffect(() => {
         if (isInsta) {

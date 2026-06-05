@@ -25,11 +25,18 @@ apiClient.interceptors.request.use((config) => {
     }
     
     // Parse tenant ID from the URL path, fallback to localStorage
-    const pathParts = window.location.pathname.split('/');
+    const path = window.location.pathname;
+    const pathParts = path.split('/');
     let tenantId = 'gordian';
-    if (pathParts.includes('insta')) {
+    const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
+    const isInstaPath = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta');
+    
+    if (isInstaPath) {
         tenantId = 'insta';
         localStorage.setItem('tenant_id', 'insta');
+    } else if (path.startsWith('/dashboard') || path.startsWith('/storage')) {
+        tenantId = 'gordian';
+        localStorage.setItem('tenant_id', 'gordian');
     } else {
         const storedTenant = localStorage.getItem('tenant_id');
         if (storedTenant) {
@@ -43,13 +50,22 @@ apiClient.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
-// Response Interceptor: Handle global errors
+// Response Interceptor: Handle global errors like 401 Unauthorized
 apiClient.interceptors.response.use((response) => {
     return response;
 }, (error) => {
     if (error.response && error.response.status === 401) {
-        // Auto-logout redirection bypassed for free direct access
+        // Auto-logout: Clear local session and redirect dynamically based on tenant
         localStorage.removeItem('access_token');
+        const path = window.location.pathname;
+        const pathParts = path.split('/');
+        const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
+        const isInsta = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta') || localStorage.getItem('tenant_id') === 'insta';
+        
+        const loginPath = isInsta ? '/insta/login' : '/login';
+        if (path !== loginPath) {
+            window.location.href = loginPath;
+        }
     }
     return Promise.reject(error);
 });

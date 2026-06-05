@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './views/Login';
@@ -31,34 +31,83 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }) => {
-    // Authentication check bypassed for direct link access
+    const { user, loading } = useAuth();
+    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+
+    if (!user) {
+        const pathParts = window.location.pathname.split('/');
+        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
+        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
+        return <Navigate to={loginPath} replace />;
+    }
     return children;
 };
 
 const GordianProtectedRoute = ({ children }) => {
-    // Authentication and tenant check bypassed for direct link access
+    const { user, loading } = useAuth();
+    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+
+    if (!user) {
+        return <Navigate to="/insta/login" replace />;
+    }
+
+    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
+    if (activeTenant !== 'insta') {
+        return <Navigate to="/dashboard" replace />;
+    }
+
     return children;
 };
 
 const RootRedirect = () => {
-    // Automatically redirect based on URL/localStorage tenant
-    const pathParts = window.location.pathname.split('/');
-    const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
-    
-    if (tenant === 'insta') {
+    const { user, loading } = useAuth();
+    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+
+    if (!user) {
+        const pathParts = window.location.pathname.split('/');
+        let tenant = 'gordian';
+        if (pathParts.includes('insta')) {
+            tenant = 'insta';
+        } else {
+            const storedTenant = localStorage.getItem('tenant_id');
+            if (storedTenant) {
+                tenant = storedTenant;
+            }
+        }
+        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
+        return <Navigate to={loginPath} replace />;
+    }
+
+    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
+    if (activeTenant === 'insta') {
         return <Navigate to="/design" replace />;
     } else {
         return <Navigate to="/dashboard" replace />;
     }
 };
 
+const TenantRedirect = () => {
+    const { tenant } = useParams();
+    const target = tenant === 'insta' ? '/design' : '/dashboard';
+    return <Navigate to={target} replace />;
+};
+
 export default function App() {
     useEffect(() => {
         const handlePathChange = () => {
-            const pathParts = window.location.pathname.split('/');
+            const path = window.location.pathname;
+            const pathParts = path.split('/');
+            
             let tenant = 'gordian';
-            if (pathParts.includes('insta')) {
+            const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
+            const isInstaPath = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta');
+            
+            if (isInstaPath) {
                 tenant = 'insta';
+                localStorage.setItem('tenant_id', 'insta');
+            } else if (path.startsWith('/dashboard') || path.startsWith('/storage')) {
+                tenant = 'gordian';
+                localStorage.setItem('tenant_id', 'gordian');
             } else {
                 const storedTenant = localStorage.getItem('tenant_id');
                 if (storedTenant) {
@@ -110,7 +159,7 @@ export default function App() {
                             <Routes>
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/:tenant/login" element={<Login />} />
-                                <Route path="/:tenant" element={<Navigate to="/:tenant/login" replace />} />
+                                <Route path="/:tenant" element={<TenantRedirect />} />
                                 {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
                                 {/* <Route path="/reset-password" element={<ResetPassword />} /> */}
                                 <Route path="/" element={<RootRedirect />} />

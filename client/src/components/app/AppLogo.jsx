@@ -13,7 +13,10 @@ export const AristroLogo = () => (
 
 export default function AppLogo({ className, style }) {
     const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
-    const isInsta = activeTenant === 'insta';
+    const path = window.location.pathname;
+    const pathParts = path.split('/');
+    const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
+    const isInsta = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta') || activeTenant === 'insta';
 
     if (isInsta) {
         return (
