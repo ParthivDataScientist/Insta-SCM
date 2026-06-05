@@ -31,7 +31,7 @@ class User(AuditMixin, table=True):
         description="User permission level (e.g., ADMIN, PROJECT_MANAGER, VIEWER)."
     )
     is_active: bool = Field(default=True, description="Status flag for account enabling.")
-    tenant_id: str = Field(default="gordian", index=True, description="Tenant identification slug (e.g., gordian, insta)")
+    tenant_id: str = Field(default="insta", index=True, description="Tenant identification slug (e.g., gordian, insta)")
 
     # Security & Recovery
     mfa_secret: Optional[str] = Field(

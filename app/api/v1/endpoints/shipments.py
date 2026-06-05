@@ -272,7 +272,7 @@ def _save_sheet_row_without_live_tracking(
     master_tracking_number: Optional[str] = None,
     is_master: Optional[bool] = None,
     country: Optional[str] = None,
-    tenant_id: Optional[str] = "gordian",
+    tenant_id: Optional[str] = "insta",
     commit: bool = True,
 ) -> Optional[dict]:
     """

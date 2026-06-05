@@ -14,7 +14,7 @@ const MOCK_USER = {
     role: 'admin',
     is_active: true,
     mfa_enabled: false,
-    tenant_id: 'gordian'
+    tenant_id: 'insta'
 };
 
 export const AuthProvider = ({ children }) => {

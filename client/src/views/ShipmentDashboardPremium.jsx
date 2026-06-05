@@ -84,12 +84,7 @@ export default function ShipmentDashboardPremium() {
     }, []);
 
     const importExcelPrompt = () => {
-        const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
-        if (activeTenant === 'insta') {
-            window.open('https://docs.google.com/spreadsheets/d/1WCH9zdzptI8hYpcS_URlZqjRKVExHpuz1Esyg29TtiQ/edit?gid=0#gid=0', '_blank');
-        } else {
-            window.open('https://docs.google.com/spreadsheets/d/19NkCTnzG8Ew6GrVJf6hgXs7DlgYMxp-OEdQBu_fCWVg/edit?gid=0#gid=0', '_blank');
-        }
+        window.open('https://docs.google.com/spreadsheets/d/1WCH9zdzptI8hYpcS_URlZqjRKVExHpuz1Esyg29TtiQ/edit?gid=0#gid=0', '_blank');
     };
 
     const handleDelete = (id) => {

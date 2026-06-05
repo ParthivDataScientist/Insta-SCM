@@ -13,7 +13,7 @@ class Client(AuditMixin, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True, description="Unique name of the client.")
     industry: Optional[str] = None
-    tenant_id: str = Field(default="gordian", index=True, description="Tenant identification slug (e.g., gordian, insta)")
+    tenant_id: str = Field(default="insta", index=True, description="Tenant identification slug (e.g., gordian, insta)")
     
     # Relationships
     projects: List["DashboardProject"] = Relationship(back_populates="client_relationship")
@@ -38,7 +38,7 @@ class DashboardProject(AuditMixin, table=True):
     Consolidated to act as the single source of truth for the SCM system.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    tenant_id: str = Field(default="gordian", index=True, description="Tenant identification slug (e.g., gordian, insta)")
+    tenant_id: str = Field(default="insta", index=True, description="Tenant identification slug (e.g., gordian, insta)")
     crm_project_id: Optional[str] = Field(
         default=None,
         sa_column=Column(String, unique=True, index=True, nullable=True),

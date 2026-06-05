@@ -1057,7 +1057,7 @@ def save_shipment_to_db(
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
     country: Optional[str] = None,
-    tenant_id: Optional[str] = "gordian",
+    tenant_id: Optional[str] = "insta",
     commit: bool = True,
 ) -> dict:
     tracking_number = (tracking_number or "").strip().upper()
@@ -1237,7 +1237,7 @@ async def track_and_save(
     is_master: Optional[bool] = None,
     destination: Optional[str] = None,
     country: Optional[str] = None,
-    tenant_id: Optional[str] = "gordian",
+    tenant_id: Optional[str] = "insta",
 ) -> dict:
     """
     Detect carrier, call tracking API, then upsert the shipment record in DB.
@@ -1381,7 +1381,7 @@ def rate_shipment(payload: dict) -> dict:
     }
 
 
-def create_shipment(payload: dict, db: Session, tenant_id: Optional[str] = "gordian") -> dict:
+def create_shipment(payload: dict, db: Session, tenant_id: Optional[str] = "insta") -> dict:
     config_error = _validate_dhl_booking_configuration()
     if config_error:
         return {"error": config_error}

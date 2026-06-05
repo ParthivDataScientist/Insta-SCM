@@ -34,32 +34,8 @@ export default function AppShell({
     const { theme, isDark, toggleTheme } = useTheme();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const hostname = window.location.hostname.toLowerCase();
-    const path = window.location.pathname.toLowerCase();
-    const search = window.location.search.toLowerCase();
-    
-    let isInsta = false;
-    if (hostname.includes('insta')) {
-        isInsta = true;
-    } else if (path.startsWith('/storage')) {
-        isInsta = false;
-    } else {
-        const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
-        if (instaPaths.some(p => path.startsWith(p))) {
-            isInsta = true;
-        } else if (path.startsWith('/dashboard') || path.startsWith('/shipments')) {
-            isInsta = localStorage.getItem('tenant_id') === 'insta';
-        } else {
-            isInsta = hostname.includes('insta') || path.includes('insta') || search.includes('insta') || localStorage.getItem('tenant_id') === 'insta';
-        }
-    }
-
-    const nav = useMemo(() => {
-        if (!isInsta) {
-            return NAV_ITEMS.filter((item) => item.key === 'dashboard' || item.key === 'storage');
-        }
-        return NAV_ITEMS;
-    }, [isInsta]);
+    const isInsta = true;
+    const nav = NAV_ITEMS;
     const headerOverrideProps = useMemo(
         () => ({
             theme,
@@ -107,8 +83,8 @@ export default function AppShell({
                             </button>
                             <AppLogo className="premium-sidebar__logo" />
                             <div>
-                                <div className="premium-sidebar__title">{isInsta ? "Insta SCM" : "Gordian"}</div>
-                                <div className="premium-sidebar__subtitle">{isInsta ? "Design to delivery" : "Unified Logistics Control"}</div>
+                                <div className="premium-sidebar__title">Insta SCM</div>
+                                <div className="premium-sidebar__subtitle">Design to delivery</div>
                             </div>
                         </div>
 

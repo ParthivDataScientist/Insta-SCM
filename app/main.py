@@ -94,7 +94,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
         "booking_date": "ALTER TABLE dashboardproject ADD COLUMN booking_date DATE",
         "revision_history": "ALTER TABLE dashboardproject ADD COLUMN revision_history JSON",
         "client_id": "ALTER TABLE dashboardproject ADD COLUMN client_id INTEGER",
-        "tenant_id": "ALTER TABLE dashboardproject ADD COLUMN tenant_id VARCHAR DEFAULT 'gordian'",
+        "tenant_id": "ALTER TABLE dashboardproject ADD COLUMN tenant_id VARCHAR DEFAULT 'insta'",
     }
 
     shipment_columns = {}
@@ -125,7 +125,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
         "locked_until": 'ALTER TABLE "users" ADD COLUMN locked_until TIMESTAMP',
         "reset_token": 'ALTER TABLE "users" ADD COLUMN reset_token VARCHAR',
         "reset_token_expires": 'ALTER TABLE "users" ADD COLUMN reset_token_expires TIMESTAMP',
-        "tenant_id": 'ALTER TABLE "users" ADD COLUMN tenant_id VARCHAR DEFAULT \'gordian\'',
+        "tenant_id": 'ALTER TABLE "users" ADD COLUMN tenant_id VARCHAR DEFAULT \'insta\'',
     }
 
     with engine.begin() as connection:
@@ -169,7 +169,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
                 "origin_city": "ALTER TABLE shipment ADD COLUMN origin_city VARCHAR",
                 "destination_city": "ALTER TABLE shipment ADD COLUMN destination_city VARCHAR",
                 "manual_lock": "ALTER TABLE shipment ADD COLUMN manual_lock BOOLEAN DEFAULT FALSE",
-                "tenant_id": "ALTER TABLE shipment ADD COLUMN tenant_id VARCHAR DEFAULT 'gordian'",
+                "tenant_id": "ALTER TABLE shipment ADD COLUMN tenant_id VARCHAR DEFAULT 'insta'",
             }
             for col_name, ddl in shipment_ddl.items():
                 if col_name not in shipment_columns:
@@ -178,7 +178,7 @@ def _ensure_project_schema_compatibility() -> list[str]:
         
         if "client" in inspector.get_table_names():
             client_ddl = {
-                "tenant_id": "ALTER TABLE client ADD COLUMN tenant_id VARCHAR DEFAULT 'gordian'",
+                "tenant_id": "ALTER TABLE client ADD COLUMN tenant_id VARCHAR DEFAULT 'insta'",
             }
             for col_name, ddl in client_ddl.items():
                 if col_name not in client_columns:

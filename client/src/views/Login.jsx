@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Mail, KeyRound, Eye, EyeOff, LoaderCircle, ShieldCheck } from 'lucide-react';
 import '../styles.css';
@@ -26,33 +26,23 @@ const Login = () => {
     
     const { login, verifyMfa, user } = useAuth();
     const navigate = useNavigate();
-    const { tenant } = useParams();
-
-    const hostname = window.location.hostname.toLowerCase();
-    const pathname = window.location.pathname.toLowerCase();
-    const search = window.location.search.toLowerCase();
-    const activeTenant = (tenant === 'insta' || hostname.includes('insta') || pathname.includes('insta') || search.includes('insta')) ? 'insta' : 'gordian';
-    const isInsta = activeTenant === 'insta';
 
     useEffect(() => {
-        localStorage.setItem('tenant_id', activeTenant);
-    }, [activeTenant]);
+        localStorage.setItem('tenant_id', 'insta');
+    }, []);
 
     useEffect(() => {
         if (user) {
-            const target = isInsta ? '/design' : '/dashboard';
-            navigate(target);
+            navigate('/design');
         }
-    }, [user, navigate, isInsta]);
+    }, [user, navigate]);
 
     useEffect(() => {
-        if (isInsta) {
-            const interval = setInterval(() => {
-                setQuoteIndex((prev) => (prev + 1) % QUOTES.length);
-            }, 7000);
-            return () => clearInterval(interval);
-        }
-    }, [isInsta]);
+        const interval = setInterval(() => {
+            setQuoteIndex((prev) => (prev + 1) % QUOTES.length);
+        }, 7000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -77,63 +67,17 @@ const Login = () => {
         }
     };
 
-    // Branding configuration
     const brand = {
-        name: isInsta ? "Insta-Exhibition-Dashboards" : "Gordian",
-        subtitle: isInsta ? "Secure access to the tracking management system." : "Unified Supply Chain & Logistics Control",
-        logo: isInsta ? (
+        name: "Insta-Exhibition-Dashboards",
+        subtitle: "Secure access to the tracking management system.",
+        logo: (
             <img src="/logo.jpg" alt="Insta-SCM Logo" style={{ height: '32px', width: 'auto' }} />
-        ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '18px',
-                    boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
-                }}>G</div>
-                <span style={{ fontWeight: '800', fontSize: '1.2rem', background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Gordian</span>
-            </div>
         ),
-        leftBg: isInsta 
-            ? 'linear-gradient(135deg, #E53935 0%, #B71C1C 100%)' 
-            : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        leftIllustration: isInsta ? (
+        leftBg: 'linear-gradient(135deg, #E53935 0%, #B71C1C 100%)',
+        leftIllustration: (
             <div className="auth-illustration">
                 <h2 key={`title-${quoteIndex}`} className="fade-text">{QUOTES[quoteIndex].title}</h2>
                 <p key={`text-${quoteIndex}`} className="fade-text">{QUOTES[quoteIndex].text}</p>
-            </div>
-        ) : (
-            <div className="auth-illustration" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', zIndex: 2 }}>
-                <div style={{ display: 'inline-flex', padding: '6px 12px', borderRadius: '20px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', width: 'fit-content' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#60a5fa', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Next-Gen Multi-Tenant Platform</span>
-                </div>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2', background: 'linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 1rem 0' }}>
-                    Solve the complexity of supply chain logistics.
-                </h1>
-                <p style={{ fontSize: '1.05rem', color: '#94a3b8', lineHeight: '1.6', maxWidth: '440px', margin: '0 0 1.5rem 0' }}>
-                    Gordian streamlines operations, tracks critical assets in real time, and leverages intelligent data models to orchestrate seamless global shipments.
-                </p>
-                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingRight: '1.5rem', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'white' }}>99.9%</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>Uptime SLA</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingRight: '1.5rem', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'white' }}>10M+</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>Tracked Assets</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'white' }}>&lt; 50ms</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>API Latency</span>
-                    </div>
-                </div>
             </div>
         )
     };
@@ -141,29 +85,18 @@ const Login = () => {
     return (
         <div className="auth-container">
             <div className="auth-left" style={{ background: brand.leftBg, position: 'relative', overflow: 'hidden' }}>
-                {!isInsta && (
-                    <div style={{
-                        position: 'absolute',
-                        top: '-10%',
-                        left: '-10%',
-                        width: '50%',
-                        height: '50%',
-                        background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
-                        filter: 'blur(40px)'
-                    }} />
-                )}
-                <div className="auth-brand" style={{ background: isInsta ? 'white' : 'transparent', padding: isInsta ? '0.5rem 1rem' : '0', border: 'none' }}>
+                <div className="auth-brand" style={{ background: 'white', padding: '0.5rem 1rem', border: 'none' }}>
                     {brand.logo}
-                    {isInsta && <span className="auth-brand-text">Insta-Exhibition-Dashboards</span>}
+                    <span className="auth-brand-text">Insta-Exhibition-Dashboards</span>
                 </div>
                 {brand.leftIllustration}
             </div>
             <div className="auth-right">
-                <div className="auth-card" style={{ borderRadius: isInsta ? '12px' : '16px', boxShadow: isInsta ? undefined : '0 20px 40px rgba(0, 0, 0, 0.08)' }}>
-                    <h2>{isInsta ? "Welcome Back" : "Sign In to Gordian"}</h2>
+                <div className="auth-card" style={{ borderRadius: '12px' }}>
+                    <h2>Welcome Back</h2>
                     <p className="auth-subtitle">{brand.subtitle}</p>
 
-                    {error && <div className="auth-error" style={{ borderRadius: isInsta ? '6px' : '8px' }}>{error}</div>}
+                    {error && <div className="auth-error" style={{ borderRadius: '6px' }}>{error}</div>}
 
                     <form onSubmit={handleSubmit} className="auth-form">
                         {!mfaToken ? (
@@ -171,7 +104,7 @@ const Login = () => {
                                 <div className="input-group">
                                     <label>Email Address</label>
                                     <div className="input-wrapper">
-                                        <Mail size={18} className="input-icon" style={{ color: emailFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined }} />
+                                        <Mail size={18} className="input-icon" style={{ color: emailFocused ? '#E53935' : undefined }} />
                                         <input
                                             type="text"
                                             placeholder="Enter your email"
@@ -181,9 +114,9 @@ const Login = () => {
                                             onBlur={() => setEmailFocused(false)}
                                             required
                                             style={{
-                                                borderRadius: isInsta ? '6px' : '8px',
-                                                borderColor: emailFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined,
-                                                boxShadow: emailFocused ? (isInsta ? '0 0 0 3px rgba(229, 57, 53, 0.1)' : '0 0 0 3px rgba(59, 130, 246, 0.1)') : undefined,
+                                                borderRadius: '6px',
+                                                borderColor: emailFocused ? '#E53935' : undefined,
+                                                boxShadow: emailFocused ? '0 0 0 3px rgba(229, 57, 53, 0.1)' : undefined,
                                                 outline: 'none',
                                                 transition: 'all 0.2s'
                                             }}
@@ -194,7 +127,7 @@ const Login = () => {
                                 <div className="input-group">
                                     <label>Password</label>
                                     <div className="input-wrapper">
-                                        <KeyRound size={18} className="input-icon" style={{ color: passwordFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined }} />
+                                        <KeyRound size={18} className="input-icon" style={{ color: passwordFocused ? '#E53935' : undefined }} />
                                         <input
                                             type={showPassword ? "text" : "password"}
                                             placeholder="••••••••"
@@ -204,9 +137,9 @@ const Login = () => {
                                             onBlur={() => setPasswordFocused(false)}
                                             required
                                             style={{
-                                                borderRadius: isInsta ? '6px' : '8px',
-                                                borderColor: passwordFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined,
-                                                boxShadow: passwordFocused ? (isInsta ? '0 0 0 3px rgba(229, 57, 53, 0.1)' : '0 0 0 3px rgba(59, 130, 246, 0.1)') : undefined,
+                                                borderRadius: '6px',
+                                                borderColor: passwordFocused ? '#E53935' : undefined,
+                                                boxShadow: passwordFocused ? '0 0 0 3px rgba(229, 57, 53, 0.1)' : undefined,
                                                 outline: 'none',
                                                 transition: 'all 0.2s'
                                             }}
@@ -223,9 +156,9 @@ const Login = () => {
 
                                 <div className="auth-actions">
                                     <label className="remember-me">
-                                        <input type="checkbox" style={{ borderRadius: isInsta ? '3px' : '4px' }} /> Remember me
+                                        <input type="checkbox" style={{ borderRadius: '3px' }} /> Remember me
                                     </label>
-                                    <Link to="/forgot-password" className="forgot-password" style={{ color: isInsta ? '#E53935' : '#3b82f6' }}>
+                                    <Link to="/forgot-password" className="forgot-password" style={{ color: '#E53935' }}>
                                         Forgot Password?
                                     </Link>
                                 </div>
@@ -234,7 +167,7 @@ const Login = () => {
                             <div className="input-group">
                                 <label>MFA Authenticator Code</label>
                                 <div className="input-wrapper">
-                                    <ShieldCheck size={18} className="input-icon" style={{ color: mfaFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined }} />
+                                    <ShieldCheck size={18} className="input-icon" style={{ color: mfaFocused ? '#E53935' : undefined }} />
                                     <input
                                         type="text"
                                         placeholder="000000"
@@ -248,9 +181,9 @@ const Login = () => {
                                             letterSpacing: '0.5em',
                                             textAlign: 'center',
                                             fontSize: '1.2em',
-                                            borderRadius: isInsta ? '6px' : '8px',
-                                            borderColor: mfaFocused ? (isInsta ? '#E53935' : '#3b82f6') : undefined,
-                                            boxShadow: mfaFocused ? (isInsta ? '0 0 0 3px rgba(229, 57, 53, 0.1)' : '0 0 0 3px rgba(59, 130, 246, 0.1)') : undefined,
+                                            borderRadius: '6px',
+                                            borderColor: mfaFocused ? '#E53935' : undefined,
+                                            boxShadow: mfaFocused ? '0 0 0 3px rgba(229, 57, 53, 0.1)' : undefined,
                                             outline: 'none',
                                             transition: 'all 0.2s'
                                         }}
@@ -265,11 +198,10 @@ const Login = () => {
                             className="auth-btn btn-primary"
                             disabled={isSubmitting}
                             style={{
-                                background: isInsta ? '#E53935' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                background: '#E53935',
                                 borderColor: 'transparent',
-                                borderRadius: isInsta ? '6px' : '8px',
+                                borderRadius: '6px',
                                 height: '44px',
-                                boxShadow: isInsta ? undefined : '0 4px 12px rgba(59, 130, 246, 0.25)',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
                                 display: 'flex',

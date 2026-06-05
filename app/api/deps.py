@@ -10,9 +10,8 @@ from app.models.user import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 def get_tenant_id(request: Request) -> str:
-    """Read the incoming X-Tenant-ID request header, defaulting to 'gordian' if omitted."""
-    tenant_id = request.headers.get("X-Tenant-ID") or request.headers.get("x-tenant-id")
-    return tenant_id if tenant_id else "gordian"
+    """Read the incoming X-Tenant-ID request header, locked to 'insta'."""
+    return "insta"
 
 def get_current_user(
     request: Request,
@@ -31,7 +30,7 @@ def get_current_user(
             hashed_password="dummy_password",
             role="ADMIN",
             is_active=True,
-            tenant_id="gordian"
+            tenant_id="insta"
         )
         db.add(user)
         db.commit()
