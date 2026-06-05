@@ -31,50 +31,21 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }) => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-
-    if (!user) {
-        const pathParts = window.location.pathname.split('/');
-        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
-        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
-        return <Navigate to={loginPath} replace />;
-    }
+    // Authentication check bypassed for direct link access
     return children;
 };
 
 const GordianProtectedRoute = ({ children }) => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-
-    if (!user) {
-        const pathParts = window.location.pathname.split('/');
-        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
-        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
-        return <Navigate to={loginPath} replace />;
-    }
-
-    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
-    if (activeTenant !== 'insta') {
-        return <Navigate to="/dashboard" replace />;
-    }
-
+    // Authentication and tenant check bypassed for direct link access
     return children;
 };
 
 const RootRedirect = () => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-
-    if (!user) {
-        const pathParts = window.location.pathname.split('/');
-        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
-        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
-        return <Navigate to={loginPath} replace />;
-    }
-
-    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
-    if (activeTenant === 'insta') {
+    // Automatically redirect based on URL/localStorage tenant
+    const pathParts = window.location.pathname.split('/');
+    const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
+    
+    if (tenant === 'insta') {
         return <Navigate to="/design" replace />;
     } else {
         return <Navigate to="/dashboard" replace />;
