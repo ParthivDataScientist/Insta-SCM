@@ -61,12 +61,24 @@ export default function App() {
             const search = window.location.search.toLowerCase();
             
             let tenant = 'gordian';
-            if (hostname.includes('insta') || pathname.includes('insta') || search.includes('insta')) {
+            if (hostname.includes('insta')) {
                 tenant = 'insta';
-            } else if (hostname.includes('localhost') || hostname === '127.0.0.1') {
-                const stored = localStorage.getItem('tenant_id');
-                if (stored) {
-                    tenant = stored;
+            } else if (pathname.startsWith('/storage')) {
+                tenant = 'gordian';
+            } else {
+                const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
+                if (instaPaths.some(p => pathname.startsWith(p))) {
+                    tenant = 'insta';
+                } else if (pathname.startsWith('/dashboard') || pathname.startsWith('/shipments')) {
+                    const stored = localStorage.getItem('tenant_id');
+                    tenant = (stored === 'insta') ? 'insta' : 'gordian';
+                } else if (pathname.includes('insta') || search.includes('insta')) {
+                    tenant = 'insta';
+                } else {
+                    const stored = localStorage.getItem('tenant_id');
+                    if (stored) {
+                        tenant = stored;
+                    }
                 }
             }
             

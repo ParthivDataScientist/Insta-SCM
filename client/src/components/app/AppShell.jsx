@@ -37,15 +37,22 @@ export default function AppShell({
     const hostname = window.location.hostname.toLowerCase();
     const path = window.location.pathname.toLowerCase();
     const search = window.location.search.toLowerCase();
-    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
     
-    const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
-    const isInsta = 
-        hostname.includes('insta') || 
-        path.includes('insta') || 
-        search.includes('insta') || 
-        activeTenant === 'insta' ||
-        instaPaths.some(p => path.startsWith(p));
+    let isInsta = false;
+    if (hostname.includes('insta')) {
+        isInsta = true;
+    } else if (path.startsWith('/storage')) {
+        isInsta = false;
+    } else {
+        const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
+        if (instaPaths.some(p => path.startsWith(p))) {
+            isInsta = true;
+        } else if (path.startsWith('/dashboard') || path.startsWith('/shipments')) {
+            isInsta = localStorage.getItem('tenant_id') === 'insta';
+        } else {
+            isInsta = hostname.includes('insta') || path.includes('insta') || search.includes('insta') || localStorage.getItem('tenant_id') === 'insta';
+        }
+    }
 
     const nav = useMemo(() => {
         if (!isInsta) {
