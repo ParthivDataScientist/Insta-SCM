@@ -1660,7 +1660,9 @@ def archive_shipment(
     from app.api.deps import get_tenant_id
     tenant_id = get_tenant_id(request)
     shipment = db.get(Shipment, shipment_id)
-    if not shipment or shipment.tenant_id != tenant_id:
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if shipment.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
 
     from app.services.shipment_service import toggle_archive
@@ -1685,7 +1687,9 @@ def patch_shipment_cell(
     from app.api.deps import get_tenant_id
     tenant_id = get_tenant_id(request)
     shipment_record = db.get(Shipment, shipment_id)
-    if not shipment_record or shipment_record.tenant_id != tenant_id:
+    if not shipment_record:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if shipment_record.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
 
     data = update_data.model_dump(exclude_unset=True)
@@ -1761,7 +1765,9 @@ def get_mps_detail(
     from app.api.deps import get_tenant_id
     tenant_id = get_tenant_id(request)
     shipment = db.get(Shipment, shipment_id)
-    if not shipment or shipment.tenant_id != tenant_id:
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if shipment.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
     if not shipment.is_master:
         raise HTTPException(
@@ -1776,7 +1782,9 @@ def get_shipment(shipment_id: int, request: Request, db: Session = Depends(get_s
     from app.api.deps import get_tenant_id
     tenant_id = get_tenant_id(request)
     shipment = db.get(Shipment, shipment_id)
-    if not shipment or shipment.tenant_id != tenant_id:
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if shipment.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
     return _serialize_shipment(db, shipment)
 
@@ -1816,7 +1824,9 @@ def delete_shipment(
     from app.api.deps import get_tenant_id
     tenant_id = get_tenant_id(request)
     shipment = db.get(Shipment, shipment_id)
-    if not shipment or shipment.tenant_id != tenant_id:
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if shipment.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this shipment.")
 
     from app.services.shipment_service import batch_delete

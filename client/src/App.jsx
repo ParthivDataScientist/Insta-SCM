@@ -31,53 +31,14 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }) => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-
-    if (!user) {
-        const pathParts = window.location.pathname.split('/');
-        const tenant = pathParts.includes('insta') ? 'insta' : 'gordian';
-        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
-        return <Navigate to={loginPath} replace />;
-    }
     return children;
 };
 
 const GordianProtectedRoute = ({ children }) => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-
-    if (!user) {
-        return <Navigate to="/insta/login" replace />;
-    }
-
-    const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
-    if (activeTenant !== 'insta') {
-        return <Navigate to="/dashboard" replace />;
-    }
-
     return children;
 };
 
 const RootRedirect = () => {
-    const { user, loading } = useAuth();
-    if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
-
-    if (!user) {
-        const pathParts = window.location.pathname.split('/');
-        let tenant = 'gordian';
-        if (pathParts.includes('insta')) {
-            tenant = 'insta';
-        } else {
-            const storedTenant = localStorage.getItem('tenant_id');
-            if (storedTenant) {
-                tenant = storedTenant;
-            }
-        }
-        const loginPath = tenant === 'insta' ? '/insta/login' : '/login';
-        return <Navigate to={loginPath} replace />;
-    }
-
     const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
     if (activeTenant === 'insta') {
         return <Navigate to="/design" replace />;

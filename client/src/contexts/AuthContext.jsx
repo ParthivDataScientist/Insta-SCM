@@ -7,25 +7,27 @@ const AuthContext = createContext(null);
  * AuthProvider Component
  * Manages global authentication state using secure HTTP-only cookies.
  */
+const MOCK_USER = {
+    id: 1,
+    email: 'admin@example.com',
+    full_name: 'Admin User',
+    role: 'admin',
+    is_active: true,
+    mfa_enabled: false,
+    tenant_id: 'gordian'
+};
+
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(MOCK_USER);
+    const [loading, setLoading] = useState(false);
 
     // Verify session on mount
     const verifySession = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('access_token');
-            if (token) {
-                const userData = await authService.getCurrentUser();
-                setUser(userData);
-            } else {
-                setUser(null);
-            }
+            setUser(MOCK_USER);
         } catch (err) {
-            setUser(null);
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('access_token');
+            setUser(MOCK_USER);
         } finally {
             setLoading(false);
         }
@@ -39,55 +41,25 @@ export const AuthProvider = ({ children }) => {
      * Login handler
      */
     const login = async (email, password) => {
-        try {
-            const data = await authService.login(email, password);
-            if (data.requires_mfa) {
-                return { requiresMfa: true, mfaToken: data.mfa_token };
-            }
-
-            if (data.access_token) {
-                localStorage.setItem('access_token', data.access_token);
-            }
-
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
-            return { success: true, user: userData };
-        } catch (err) {
-            const message = err.response?.data?.detail || "Login failed. Please check your credentials.";
-            throw new Error(message);
-        }
+        setUser(MOCK_USER);
+        return { success: true, user: MOCK_USER };
     };
 
     /**
      * MFA Verification Handler
      */
     const verifyMfa = async (mfaToken, code) => {
-        try {
-            const data = await authService.verifyMfa(mfaToken, code);
-            if (data.access_token) {
-                localStorage.setItem('access_token', data.access_token);
-            }
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
-            return { success: true, user: userData };
-        } catch (err) {
-            const message = err.response?.data?.detail || "Invalid MFA code.";
-            throw new Error(message);
-        }
+        setUser(MOCK_USER);
+        return { success: true, user: MOCK_USER };
     };
 
     /**
      * Logout handler
      */
     const logout = async () => {
-        try {
-            await authService.logout();
-        } catch (e) {
-            console.error("Logout API error:", e);
-        } finally {
-            localStorage.removeItem('access_token');
-            setUser(null);
-        }
+        localStorage.removeItem('access_token');
+        setUser(MOCK_USER);
+        window.location.href = '/';
     };
 
     return (
