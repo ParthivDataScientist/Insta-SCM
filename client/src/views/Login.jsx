@@ -28,7 +28,10 @@ const Login = () => {
     const navigate = useNavigate();
     const { tenant } = useParams();
 
-    const activeTenant = (tenant === 'insta' || window.location.pathname.includes('/insta')) ? 'insta' : 'gordian';
+    const hostname = window.location.hostname.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    const activeTenant = (tenant === 'insta' || hostname.includes('insta') || pathname.includes('insta') || search.includes('insta')) ? 'insta' : 'gordian';
     const isInsta = activeTenant === 'insta';
 
     useEffect(() => {

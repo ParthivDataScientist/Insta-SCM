@@ -12,11 +12,18 @@ export const AristroLogo = () => (
 );
 
 export default function AppLogo({ className, style }) {
+    const hostname = window.location.hostname.toLowerCase();
+    const path = window.location.pathname.toLowerCase();
+    const search = window.location.search.toLowerCase();
     const activeTenant = localStorage.getItem('tenant_id') || 'gordian';
-    const path = window.location.pathname;
-    const pathParts = path.split('/');
+    
     const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
-    const isInsta = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta') || activeTenant === 'insta';
+    const isInsta = 
+        hostname.includes('insta') || 
+        path.includes('insta') || 
+        search.includes('insta') || 
+        activeTenant === 'insta' ||
+        instaPaths.some(p => path.startsWith(p));
 
     if (isInsta) {
         return (

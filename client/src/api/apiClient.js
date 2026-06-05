@@ -24,25 +24,20 @@ apiClient.interceptors.request.use((config) => {
         config.headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Parse tenant ID from the URL path, fallback to localStorage
-    const path = window.location.pathname;
-    const pathParts = path.split('/');
-    let tenantId = 'gordian';
-    const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
-    const isInstaPath = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta');
+    const hostname = window.location.hostname.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
+    const search = window.location.search.toLowerCase();
     
-    if (isInstaPath) {
+    let tenantId = 'gordian';
+    if (hostname.includes('insta') || pathname.includes('insta') || search.includes('insta')) {
         tenantId = 'insta';
-        localStorage.setItem('tenant_id', 'insta');
-    } else if (path.startsWith('/dashboard') || path.startsWith('/storage')) {
-        tenantId = 'gordian';
-        localStorage.setItem('tenant_id', 'gordian');
-    } else {
-        const storedTenant = localStorage.getItem('tenant_id');
-        if (storedTenant) {
-            tenantId = storedTenant;
+    } else if (hostname.includes('localhost') || hostname === '127.0.0.1') {
+        const stored = localStorage.getItem('tenant_id');
+        if (stored) {
+            tenantId = stored;
         }
     }
+    localStorage.setItem('tenant_id', tenantId);
     config.headers['X-Tenant-ID'] = tenantId;
     
     return config;
@@ -57,13 +52,13 @@ apiClient.interceptors.response.use((response) => {
     if (error.response && error.response.status === 401) {
         // Auto-logout: Clear local session and redirect dynamically based on tenant
         localStorage.removeItem('access_token');
-        const path = window.location.pathname;
-        const pathParts = path.split('/');
-        const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
-        const isInsta = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta') || localStorage.getItem('tenant_id') === 'insta';
+        const hostname = window.location.hostname.toLowerCase();
+        const pathname = window.location.pathname.toLowerCase();
+        const search = window.location.search.toLowerCase();
+        const isInsta = hostname.includes('insta') || pathname.includes('insta') || search.includes('insta') || localStorage.getItem('tenant_id') === 'insta';
         
         const loginPath = isInsta ? '/insta/login' : '/login';
-        if (path !== loginPath) {
+        if (window.location.pathname !== loginPath) {
             window.location.href = loginPath;
         }
     }

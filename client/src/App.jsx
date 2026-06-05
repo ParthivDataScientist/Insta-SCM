@@ -56,25 +56,21 @@ const TenantRedirect = () => {
 export default function App() {
     useEffect(() => {
         const handlePathChange = () => {
-            const path = window.location.pathname;
-            const pathParts = path.split('/');
+            const hostname = window.location.hostname.toLowerCase();
+            const pathname = window.location.pathname.toLowerCase();
+            const search = window.location.search.toLowerCase();
             
             let tenant = 'gordian';
-            const instaPaths = ['/design', '/projects', '/stages', '/board', '/project-officer', '/timeline'];
-            const isInstaPath = instaPaths.some(p => path.startsWith(p)) || pathParts.includes('insta');
-            
-            if (isInstaPath) {
+            if (hostname.includes('insta') || pathname.includes('insta') || search.includes('insta')) {
                 tenant = 'insta';
-                localStorage.setItem('tenant_id', 'insta');
-            } else if (path.startsWith('/dashboard') || path.startsWith('/storage')) {
-                tenant = 'gordian';
-                localStorage.setItem('tenant_id', 'gordian');
-            } else {
-                const storedTenant = localStorage.getItem('tenant_id');
-                if (storedTenant) {
-                    tenant = storedTenant;
+            } else if (hostname.includes('localhost') || hostname === '127.0.0.1') {
+                const stored = localStorage.getItem('tenant_id');
+                if (stored) {
+                    tenant = stored;
                 }
             }
+            
+            localStorage.setItem('tenant_id', tenant);
             
             const isInsta = tenant === 'insta';
             document.title = isInsta 
