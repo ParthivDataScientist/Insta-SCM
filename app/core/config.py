@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     FEDEX_URL: str = "https://apis.fedex.com"
     FEDEX_ENABLE_MOCK_DATA: bool = False
 
+    GEMINI_API_KEY: str = ""
+    LOCAL_EXCEL_SHEET_PATH: str = os.path.join(_ROOT_DIR, "storage", "shipments_weight.xlsx")
+
     UPS_CLIENT_ID: str = ""
     UPS_CLIENT_SECRET: str = ""
 

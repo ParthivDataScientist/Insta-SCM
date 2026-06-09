@@ -16,11 +16,11 @@ from app.models.shipment import Shipment
 def inspect_neon_schema():
     print(">>> Connecting to Neon PostgreSQL and inspecting physical schema...")
     print(f"    Target Database Host: {settings.DATABASE_URL.split('@')[-1].split('/')[0] if '@' in settings.DATABASE_URL else 'localhost'}")
-    
     inspector = inspect(engine)
     physical_tables = inspector.get_table_names()
     defined_tables = list(SQLModel.metadata.tables.keys())
-    
+    print(physical_tables)
+    print(defined_tables)
     print("\n--- TABLES SUMMARY ---")
     print(f"Total Physical Tables in Neon: {len(physical_tables)}")
     print(f"Total Code-Defined Models:    {len(defined_tables)}")
@@ -36,7 +36,7 @@ def inspect_neon_schema():
     for table_name in physical_tables:
         if table_name not in defined_tables:
             continue
-            
+        #if table_name == "user_tenant":
         print(f"\nAnalyzing Table: '{table_name}'")
         
         # Get physical columns from Neon
