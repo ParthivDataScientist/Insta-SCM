@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insta Exhibitions — Truck Logistics Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#0b2545; --navy2:#13315c; --blue:#1d6fb8; --blue-soft:#e8f1fa;
+    --teal:#0f6e56; --teal-soft:#e3f3ee; --ink:#1b2733; --muted:#6b7a8d;
+    --line:#e2e8f0; --line2:#eef2f7; --bg:#f5f7fa; --white:#fff;
+    --amber-soft:#fdf2dd; --amber-ink:#8a5a00; --red:#c0392b; --green:#1e7a4d; --radius:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Inter',sans-serif; color:var(--ink); min-height:100vh; background:var(--bg);}
+
+  /* LOGIN */
+  #loginScreen{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    background:radial-gradient(900px 500px at 15% -10%, #173a6b 0%, transparent 60%),
+      radial-gradient(900px 500px at 100% 110%, #0f6e56 0%, transparent 55%),
+      linear-gradient(160deg,#0b2545,#13315c);}
+  .login{width:100%; max-width:400px; background:var(--white); border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.4); overflow:hidden; animation:rise .5s ease both;}
+  .login .top{padding:30px 32px 22px; text-align:center; border-bottom:1px solid var(--line2);}
+  .login .logo{width:78px; height:78px; margin:0 auto 14px; border-radius:18px; background:#fff; border:1px solid var(--line); padding:8px; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(13,37,69,.12);}
+  .login .logo img{width:100%; height:100%; object-fit:contain;}
+  .login h1{font-family:'Sora',sans-serif; font-size:19px; font-weight:700; color:var(--navy); letter-spacing:-.3px;}
+  .login .sub{font-size:12.5px; color:var(--muted); margin-top:3px; font-weight:500;}
+  .login .body{padding:26px 32px 30px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12px; font-weight:600; color:var(--navy2); margin-bottom:7px;}
+  .field input{width:100%; border:1px solid var(--line); border-radius:11px; padding:12px 13px; font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); background:#fcfdfe; outline:none; transition:border-color .15s, box-shadow .15s;}
+  .field input:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(29,111,184,.15); background:#fff;}
+  .btn-login{width:100%; margin-top:6px; cursor:pointer; border:none; border-radius:11px; padding:13px; font-family:'Sora',sans-serif; font-weight:600; font-size:14px; color:#fff; background:linear-gradient(145deg,var(--blue),var(--navy2)); box-shadow:0 6px 18px rgba(29,111,184,.32); transition:transform .15s;}
+  .btn-login:hover{transform:translateY(-1px);}
+  .err{display:none; margin-top:12px; font-size:12px; font-weight:600; color:var(--red); text-align:center;}
+  .hint{margin-top:18px; padding-top:16px; border-top:1px dashed var(--line); font-size:11px; color:var(--muted); line-height:1.7;}
+  .hint b{color:var(--navy2);}
+  .login .footer{padding:14px; text-align:center; font-size:11px; color:var(--muted); background:#fafcfe; border-top:1px solid var(--line2);}
+
+  /* APP */
+  #appScreen{display:none;}
+  .appbar{background:linear-gradient(180deg,var(--navy),var(--navy2)); color:#fff; padding:11px 20px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+  .appbar .who{display:flex; align-items:center; gap:12px;}
+  .appbar .mini{width:42px; height:42px; border-radius:11px; background:#fff; padding:5px; display:flex; align-items:center; justify-content:center;}
+  .appbar .mini img{width:100%; height:100%; object-fit:contain;}
+  .appbar h2{font-family:'Sora',sans-serif; font-size:15px; font-weight:600;}
+  .appbar .role{font-size:11.5px; color:#aec6e3;}
+  .appbar .right{display:flex; align-items:center; gap:10px; font-size:12.5px; flex-wrap:wrap;}
+  .clock{color:#aec6e3;}
+  .btn{font-family:'Sora',sans-serif; cursor:pointer; border:none; border-radius:10px; padding:9px 15px; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:7px; transition:transform .15s, box-shadow .15s;}
+  .btn-export{background:linear-gradient(145deg,var(--teal),#0a5240); color:#fff; box-shadow:0 5px 16px rgba(15,110,86,.3);}
+  .btn-export:hover{transform:translateY(-1px);}
+  .logout{background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:#fff;}
+  .logout:hover{background:rgba(255,255,255,.24);}
+  .stage{padding:22px; max-width:1340px; margin:0 auto;}
+
+  .toolbar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;}
+  .pill{background:var(--white); border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:12px; font-weight:600; color:var(--navy2); display:flex; align-items:center; gap:7px;}
+  .pill .dot{width:8px; height:8px; border-radius:50%; background:var(--teal);}
+  .btn-clear{background:var(--white); color:var(--navy2); border:1px solid var(--line);}
+  .btn-clear:hover{background:#eef2f7;}
+
+  .card{background:var(--white); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; box-shadow:0 10px 40px rgba(13,37,69,.07); animation:fadeUp .4s ease both;}
+  .scroll{overflow-x:auto;}
+  table{border-collapse:separate; border-spacing:0; min-width:1480px; width:100%;}
+  thead th{position:sticky; top:0; z-index:2; background:linear-gradient(180deg,var(--navy),var(--navy2)); color:#dce8f5; font-family:'Sora',sans-serif; font-weight:600; font-size:11px; letter-spacing:.5px; text-transform:uppercase; text-align:left; padding:13px 11px; white-space:nowrap;}
+  thead th.center{text-align:center;}
+  thead tr.filterrow th{position:sticky; top:43px; z-index:2; background:#11294a; padding:7px 8px; border-bottom:2px solid var(--blue); text-transform:none; letter-spacing:0;}
+  thead tr.filterrow input, thead tr.filterrow select{width:100%; border:1px solid #c7d2e0; border-radius:7px; padding:6px 8px; font-family:'Inter',sans-serif; font-size:11.5px; background:#fff; color:#1b2733; outline:none;}
+  thead tr.filterrow input::placeholder{color:#94a3b8;}
+  thead tr.filterrow input:focus, thead tr.filterrow select:focus{border-color:var(--blue); box-shadow:0 0 0 2px rgba(29,111,184,.35);}
+  tbody td{padding:10px 11px; border-bottom:1px solid var(--line2); vertical-align:top;}
+  tbody tr.req-start td{border-top:2px solid #dbe5f0;}
+  .reqgrp:hover td.reqcell{background:var(--blue-soft);}
+  td.reqcell{background:#fafcfe;}
+  .reqno{font-family:'Sora',sans-serif; font-weight:700; color:var(--blue); font-size:13px; white-space:nowrap;}
+  .pm{font-weight:600; color:var(--navy2); white-space:nowrap;}
+  .nowrap{white-space:nowrap;}
+  .chip{display:inline-block; background:var(--blue-soft); color:var(--navy); font-weight:600; font-size:11px; padding:3px 9px; border-radius:7px; white-space:nowrap;}
+  .qty{display:inline-flex; align-items:center; justify-content:center; min-width:26px; height:26px; background:var(--navy); color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:12px; border-radius:8px; padding:0 7px;}
+  .trucktag{font-family:'Sora',sans-serif; font-weight:600; color:var(--navy2); white-space:nowrap; display:flex; align-items:center; gap:6px;}
+  .trucktag i{color:var(--blue); font-style:normal;}
+  .tstatus{display:inline-block; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:6px; margin-top:5px; letter-spacing:.3px;}
+  .tstatus.appr{background:#e7f6ee; color:var(--green);}
+  .tstatus.wait{background:var(--amber-soft); color:var(--amber-ink);}
+  .tstatus.draft{background:#eef2f7; color:var(--muted);}
+  .vend{min-width:170px;}
+  .vbox{border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:6px; background:#fcfdfe;}
+  .vbox:last-child{margin-bottom:0;}
+  .vbox.lowest{border-color:#bfe3d4; background:var(--teal-soft);}
+  .vbox.rec{border-color:#9fc4ea; background:var(--blue-soft);}
+  .vbox.approved{border:2px solid var(--green); background:#e7f6ee;}
+  .vbox .vn{font-size:12px; font-weight:600; color:var(--navy2);}
+  .vbox .va{font-size:13px; font-family:'Sora',sans-serif; font-weight:600; color:var(--ink);}
+  .vbox .vtag{font-size:10px; font-weight:600; margin-top:3px; display:inline-block;}
+  .vtag.rec{color:var(--blue);} .vtag.low{color:var(--green);} .vtag.appr{color:var(--green);}
+  .vinput input{width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12px; background:#fff; outline:none; margin-bottom:5px;}
+  .vinput input:focus{border-color:var(--blue); box-shadow:0 0 0 2px rgba(29,111,184,.15);}
+  .vinput .amtwrap{position:relative;}
+  .vinput .amtwrap .cur{position:absolute; left:8px; top:7px; color:var(--muted); font-size:11px; font-weight:600;}
+  .vinput .amtwrap input{padding-left:20px; margin-bottom:0;}
+  .approve-btn{width:100%; cursor:pointer; border:1px solid var(--line); background:#fff; color:var(--navy2); border-radius:8px; padding:6px; font-family:'Sora',sans-serif; font-weight:600; font-size:11px; margin-top:5px;}
+  .approve-btn:hover{background:var(--blue-soft); border-color:var(--blue);}
+  .actcell{min-width:150px; text-align:center;}
+  .send{width:100%; cursor:pointer; border:none; border-radius:10px; padding:10px 12px; font-family:'Sora',sans-serif; font-weight:600; font-size:12px; color:#fff; background:linear-gradient(145deg,var(--blue),var(--navy2)); box-shadow:0 4px 12px rgba(29,111,184,.28); transition:transform .15s; display:flex; align-items:center; justify-content:center; gap:7px;}
+  .send:hover:not(:disabled){transform:translateY(-1px);}
+  .send.waiting{background:#eef2f7; color:var(--muted); box-shadow:none; cursor:default;}
+  .send.approved{background:linear-gradient(145deg,var(--green),#15603b); cursor:default;}
+  .msg{margin-top:8px; font-size:10.5px; font-weight:600; color:var(--muted); line-height:1.4;}
+  .msg.err{color:var(--red);} .msg.ok{color:var(--green);}
+  .foot{padding:13px 16px; font-size:11.5px; color:var(--muted); border-top:1px solid var(--line2); background:#fafcfe; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+  .noresult{padding:30px; text-align:center; color:var(--muted); font-size:13px;}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:26px; box-shadow:0 10px 40px rgba(13,37,69,.07);}
+  .panel h3{font-family:'Sora',sans-serif; font-size:17px; color:var(--navy); margin-bottom:6px;}
+  .panel p{font-size:13px; color:var(--muted); line-height:1.6;}
+  .tag{display:inline-block; margin-bottom:14px; font-size:11.5px; font-weight:600; padding:4px 11px; border-radius:999px;}
+  .tag.pm{background:var(--blue-soft); color:var(--navy);}
+  .pmform label{display:block; font-size:12px; font-weight:600; color:var(--navy2); margin-bottom:6px;}
+  .pmform input, .pmform select, .pmform textarea{width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 10px; font-family:'Inter',sans-serif; font-size:13px; color:var(--ink); background:#fcfdfe; outline:none;}
+  .pmform input:focus, .pmform select:focus, .pmform textarea:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(29,111,184,.14); background:#fff;}
+  .pmgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:16px;}
+  .pmtable{width:100%; border-collapse:separate; border-spacing:0; min-width:760px;}
+  .pmtable th{background:var(--navy); color:#dce8f5; font-family:'Sora',sans-serif; font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; text-align:left; padding:9px 8px; white-space:nowrap;}
+  .pmtable td{padding:5px; border-bottom:1px solid var(--line2); vertical-align:top;}
+  .pmtable input, .pmtable select{margin-bottom:0; font-size:12px; padding:7px 8px;}
+  .pmtable .srno{text-align:center; font-weight:700; color:var(--blue); font-family:'Sora',sans-serif;}
+  .addrow{background:#fff; color:var(--navy2); border:1px dashed var(--blue); border-radius:9px; padding:8px 14px; font-family:'Sora',sans-serif; font-weight:600; font-size:12px; cursor:pointer; margin-top:10px;}
+  .addrow:hover{background:var(--blue-soft);}
+  .delrow{background:#fff; border:1px solid var(--line); color:var(--red); border-radius:8px; width:30px; height:30px; cursor:pointer;}
+  .submitreq{margin-top:18px; width:100%; cursor:pointer; border:none; border-radius:11px; padding:13px; font-family:'Sora',sans-serif; font-weight:600; font-size:14px; color:#fff; background:linear-gradient(145deg,var(--blue),var(--navy2)); box-shadow:0 6px 18px rgba(29,111,184,.3);}
+  .submitreq:hover{transform:translateY(-1px);}
+  .okbox{margin-top:16px; padding:14px 16px; background:#e7f6ee; border-radius:11px; font-size:13px; font-weight:600; color:var(--green); display:none;}
+  .pmlist td{padding:9px 11px; border-bottom:1px solid var(--line2); font-size:12.5px;}
+  .pmlist th{background:linear-gradient(180deg,var(--navy),var(--navy2)); color:#dce8f5; font-family:'Sora',sans-serif; font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; text-align:left; padding:11px;}
+  .stbadge{font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:6px;}
+  .stbadge.draft{background:#eef2f7; color:var(--muted);} .stbadge.pending{background:var(--amber-soft); color:var(--amber-ink);} .stbadge.approved{background:#e7f6ee; color:var(--green);}
+  .stat{display:flex; gap:12px; flex-wrap:wrap; margin-top:18px;}
+  .stat>div{flex:1; min-width:120px; background:#fafcfe; border:1px solid var(--line2); border-radius:12px; padding:14px;}
+  .stat .n{font-family:'Sora',sans-serif; font-size:22px; font-weight:700; color:var(--navy);}
+  .stat .l{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .pipe{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px;}
+  .pcard{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 6px 20px rgba(13,37,69,.05); position:relative; overflow:hidden;}
+  .pcard:before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--c,#1d6fb8);}
+  .pcard .pn{font-family:'Sora',sans-serif; font-size:26px; font-weight:700; color:var(--navy); line-height:1;}
+  .pcard .pl{font-size:11.5px; color:var(--muted); margin-top:5px; font-weight:600;}
+  .pcard .pi{position:absolute; right:12px; top:12px; font-size:18px; opacity:.35; color:var(--c,#1d6fb8);}
+  .pcard[data-pstatus]:hover{border-color:var(--c,#1d6fb8); transform:translateY(-1px);}
+  .pcard.pcard-active{border:2px solid var(--c,#1d6fb8); background:#f3f8fd;}
+  .pcard.pcard-active:before{width:6px;}
+  @keyframes rise{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  @keyframes fadeUp{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login">
+    <div class="top">
+      <div class="logo"><img src="data:image/png;base64,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" alt="Insta Exhibitions"></div>
+      <h1>Insta Exhibitions Pvt. Ltd.</h1>
+      <div class="sub">Truck logistics portal</div>
+    </div>
+    <div class="body">
+      <div class="field"><label>Username</label><input type="text" id="user" placeholder="e.g. anil" autocomplete="off"></div>
+      <div class="field"><label>Password</label><input type="password" id="pass" placeholder="Enter password"></div>
+      <button class="btn-login" id="loginBtn">Sign in</button>
+      <div class="err" id="err">Incorrect username or password.</div>
+      <div class="hint"><b>Demo logins</b> (password <b>1234</b>):<br>
+        PMs: uday, abhijeet, kailash, satyendra, ajit, prathamesh<br>
+        Logistics: <b>anil</b> &nbsp;·&nbsp; Senior: <b>manager</b></div>
+    </div>
+    <div class="footer">Insta Exhibitions Pvt. Ltd.</div>
+  </div>
+</div>
+
+<div id="appScreen">
+  <div class="appbar">
+    <div class="who">
+      <div class="mini"><img src="data:image/png;base64,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" alt="Insta"></div>
+      <div><h2 id="barName">—</h2><div class="role" id="barRole">—</div></div>
+    </div>
+    <div class="right">
+      <span class="clock" id="clock"></span>
+      <button class="btn btn-export" id="exportBtn" style="display:none;"><span style="font-size:14px;">&#8615;</span> Export to Excel</button>
+      <button class="btn logout" id="logoutBtn">Log out</button>
+    </div>
+  </div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<script>
+(function(){
+  var users = {
+    uday:{name:'Uday Ambala',role:'pm'}, abhijeet:{name:'Abhijeet',role:'pm'},
+    kailash:{name:'Kailash',role:'pm'}, satyendra:{name:'Satyendra',role:'pm'},
+    ajit:{name:'Ajit Tiwari',role:'pm'}, prathamesh:{name:'Prathamesh Magdum',role:'pm'},
+    anil:{name:'Anil Kate',role:'lm'}, manager:{name:'Manager',role:'sr'}
+  };
+  var PASSWORD='1234';
+  var roleLabel={pm:'Project manager', lm:'Logistics manager', sr:'Senior — approvals'};
+  var STORE='insta_portal_state_v1';
+  var BRANCHES=['Vasai','Manesar','Haridwar','Bangalore','Chennai','Ahmedabad'];
+  var BRANCH_CODE={Vasai:'VAS', Manesar:'MAN', Haridwar:'HAR', Bangalore:'BLR', Chennai:'CHN', Ahmedabad:'AMD'};
+  var TRUCK_SIZES=['Mini truck (Tata Ace)','17 ft','19 ft','22 ft','32 ft container','Open body','Trailer'];
+  function nextReqNo(code){
+    var max=1060;
+    state.forEach(function(R){ var m=R.id.match(/(\d+)$/); if(m){ var n=+m[1]; if(n>max) max=n; } });
+    return 'REQ-'+code+'-'+(max+1);
+  }
+
+  var seed = [
+    {id:'REQ-VAS-1051', pm:'Uday Ambala', branch:'Vasai', date:'2026-06-08', size:'32 ft container', from:'Vasai warehouse', to:'Pragati Maidan, Delhi', unload:'2026-06-10', proj:'Auto Expo 2026', sent:false,
+      trucks:[{vendors:[{n:'Sharma Transport',a:42000},{n:'Highway Carriers',a:39500},{n:'Royal Logistics',a:41000}], approved:null}]},
+    {id:'REQ-VAS-1052', pm:'Uday Ambala', branch:'Vasai', date:'2026-06-08', size:'22 ft', from:'Vasai warehouse', to:'Pragati Maidan, Delhi', unload:'2026-06-10', proj:'Auto Expo 2026', sent:false,
+      trucks:[{vendors:[{n:'Sharma Transport',a:28000},{n:'Highway Carriers',a:27000},{n:'Royal Logistics',a:29000}], approved:null},
+              {vendors:[{n:'Sharma Transport',a:28500},{n:'Highway Carriers',a:27500},{n:'Royal Logistics',a:28000}], approved:null}]},
+    {id:'REQ-MAN-1053', pm:'Abhijeet', branch:'Manesar', date:'2026-06-07', size:'19 ft', from:'Manesar plant', to:'BEC, Goregaon', unload:'2026-06-08', proj:'Pharma Tech Mumbai', sent:false,
+      trucks:[{vendors:[{n:'North Cargo',a:22000},{n:'Speed Movers',a:21500},{n:'Delhi Freight',a:23000}], approved:null}]},
+    {id:'REQ-HAR-1054', pm:'Kailash', branch:'Haridwar', date:'2026-06-05', size:'32 ft container', from:'Haridwar depot', to:'Auto Cluster, Pune', unload:'2026-06-06', proj:'Food & Hospitality', sent:false,
+      trucks:[{vendors:[{n:'Uttarakhand Roadways',a:55000},{n:'Ganga Transport',a:53500},{n:'Shivalik Cargo',a:56000}], approved:null}]},
+    {id:'REQ-BLR-1056', pm:'Ajit Tiwari', branch:'Bangalore', date:'2026-06-04', size:'Trailer', from:'Bangalore hub', to:'Surat Intl. Exhibition', unload:'2026-06-05', proj:'Textile Expo Surat', sent:false,
+      trucks:[{vendors:[{n:'Deccan Movers',a:68000},{n:'South Star Logistics',a:65000},{n:'Karnataka Carriers',a:67000}], approved:null}]},
+    {id:'REQ-CHN-1058', pm:'Prathamesh Magdum', branch:'Chennai', date:'2026-06-03', size:'22 ft', from:'Chennai yard', to:'Trade Centre, Chennai', unload:'2026-06-04', proj:'Engineering Fair', sent:false,
+      trucks:[{vendors:[{n:'Coromandel Transport',a:24000},{n:'Marina Cargo',a:23500},{n:'TN Express',a:25000}], approved:null}]}
+  ];
+
+  function loadState(){
+    try{ var raw=localStorage.getItem(STORE); if(raw) return JSON.parse(raw); }catch(e){}
+    return JSON.parse(JSON.stringify(seed));
+  }
+  function saveState(){ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
+  var state=loadState();
+  var current=null;
+
+  function fmt(d){var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+  function inr(n){return '₹'+Number(n).toLocaleString('en-IN');}
+  function lowestIdx(vs){var m=Math.min.apply(null,vs.map(function(v){return v.a;}));return vs.map(function(v){return v.a;}).indexOf(m);}
+
+  function login(){
+    var u=document.getElementById('user').value.trim().toLowerCase();
+    var p=document.getElementById('pass').value;
+    var rec=users[u];
+    if(!rec || p!==PASSWORD){ document.getElementById('err').style.display='block'; return; }
+    document.getElementById('err').style.display='none';
+    current=rec;
+    document.getElementById('barName').textContent=rec.name;
+    document.getElementById('barRole').textContent=roleLabel[rec.role];
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('appScreen').style.display='block';
+    document.getElementById('exportBtn').style.display = (rec.role==='lm'||rec.role==='sr')?'flex':'none';
+    renderStage();
+  }
+  function logout(){
+    current=null;
+    document.getElementById('appScreen').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('user').value=''; document.getElementById('pass').value='';
+  }
+
+  function renderStage(){
+    if(!current) return;
+    if(current.role==='lm' || current.role==='sr') return renderLogistics();
+    return renderPM();
+  }
+
+  function renderPM(){
+    var sizeOpts=TRUCK_SIZES.map(function(s){return '<option>'+s+'</option>';}).join('');
+    var branchOpts=BRANCHES.map(function(b){return '<option>'+b+'</option>';}).join('');
+    var today=new Date().toISOString().slice(0,10);
+    var html=
+      '<div class="panel pmform"><span class="tag pm">Project manager</span><h3>New truck requisition</h3>'+
+      '<p style="margin-bottom:16px;">Fill the requisition and submit — it goes straight to the logistics team (Anil) for quotes.</p>'+
+      '<div class="pmgrid">'+
+        '<div><label>Requisition date</label><input type="date" id="pf-date" value="'+today+'"></div>'+
+        '<div><label>Project manager</label><input type="text" id="pf-pm" value="'+current.name+'" readonly style="background:#eef2f7;"></div>'+
+        '<div><label>Branch</label><select id="pf-branch">'+branchOpts+'</select></div>'+
+        '<div><label>Exhibition / project name</label><input type="text" id="pf-proj" placeholder="e.g. Auto Expo 2026"></div>'+
+      '</div>'+
+      '<div style="overflow-x:auto;"><table class="pmtable"><thead><tr>'+
+        '<th style="width:40px;">Sr</th><th>Truck required date</th><th>Truck size</th><th>From location</th>'+
+        '<th>To location</th><th>Unloading date</th><th>Special instructions</th><th style="width:40px;"></th>'+
+      '</tr></thead><tbody id="pf-rows"></tbody></table></div>'+
+      '<button class="addrow" id="pf-add"><i class="ti ti-plus" style="vertical-align:-2px;"></i> Add another truck</button>'+
+      '<button class="submitreq" id="pf-submit"><span style="font-size:15px;">&#9993;</span> Submit requisition to logistics</button>'+
+      '<div class="okbox" id="pf-ok"></div></div>';
+
+    // PM's own requisitions list
+    var mine=state.filter(function(r){return r.pm===current.name;});
+    var listRows='';
+    mine.forEach(function(R){
+      var st=reqStatus(R);
+      var label=st==='approved'?'Approved':(st==='pending'?'In approval':'With logistics');
+      listRows+='<tr><td><span class="reqno">'+R.id+'</span></td><td>'+R.size+'</td>'+
+        '<td><span class="chip">'+R.branch+'</span></td><td>'+R.proj+'</td>'+
+        '<td class="nowrap">'+fmt(R.date)+'</td><td style="text-align:center;">'+R.trucks.length+'</td>'+
+        '<td><span class="stbadge '+st+'">'+label+'</span></td></tr>';
+    });
+    if(mine.length===0) listRows='<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:18px;">No requisitions yet. Submit one above.</td></tr>';
+    html+='<div class="card" style="margin-top:22px;"><table class="pmlist"><thead><tr>'+
+      '<th>Req. no.</th><th>Truck size</th><th>Branch</th><th>Project</th><th>Date</th><th style="text-align:center;">Qty</th><th>Status</th>'+
+      '</tr></thead><tbody>'+listRows+'</tbody></table>'+
+      '<div class="foot"><span>Your requisitions and their live status.</span><span>Insta Exhibitions Pvt. Ltd.</span></div></div>';
+
+    document.getElementById('stage').innerHTML=html;
+
+    var rowsBody=document.getElementById('pf-rows');
+    function addRow(){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td class="srno"></td>'+
+        '<td><input type="date"></td>'+
+        '<td><select>'+sizeOpts+'</select></td>'+
+        '<td><input type="text" placeholder="Origin"></td>'+
+        '<td><input type="text" placeholder="Destination"></td>'+
+        '<td><input type="date"></td>'+
+        '<td><input type="text" placeholder="Notes (optional)"></td>'+
+        '<td style="text-align:center;"><button class="delrow" title="Remove">&#10005;</button></td>';
+      rowsBody.appendChild(tr);
+      tr.querySelector('.delrow').addEventListener('click', function(){ tr.remove(); renumber(); });
+      renumber();
+    }
+    function renumber(){ Array.prototype.forEach.call(rowsBody.querySelectorAll('.srno'), function(c,i){ c.textContent=i+1; }); }
+    document.getElementById('pf-add').addEventListener('click', addRow);
+    addRow();
+
+    document.getElementById('pf-submit').addEventListener('click', function(){
+      var branch=document.getElementById('pf-branch').value;
+      var proj=document.getElementById('pf-proj').value.trim();
+      var date=document.getElementById('pf-date').value;
+      var ok=document.getElementById('pf-ok');
+      if(!proj){ ok.style.display='block'; ok.style.background='#fde9e7'; ok.style.color='var(--red)'; ok.textContent='Please enter the project name.'; return; }
+      var trs=Array.prototype.slice.call(rowsBody.children);
+      var trucks=[]; var firstReqDate=date, firstFrom='', firstTo='', firstUnload=date, firstSize='';
+      var valid=true;
+      trs.forEach(function(tr,i){
+        var inp=tr.querySelectorAll('input'); var sel=tr.querySelector('select');
+        var rdate=inp[0].value, size=sel.value, from=inp[1].value.trim(), to=inp[2].value.trim(), unload=inp[3].value;
+        if(!from||!to){ valid=false; }
+        if(i===0){ firstReqDate=rdate||date; firstFrom=from; firstTo=to; firstUnload=unload||date; firstSize=size; }
+        trucks.push({size:size, from:from, to:to, rdate:rdate, unload:unload,
+          vendors:[{n:'',a:0},{n:'',a:0},{n:'',a:0}], approved:null});
+      });
+      if(trucks.length===0 || !valid){ ok.style.display='block'; ok.style.background='#fde9e7'; ok.style.color='var(--red)'; ok.textContent='Each truck needs at least a From and To location.'; return; }
+      // Group as one requisition (shared header from first row). Vendors blank for logistics to fill.
+      var id=nextReqNo(BRANCH_CODE[branch]||'REQ');
+      var newReq={ id:id, pm:current.name, branch:branch, date:firstReqDate, size:firstSize,
+        from:firstFrom, to:firstTo, unload:firstUnload, proj:proj, sent:false,
+        trucks:trucks.map(function(t){ return {vendors:[{n:'',a:0},{n:'',a:0},{n:'',a:0}], approved:null,
+          size:t.size, from:t.from, to:t.to, rdate:t.rdate, unload:t.unload}; }) };
+      state.unshift(newReq); saveState();
+      ok.style.display='block'; ok.style.background='#e7f6ee'; ok.style.color='var(--green)';
+      ok.innerHTML='&#10003; Requisition '+id+' submitted with '+trucks.length+' truck'+(trucks.length>1?'s':'')+'. Logistics will now collect 3 vendor quotes.';
+      setTimeout(function(){ renderPM(); }, 1400);
+    });
+  }
+
+  function lowestIdxNZ(vs){
+    var idx=-1, min=Infinity;
+    vs.forEach(function(v,i){ if(v.a>0 && v.a<min){ min=v.a; idx=i; } });
+    return idx;
+  }
+  function vBoxLM(R, tk, ti, vi){
+    var v=tk.vendors[vi]; var li=lowestIdxNZ(tk.vendors);
+    var cls='vbox'; var tag='';
+    var isManager = current && current.role==='sr';
+    var isLogistics = current && current.role==='lm';
+    // Logistics can enter/edit quotes while requisition not yet sent
+    if(isLogistics && !R.sent){
+      return '<div class="vbox vinput"><input type="text" placeholder="Transporter name" value="'+(v.n||'')+'" data-vn="'+R.id+'|'+ti+'|'+vi+'">'+
+        '<div class="amtwrap"><span class="cur">&#8377;</span><input type="number" placeholder="Quote" value="'+(v.a>0?v.a:'')+'" data-va="'+R.id+'|'+ti+'|'+vi+'"></div></div>';
+    }
+    if(tk.approved===vi){ cls+=' approved'; tag='<span class="vtag appr">&#10003; Approved by manager</span>'; }
+    else if(tk.approved!==null){ /* another vendor approved on this truck */ }
+    else if(vi===li){ cls+=' lowest'; tag='<span class="vtag low">Lowest quote</span>'; }
+    var action='';
+    if(isManager && R.sent && tk.approved===null){
+      action='<button class="approve-btn" data-appr="'+R.id+'|'+ti+'|'+vi+'">Approve this transporter</button>';
+    } else if(isManager && tk.approved===vi){
+      action='<button class="approve-btn" data-unappr="'+R.id+'|'+ti+'" style="border-color:var(--line); color:var(--muted);">Undo approval</button>';
+    }
+    var nm = v.n || '<span style="color:var(--muted);">—</span>';
+    var am = v.a>0 ? inr(v.a) : '<span style="color:var(--muted);">—</span>';
+    return '<div class="'+cls+'"><div class="vn">'+nm+'</div><div class="va">'+am+'</div>'+tag+action+'</div>';
+  }
+
+  function reqStatus(R){
+    var allApproved=R.trucks.every(function(t){return t.approved!==null;});
+    if(R.sent && allApproved) return 'approved';
+    if(R.sent) return 'pending';
+    return 'draft';
+  }
+  var lmStatusFilter='';
+  var srStatusFilter='';
+
+  function pipeStats(){
+    var totalReq=state.length, totalTrucks=0, draft=0, pendingReq=0, approvedReq=0, approvedTrucks=0;
+    state.forEach(function(R){
+      var qty=R.trucks.length; totalTrucks+=qty;
+      var allApproved=R.trucks.every(function(t){return t.approved!==null;});
+      R.trucks.forEach(function(t){ if(t.approved!==null) approvedTrucks++; });
+      if(allApproved && R.sent) approvedReq++;
+      else if(R.sent) pendingReq++;
+      else draft++;
+    });
+    return {totalReq:totalReq, totalTrucks:totalTrucks, draft:draft, pendingReq:pendingReq, approvedReq:approvedReq, approvedTrucks:approvedTrucks};
+  }
+  function pcard(n,label,color,icon,pstatus){
+    var clickable = pstatus ? ' data-pstatus="'+pstatus+'" style="--c:'+color+'; cursor:pointer;"' : ' style="--c:'+color+';"';
+    var active = (pstatus && pstatus===lmStatusFilter) ? ' pcard-active' : '';
+    return '<div class="pcard'+active+'"'+clickable+'><i class="ti '+icon+' pi"></i><div class="pn">'+n+'</div><div class="pl">'+label+'</div></div>';
+  }
+  function pipeLM(){
+    var s=pipeStats();
+    return '<div class="pipe">'+
+      pcard(s.totalReq,'Total requisitions','#1d6fb8','ti-clipboard-list','')+
+      pcard(s.draft,'To send / quoting','#8a5a00','ti-pencil','draft')+
+      pcard(s.pendingReq,'Pending approval','#b5641a','ti-clock-hour-4','pending')+
+      pcard(s.approvedReq,'Approved','#1e7a4d','ti-circle-check','approved')+
+      pcard(s.totalTrucks,'Total trucks','#13315c','ti-truck','')+
+    '</div>';
+  }
+  function scard(n,label,color,icon,sstatus){
+    var clickable = sstatus ? ' data-sstatus="'+sstatus+'" style="--c:'+color+'; cursor:pointer;"' : ' style="--c:'+color+';"';
+    var active = (sstatus && sstatus===srStatusFilter) ? ' pcard-active' : '';
+    return '<div class="pcard'+active+'"'+clickable+'><i class="ti '+icon+' pi"></i><div class="pn">'+n+'</div><div class="pl">'+label+'</div></div>';
+  }
+  function pipeSR(){
+    var s=pipeStats();
+    return '<div class="pipe">'+
+      scard(s.pendingReq,'Pending approval','#b5641a','ti-clock-hour-4','pending')+
+      scard(s.approvedReq,'Approved','#1e7a4d','ti-circle-check','approved')+
+      scard(s.approvedTrucks,'Trucks approved','#0f6e56','ti-truck','')+
+      scard(s.totalReq,'Total requisitions','#1d6fb8','ti-clipboard-list','')+
+    '</div>';
+  }
+
+  function renderLogistics(){
+    var rows='';
+    state.forEach(function(R){
+      var qty=R.trucks.length;
+      R.trucks.forEach(function(tk,ti){
+        var rs=(ti===0);
+        var rc='';
+        if(rs){
+          rc='<td class="reqcell" rowspan="'+qty+'"><span class="reqno">'+R.id+'</span></td>'+
+            '<td class="reqcell pm" rowspan="'+qty+'">'+R.pm+'</td>'+
+            '<td class="reqcell" rowspan="'+qty+'"><span class="chip">'+R.branch+'</span></td>'+
+            '<td class="reqcell nowrap" rowspan="'+qty+'">'+fmt(R.date)+'</td>'+
+            '<td class="reqcell" rowspan="'+qty+'">'+R.size+'</td>'+
+            '<td class="reqcell center" rowspan="'+qty+'"><span class="qty">'+qty+'</span></td>'+
+            '<td class="reqcell" rowspan="'+qty+'">'+R.from+'</td>'+
+            '<td class="reqcell" rowspan="'+qty+'">'+R.to+'</td>'+
+            '<td class="reqcell nowrap" rowspan="'+qty+'">'+fmt(R.unload)+'</td>'+
+            '<td class="reqcell" rowspan="'+qty+'">'+R.proj+'</td>';
+        }
+        var vends='';
+        for(var vi=0;vi<3;vi++){ vends+='<td class="vend">'+vBoxLM(R,tk,ti,vi)+'</td>'; }
+        var isManager = current && current.role==='sr';
+        var act='';
+        if(rs){
+          var allApproved=R.trucks.every(function(t){return t.approved!==null;});
+          if(allApproved){
+            act='<td class="actcell" rowspan="'+qty+'"><button class="send approved" disabled><i class="ti ti-circle-check"></i> Approved</button></td>';
+          } else if(R.sent){
+            var note = isManager ? 'Approve a transporter per truck' : (qty>1?'All '+qty+' trucks sent':'');
+            act='<td class="actcell" rowspan="'+qty+'"><button class="send waiting" disabled>'+(isManager?'Pending your approval':'Awaiting manager approval')+'</button>'+
+              (note?'<div class="msg">'+note+'</div>':'')+'</td>';
+          } else if(isManager){
+            act='<td class="actcell" rowspan="'+qty+'"><button class="send waiting" disabled>Not yet sent</button></td>';
+          } else {
+            act='<td class="actcell" rowspan="'+qty+'"><button class="send" data-send="'+R.id+'"><span>&#9993;</span> Send for approval</button>'+
+              (qty>1?'<div class="msg">Sends all '+qty+' trucks together</div>':'<div class="msg"></div>')+'</td>';
+          }
+        }
+        var tstat, tcls;
+        if(tk.approved!==null){ tstat='&#10003; Approved'; tcls='appr'; }
+        else if(R.sent){ tstat='Awaiting manager'; tcls='wait'; }
+        else { tstat='Not sent'; tcls='draft'; }
+        var truckCell='<td><span class="trucktag"><i>&#9654;</i> Truck '+(ti+1)+'</span><br><span class="tstatus '+tcls+'">'+tstat+'</span></td>';
+        rows+='<tr class="reqgrp'+(rs?' req-start':'')+'" data-id="'+R.id+'" data-pm="'+R.pm+'" data-branch="'+R.branch+'" data-date="'+R.date+'" data-size="'+R.size+'" data-from="'+R.from+'" data-to="'+R.to+'" data-proj="'+R.proj+'">'+
+          rc+truckCell+vends+act+'</tr>';
+      });
+    });
+
+    document.getElementById('stage').innerHTML=
+      pipeLM()+
+      '<div class="toolbar"><span class="pill"><span class="dot"></span><span id="cnt">0</span> shown</span>'+
+      '<button class="btn btn-clear" id="clearBtn">&#10005; Clear filters</button></div>'+
+      '<div class="card"><div class="scroll"><table><thead>'+
+      '<tr><th>Req. no.</th><th>Project manager</th><th>Branch</th><th>Truck reqd. date</th><th>Truck size</th><th class="center">Qty</th>'+
+      '<th>From location</th><th>To location</th><th>Unloading date</th><th>Project</th><th>Truck</th>'+
+      '<th>Transporter 1</th><th>Transporter 2</th><th>Transporter 3</th><th class="center">Action</th></tr>'+
+      '<tr class="filterrow"><th><input type="text" data-f="id" placeholder="filter"></th>'+
+      '<th><select data-f="pm"><option value="">All</option></select></th>'+
+      '<th><select data-f="branch"><option value="">All</option></select></th>'+
+      '<th><input type="date" data-f="date"></th>'+
+      '<th><select data-f="size"><option value="">All</option></select></th><th></th>'+
+      '<th><input type="text" data-f="from" placeholder="filter"></th>'+
+      '<th><input type="text" data-f="to" placeholder="filter"></th><th></th>'+
+      '<th><input type="text" data-f="proj" placeholder="filter"></th>'+
+      '<th></th><th></th><th></th><th></th><th></th></tr>'+
+      '</thead><tbody id="lmRows">'+rows+'</tbody></table></div>'+
+      '<div id="noresult" class="noresult" style="display:none;">No requisitions match these filters.</div>'+
+      '<div class="foot"><span>Send each requisition for manager approval. Approved transporters are highlighted green; each truck shows its approval status.</span><span>Insta Exhibitions Pvt. Ltd.</span></div></div>';
+
+    function opts(sel,arr){arr.forEach(function(x){var o=document.createElement('option');o.value=x;o.textContent=x;sel.appendChild(o);});}
+    opts(document.querySelector('select[data-f="pm"]'), Array.from(new Set(state.map(function(r){return r.pm;}))).sort());
+    opts(document.querySelector('select[data-f="branch"]'), Array.from(new Set(state.map(function(r){return r.branch;}))).sort());
+    opts(document.querySelector('select[data-f="size"]'), Array.from(new Set(state.map(function(r){return r.size;}))).sort());
+
+    document.querySelectorAll('[data-send]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var R=state.find(function(x){return x.id===b.dataset.send;});
+        var allQuoted=R.trucks.every(function(t){ return t.vendors.some(function(v){ return v.n && v.n.trim() && v.a>0; }); });
+        if(!allQuoted){ alert('Enter at least one transporter name and quote on every truck before sending.'); return; }
+        R.sent=true; saveState(); renderLogistics();
+      });
+    });
+    document.querySelectorAll('[data-vn]').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var p=inp.dataset.vn.split('|'); var R=state.find(function(x){return x.id===p[0];});
+        R.trucks[+p[1]].vendors[+p[2]].n=inp.value; saveState();
+      });
+    });
+    document.querySelectorAll('[data-va]').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var p=inp.dataset.va.split('|'); var R=state.find(function(x){return x.id===p[0];});
+        R.trucks[+p[1]].vendors[+p[2]].a = inp.value?Number(inp.value):0; saveState();
+      });
+    });
+    document.querySelectorAll('[data-appr]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var p=b.dataset.appr.split('|'); var R=state.find(function(x){return x.id===p[0];});
+        R.trucks[+p[1]].approved=+p[2]; saveState(); renderLogistics();
+      });
+    });
+    document.querySelectorAll('[data-unappr]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var p=b.dataset.unappr.split('|'); var R=state.find(function(x){return x.id===p[0];});
+        R.trucks[+p[1]].approved=null; saveState(); renderLogistics();
+      });
+    });
+    function applyFilters(){
+      var f={}; document.querySelectorAll('[data-f]').forEach(function(el){ f[el.dataset.f]=el.value.trim().toLowerCase(); });
+      var shown=0;
+      var live={totalReq:0,draft:0,pendingReq:0,approvedReq:0,totalTrucks:0};
+      state.forEach(function(R){
+        var colOk=true;
+        if(f.id && R.id.toLowerCase().indexOf(f.id)===-1) colOk=false;
+        if(f.pm && R.pm.toLowerCase()!==f.pm) colOk=false;
+        if(f.branch && R.branch.toLowerCase()!==f.branch) colOk=false;
+        if(f.date && R.date!==f.date) colOk=false;
+        if(f.size && R.size.toLowerCase()!==f.size) colOk=false;
+        if(f.from && R.from.toLowerCase().indexOf(f.from)===-1) colOk=false;
+        if(f.to && R.to.toLowerCase().indexOf(f.to)===-1) colOk=false;
+        if(f.proj && R.proj.toLowerCase().indexOf(f.proj)===-1) colOk=false;
+        var st=reqStatus(R);
+        if(colOk){
+          live.totalReq++; live.totalTrucks+=R.trucks.length;
+          if(st==='draft') live.draft++; else if(st==='pending') live.pendingReq++; else live.approvedReq++;
+        }
+        var ok = colOk && (!lmStatusFilter || st===lmStatusFilter);
+        document.querySelectorAll('tr[data-id="'+R.id+'"]').forEach(function(tr){ tr.style.display=ok?'':'none'; });
+        if(ok) shown++;
+      });
+      document.getElementById('cnt').textContent=shown;
+      document.getElementById('noresult').style.display=shown?'none':'block';
+      var setN=function(sel,val){ var el=document.querySelector(sel); if(el) el.textContent=val; };
+      setN('[data-pstatus="draft"] .pn', live.draft);
+      setN('[data-pstatus="pending"] .pn', live.pendingReq);
+      setN('[data-pstatus="approved"] .pn', live.approvedReq);
+      var cards=document.querySelectorAll('.pipe .pcard');
+      if(cards[0]) cards[0].querySelector('.pn').textContent=live.totalReq;
+      if(cards[4]) cards[4].querySelector('.pn').textContent=live.totalTrucks;
+    }
+    document.querySelectorAll('[data-f]').forEach(function(el){ el.addEventListener('input',applyFilters); el.addEventListener('change',applyFilters); });
+    document.querySelectorAll('[data-pstatus]').forEach(function(card){
+      card.addEventListener('click', function(){
+        var st=card.dataset.pstatus;
+        lmStatusFilter = (lmStatusFilter===st) ? '' : st;
+        document.querySelectorAll('[data-pstatus]').forEach(function(c){ c.classList.toggle('pcard-active', c.dataset.pstatus===lmStatusFilter); });
+        applyFilters();
+      });
+    });
+    document.getElementById('clearBtn').addEventListener('click', function(){
+      document.querySelectorAll('[data-f]').forEach(function(el){el.value='';});
+      lmStatusFilter='';
+      document.querySelectorAll('[data-pstatus]').forEach(function(c){ c.classList.remove('pcard-active'); });
+      applyFilters();
+    });
+    applyFilters();
+  }
+
+  function renderSenior(){
+    var sent=state.filter(function(r){return r.sent;});
+    var list=sent.filter(function(R){
+      if(!srStatusFilter) return true;
+      return reqStatus(R)===srStatusFilter;
+    });
+    var body='';
+    if(list.length===0){
+      var emptyMsg = sent.length===0 ? 'Nothing to approve yet. When Anil sends a requisition, it appears here.'
+        : 'No requisitions in this view. Tap the active card again to see all sent requisitions.';
+      body='<div class="panel"><h3>'+(srStatusFilter==='approved'?'Approved requisitions':'Pending approvals')+'</h3><p style="margin-top:10px;"><i class="ti ti-inbox" style="font-size:24px; display:block; margin-bottom:6px; opacity:.5;"></i>'+emptyMsg+'</p></div>';
+    } else {
+      list.forEach(function(R){
+        var st=reqStatus(R);
+        var statusChip = st==='approved'
+          ? '<span style="margin-left:auto; font-size:11px; font-weight:600; padding:2px 10px; border-radius:999px; background:#e7f6ee; color:var(--green);">Approved</span>'
+          : '<span style="margin-left:auto; font-size:11px; font-weight:600; padding:2px 10px; border-radius:999px; background:var(--amber-soft); color:var(--amber-ink);">Pending</span>';
+        body+='<div class="card" style="margin-bottom:16px;"><div style="padding:14px 16px; border-bottom:1px solid var(--line2); display:flex; align-items:center; gap:10px; flex-wrap:wrap;">'+
+          '<span class="reqno">'+R.id+'</span><span class="chip">'+R.branch+'</span>'+
+          '<span style="font-size:12.5px; color:var(--muted);">'+R.size+' · '+R.proj+' · PM '+R.pm+'</span>'+statusChip+'</div>'+
+          '<div style="padding:10px 16px; border-bottom:1px solid var(--line2); font-size:12.5px; color:var(--navy2); display:flex; gap:18px; flex-wrap:wrap;">'+
+            '<span><i class="ti ti-map-pin" style="font-size:14px; vertical-align:-2px; margin-right:4px; color:var(--blue);"></i><b style="font-weight:600;">From:</b> '+R.from+'</span>'+
+            '<span><i class="ti ti-flag" style="font-size:14px; vertical-align:-2px; margin-right:4px; color:var(--teal);"></i><b style="font-weight:600;">To:</b> '+R.to+'</span>'+
+            '<span><i class="ti ti-calendar" style="font-size:14px; vertical-align:-2px; margin-right:4px; color:var(--muted);"></i>Reqd. '+fmt(R.date)+' · Unload '+fmt(R.unload)+'</span>'+
+          '</div><div style="padding:14px 16px;">';
+        R.trucks.forEach(function(tk,ti){
+          var li=lowestIdx(tk.vendors); var done=tk.approved!==null;
+          body+='<div style="margin-bottom:14px;"><div style="font-size:12.5px; font-weight:600; color:var(--navy2); margin-bottom:8px;">Truck '+(ti+1)+
+            (done?' · <span style="color:var(--green);">approved: '+tk.vendors[tk.approved].n+' ('+inr(tk.vendors[tk.approved].a)+')</span>':' — select a transporter to approve')+'</div>'+
+            '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px;">';
+          tk.vendors.forEach(function(v,vi){
+            var sel=(tk.approved===vi);
+            var cls='vbox'+(sel?' approved':(vi===li?' lowest':''));
+            body+='<div class="'+cls+'"><div class="vn">'+v.n+'</div><div class="va">'+inr(v.a)+'</div>'+
+              (vi===li?'<span class="vtag low">Lowest</span>':'')+
+              (sel?'<div class="vtag appr" style="display:block;">&#10003; Approved</div>':
+                '<button class="approve-btn" data-appr="'+R.id+'|'+ti+'|'+vi+'">Approve this transporter</button>')+
+              '</div>';
+          });
+          body+='</div></div>';
+        });
+        body+='</div></div>';
+      });
+    }
+    var label = srStatusFilter==='approved' ? list.length+' approved requisition'+(list.length===1?'':'s')
+      : srStatusFilter==='pending' ? list.length+' pending requisition'+(list.length===1?'':'s')
+      : sent.length+' requisition'+(sent.length===1?'':'s')+' sent';
+    document.getElementById('stage').innerHTML=
+      pipeSR()+
+      '<div class="toolbar"><span class="pill"><span class="dot"></span>'+label+'</span>'+
+      (srStatusFilter?'<button class="btn btn-clear" id="srClear">&#10005; Show all sent</button>':'')+'</div>'+body;
+
+    document.querySelectorAll('[data-sstatus]').forEach(function(card){
+      card.addEventListener('click', function(){
+        var st=card.dataset.sstatus;
+        srStatusFilter = (srStatusFilter===st) ? '' : st;
+        renderSenior();
+      });
+    });
+    var srClear=document.getElementById('srClear');
+    if(srClear) srClear.addEventListener('click', function(){ srStatusFilter=''; renderSenior(); });
+
+    document.querySelectorAll('[data-appr]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var p=b.dataset.appr.split('|'); var R=state.find(function(x){return x.id===p[0];});
+        R.trucks[+p[1]].approved=+p[2]; saveState(); renderSenior();
+      });
+    });
+  }
+
+  function exportExcel(){
+    var head=['Req. no.','Project manager','Branch','Truck required date','Truck size','Truck Qty','From location','To location','Unloading date','Project','Truck','Transporter1 Name','Transporter1 Quote','Transporter2 Name','Transporter2 Quote','Transporter3 Name','Transporter3 Quote','Status','Approved transporter','Approved amount'];
+    var out=[head];
+    state.forEach(function(R){
+      var qty=R.trucks.length;
+      R.trucks.forEach(function(tk,ti){
+        var st = R.trucks.every(function(t){return t.approved!==null;}) ? 'Approved' : (R.sent?'Sent for approval':'Draft');
+        var ap = tk.approved!==null ? tk.vendors[tk.approved].n : '';
+        var aa = tk.approved!==null ? tk.vendors[tk.approved].a : '';
+        out.push([R.id,R.pm,R.branch,fmt(R.date),R.size,qty,R.from,R.to,fmt(R.unload),R.proj,'Truck '+(ti+1),
+          tk.vendors[0].n,tk.vendors[0].a,tk.vendors[1].n,tk.vendors[1].a,tk.vendors[2].n,tk.vendors[2].a, st, ap, aa]);
+      });
+    });
+    var ws=XLSX.utils.aoa_to_sheet(out);
+    ws['!cols']=[{wch:14},{wch:18},{wch:11},{wch:15},{wch:16},{wch:6},{wch:16},{wch:20},{wch:13},{wch:18},{wch:8},{wch:16},{wch:13},{wch:16},{wch:13},{wch:16},{wch:13},{wch:16},{wch:18},{wch:13}];
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Requisitions');
+    var d=new Date(), stamp=d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
+    XLSX.writeFile(wb,'Insta_Truck_Requisitions_'+stamp+'.xlsx');
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', login);
+  document.getElementById('pass').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
+  document.getElementById('user').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('pass').focus(); });
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('exportBtn').addEventListener('click', exportExcel);
+
+  function clock(){var d=new Date(); document.getElementById('clock').textContent=d.toLocaleDateString('en-GB')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+  clock(); setInterval(clock,30000);
+
+  window.addEventListener('storage', function(e){ if(e.key===STORE){ state=loadState(); renderStage(); } });
+})();
+</script>
+</body>
+</html>

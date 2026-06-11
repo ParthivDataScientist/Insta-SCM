@@ -1,0 +1,2969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabric Export Order Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --bg:#F5F5F3;--bg2:#EBEBEA;--bg3:#E2E2E0;
+  --surface:#FFFFFF;--border:#D8D8D6;--border2:#ECECEA;
+  --text:#1A1A18;--text2:#5A5A57;--text3:#9A9A97;
+  --accent:#4A3FB5;--accent2:#362E8A;--accent-bg:#EEEDFC;
+  --green:#2A7A3B;--green-bg:#E8F5EC;--green-bd:#7DC98A;
+  --red:#B02020;--red-bg:#FDEAEA;--red-bd:#E08080;
+  --orange:#7A4A08;--orange-bg:#FEF3E2;--orange-bd:#F0B840;
+  --radius:8px;--radius-lg:12px;
+  --shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,0.10),0 2px 4px rgba(0,0,0,0.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;font-size:13px;color:#1A1A18;background:#F5F5F3;min-height:100vh;}
+input,select,textarea,button{font-family:'DM Sans',sans-serif;}
+#root{max-width:1800px;margin:0 auto;padding:20px 24px;}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;border:1px solid #D8D8D6;background:#fff;color:#1A1A18;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;}
+.btn:hover{background:#EBEBEA;}
+.btn-primary{background:#4A3FB5;color:#fff;border-color:#4A3FB5;}
+.btn-primary:hover{background:#362E8A;}
+.btn-danger{background:#FDEAEA;color:#B02020;border-color:#E08080;}
+.btn-danger:hover{background:#f8d5d5;}
+.btn-success{background:#E8F5EC;color:#2A7A3B;border-color:#7DC98A;}
+.btn-success:hover{background:#d5eddb;}
+.btn-sm{padding:4px 9px;font-size:11px;}
+
+/* Login */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.login-card{background:#fff;border:1px solid #D8D8D6;border-radius:12px;padding:32px;width:400px;box-shadow:0 4px 12px rgba(0,0,0,0.10);}
+.login-card h1{font-size:22px;font-weight:600;margin-bottom:4px;}
+.login-card p{font-size:12px;color:#5A5A57;margin-bottom:20px;}
+.login-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.member-btn{padding:12px 10px;border:1px solid #D8D8D6;border-radius:8px;background:#EBEBEA;cursor:pointer;text-align:center;transition:all .15s;}
+.member-btn:hover{border-color:#4A3FB5;background:#EEEDFC;}
+.m-avatar{width:32px;height:32px;border-radius:50%;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;margin-bottom:6px;}
+.m-name{font-size:13px;font-weight:500;}
+.m-role{font-size:10px;color:#5A5A57;margin-top:2px;}
+
+#main-app{display:none;}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.topbar-left h1{font-size:20px;font-weight:600;}
+.topbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.user-pill{display:flex;align-items:center;gap:7px;padding:5px 12px;border:1px solid #D8D8D6;border-radius:20px;font-size:12px;background:#fff;}
+
+/* Tabs */
+.tab-bar{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #EBEBEA;padding-bottom:0;}
+.tab-btn{padding:8px 20px;border:none;background:none;font-size:13px;font-weight:500;color:#5A5A57;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;border-radius:6px 6px 0 0;}
+.tab-btn:hover{background:#F0F0EE;color:#1A1A18;}
+.tab-btn.active{color:#4A3FB5;border-bottom-color:#4A3FB5;background:#EEEDFC;}
+.tab-badge{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;}
+.tab-badge-wip{background:#DDEEFF;color:#1155AA;}
+.tab-badge-done{background:#DFF5E5;color:#1A6830;}
+
+.banner{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:8px;margin-bottom:14px;font-size:12px;font-weight:500;}
+.banner-mgr{background:#E8F5EC;color:#2A7A3B;border:1px solid #7DC98A;}
+.banner-team{background:#FEF3E2;color:#7A4A08;border:1px solid #F0B840;}
+
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px;}
+.metric{background:#fff;border:1px solid #D8D8D6;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.metric-label{font-size:10px;font-weight:500;color:#5A5A57;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
+.metric-value{font-size:22px;font-weight:600;}
+.metric-sub{font-size:10px;color:#9A9A97;margin-top:2px;}
+
+/* Pipeline */
+.pipeline-section{margin-bottom:14px;}
+.pipeline-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.pipeline-hdr span{font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;letter-spacing:.05em;}
+.pipeline-cards{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.stage-card{background:#fff;border:1px solid #D8D8D6;border-radius:8px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .15s;user-select:none;position:relative;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.stage-card:hover{border-color:#4A3FB5;transform:translateY(-1px);}
+.stage-card.active{border:2px solid #4A3FB5;background:#EEEDFC;}
+.stage-card.all-card{background:#EBEBEA;}
+.stage-card.my-stage::after{content:'★';position:absolute;top:4px;right:6px;font-size:8px;color:#4A3FB5;}
+.st-name{font-size:9px;font-weight:600;color:#5A5A57;margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-count{font-size:20px;font-weight:600;}
+.st-bar{height:3px;border-radius:2px;background:#E2E2E0;margin-top:6px;}
+.st-bar-fill{height:100%;border-radius:2px;transition:width .3s;}
+
+.toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
+.toolbar input,.toolbar select{padding:6px 10px;border:1px solid #D8D8D6;border-radius:8px;background:#fff;color:#1A1A18;font-size:12px;outline:none;}
+.toolbar input:focus,.toolbar select:focus{border-color:#4A3FB5;}
+
+.col-panel{background:#fff;border:1px solid #D8D8D6;border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+.col-panel-title{font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+.col-toggle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;}
+.col-toggle-item{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:5px 7px;border-radius:8px;}
+.col-toggle-item:hover{background:#EBEBEA;}
+.col-toggle-item input{width:14px;height:14px;cursor:pointer;accent-color:#4A3FB5;}
+
+.tbl-wrap{overflow-x:auto;border:1px solid #D8D8D6;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+table{border-collapse:collapse;font-size:12px;}
+th{font-size:10px;font-weight:600;color:#5A5A57;padding:10px;border-bottom:1px solid #D8D8D6;border-right:1px solid #ECECEA;text-align:left;background:#EBEBEA;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;}
+th:last-child{border-right:none;}
+td{padding:7px 10px;border-bottom:1px solid #ECECEA;border-right:1px solid #ECECEA;vertical-align:middle;}
+td:last-child{border-right:none;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#FAFAF9;}
+.plan-edit{background:#FBFAFF;cursor:text;outline:none;}
+.view-btn{padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;border-color:#C8C2F8;color:#4A3FB5;background:#F3F1FE;}
+.view-btn:hover{background:#EEEDFC;border-color:#4A3FB5;}
+.of-doc{overflow:auto;max-height:64vh;background:#fff;border:1px solid #E2E2E0;border-radius:10px;padding:22px 26px;box-shadow:inset 0 0 0 1px #fff,0 1px 3px rgba(0,0,0,.04);}
+.of-doc-tbl{border-collapse:collapse;width:100%;font-size:12px;color:#1A1A18;}
+.of-doc-tbl td{padding:4px 10px;vertical-align:top;line-height:1.4;}
+.of-doc-spacer td{height:8px;padding:0;}
+.of-doc-section td{font-weight:700;color:#4A3FB5;border-top:1px solid #E2E2E0;border-bottom:1px solid #E2E2E0;background:#F7F6FE;padding-top:7px;padding-bottom:7px;text-transform:none;}
+.of-doc-title td{font-size:17px;font-weight:800;color:#1A1A18;text-align:center;padding:6px 0 10px;letter-spacing:.01em;}
+.plan-edit:hover{background:#F1EEFF;}
+.plan-edit:focus{background:#fff;box-shadow:inset 0 0 0 2px #4A3FB5;}
+
+/* Inline dispatch date edit */
+.disp-cell{display:flex;align-items:center;gap:4px;}
+.disp-input{padding:3px 6px;border:1px solid #D8D8D6;border-radius:6px;font-size:12px;width:95px;outline:none;background:#fff;}
+.disp-input:focus{border-color:#4A3FB5;}
+
+/* Remark */
+.remark-wrap{display:flex;align-items:center;gap:5px;}
+.remark-input{flex:1;padding:4px 8px;border:1px solid #D8D8D6;border-radius:8px;background:#fff;color:#1A1A18;font-size:12px;min-width:110px;outline:none;}
+.remark-input:focus{border-color:#4A3FB5;}
+.remark-save-btn{padding:3px 8px;font-size:11px;border-radius:8px;border:1px solid #4A3FB5;background:#4A3FB5;color:#fff;cursor:pointer;display:none;}
+.remark-ok{font-size:10px;color:#2A7A3B;display:none;font-weight:500;}
+
+/* Fabric status */
+.fabric-status-grid{display:flex;flex-direction:column;gap:3px;min-width:240px;}
+.fabric-status-row{display:flex;align-items:center;gap:5px;}
+.fabric-label{font-size:10px;font-weight:600;width:30px;flex-shrink:0;}
+.fabric-stages{display:flex;gap:4px;align-items:center;}
+.fab-stage{width:44px;height:22px;border-radius:11px;border:1px solid #DDD;background:#fff;color:#1A1A18;position:relative;cursor:default;display:flex;align-items:center;justify-content:center;overflow:hidden;transition:transform .12s ease,box-shadow .12s ease;}
+.fab-stage:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.16);z-index:5;}
+.fab-stage.na{background:repeating-linear-gradient(45deg,#F2F2F0,#F2F2F0 3px,#E8E8E6 3px,#E8E8E6 6px);border-color:#E2E2E0;color:#B8B8B6;cursor:default;}
+.fab-stage-na{font-size:11px;font-weight:600;color:#B8B8B6;line-height:1;}
+.fab-stage.done{background:linear-gradient(135deg,#22D3EE,#06B6D4);border-color:#0891B2;color:#fff;box-shadow:0 1px 3px rgba(6,182,212,.35);}   /* completed → cyan capsule */
+.fab-stage.current{background:linear-gradient(135deg,#FFB23E,#FF9800);border:1.5px solid #E07B00;color:#1A1A18;box-shadow:0 1px 4px rgba(255,152,0,.5);animation:blink-amber 0.6s ease-in-out infinite;}  /* live → amber capsule */
+.fab-stage.over3h{background:linear-gradient(135deg,#B71C1C,#8B0000);border:1.5px solid #6E0000;color:#fff;box-shadow:0 1px 4px rgba(139,0,0,.5);animation:blink-red 1s ease-in-out infinite;}            /* ≥3h → blood red capsule */
+.fab-stage-time{font-size:9px;font-weight:700;line-height:1;white-space:nowrap;color:inherit;}
+.fab-stage-livedot{position:absolute;top:1px;right:4px;font-size:6px;color:inherit;opacity:.85;}
+.fab-stage-tip{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:#1A1A18;color:#fff;font-size:9px;padding:3px 7px;border-radius:4px;white-space:nowrap;z-index:10;display:none;pointer-events:none;}
+.fab-stage-tip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#1A1A18;}
+.fab-stage:hover .fab-stage-tip{display:block;}
+/* Stage header row above mini blocks */
+.stage-headers{display:flex;gap:4px;margin-bottom:2px;padding-left:35px;}
+.stage-hdr{width:44px;text-align:center;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;border-bottom:2px solid;}
+.fabric-status-text{font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;white-space:nowrap;margin-left:3px;}
+.fabric-adv-btn{font-size:10px;padding:2px 6px;border-radius:5px;border:1px solid #D8D8D6;background:#fff;cursor:pointer;color:#4A3FB5;flex-shrink:0;}
+.fabric-adv-btn:hover{background:#EEEDFC;}
+
+/* Time log */
+.time-log-entry{font-size:10px;color:#5A5A57;padding:3px 6px;background:#F5F5F3;border-radius:5px;border:1px solid #ECECEA;margin-bottom:2px;}
+.time-log-stage{font-weight:600;color:#1A1A18;}
+.time-log-dur{color:#4A3FB5;font-weight:600;}
+
+/* Inline time pill inside fabric row */
+.fab-time-pill{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;background:#EEEDFC;color:#4A3FB5;border:1px solid #C9C4F5;margin-left:3px;white-space:nowrap;flex-shrink:0;}
+.fab-time-pill.fab-time-over{background:#FDEAEA;color:#B02020;border-color:#E08080;animation:pulse-red 1.5s ease-in-out infinite;}
+.fab-live-dot{color:#B86000;font-size:8px;margin-left:1px;}
+.fab-over-badge{background:#B02020;color:#fff;font-size:8px;padding:0 3px;border-radius:6px;margin-left:2px;}
+@keyframes pulse-red{0%,100%{opacity:1;}50%{opacity:.6;}}
+@keyframes blink-amber{0%,100%{filter:brightness(1);}50%{filter:brightness(1.28);}}
+@keyframes blink-red{0%,100%{filter:brightness(1);}50%{filter:brightness(1.4);}}
+
+/* Progress */
+.order-progress-wrap{display:flex;align-items:center;gap:6px;margin-top:4px;}
+.order-progress-bar{flex:1;height:5px;border-radius:3px;background:#E2E2E0;overflow:hidden;}
+.order-progress-fill{height:100%;border-radius:3px;background:#4A3FB5;transition:width .3s;}
+.order-progress-pct{font-size:10px;color:#5A5A57;font-weight:600;white-space:nowrap;}
+
+/* Fabric modal */
+.fs-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.fs-modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,0.18);max-height:90vh;overflow-y:auto;}
+.fs-modal h3{font-size:16px;font-weight:600;margin-bottom:4px;}
+.fs-modal-sub{font-size:11px;color:#5A5A57;margin-bottom:16px;}
+.fs-fabric-block{margin-bottom:14px;padding:12px 14px;background:#F5F5F3;border-radius:8px;border:1px solid #ECECEA;}
+.fs-fabric-name{font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.fs-fabric-qty{font-size:10px;background:#EBEBEA;color:#5A5A57;padding:2px 7px;border-radius:10px;font-weight:500;}
+.fs-stages{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
+.fs-stage-btn{padding:5px 10px;border-radius:6px;border:1.5px solid #D8D8D6;background:#fff;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;color:#5A5A57;}
+.fs-stage-btn:hover{border-color:#4A3FB5;color:#4A3FB5;}
+.fs-stage-btn.selected{color:#fff;border-color:transparent;}
+.fs-stage-btn:disabled{opacity:0.38;cursor:not-allowed;}
+.fs-timelog{margin-top:6px;}
+.fs-timelog-title{font-size:10px;font-weight:600;color:#5A5A57;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
+.fs-timelog-row{font-size:11px;color:#5A5A57;padding:4px 8px;background:#fff;border-radius:5px;border:1px solid #ECECEA;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;}
+.fs-timelog-stage{font-weight:600;color:#1A1A18;}
+.fs-timelog-dur{color:#4A3FB5;font-weight:600;}
+.fs-modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #ECECEA;}
+
+/* Completed tab */
+.completed-banner{background:#E8F5EC;border:1px solid #7DC98A;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#2A7A3B;display:flex;align-items:center;gap:8px;}
+
+/* Upload */
+.upload-panel{background:#fff;border:1px solid #D8D8D6;border-radius:12px;padding:16px;margin-bottom:12px;}
+.drop-zone{border:2px dashed #D8D8D6;border-radius:12px;padding:28px 16px;text-align:center;cursor:pointer;transition:all .2s;}
+.drop-zone:hover,.drop-zone.dragover{border-color:#4A3FB5;background:#EEEDFC;}
+.drop-zone input{display:none;}
+.preview-wrap{overflow-x:auto;border:1px solid #ECECEA;border-radius:8px;margin-top:12px;max-height:160px;overflow-y:auto;}
+.preview-tbl{border-collapse:collapse;font-size:11px;width:100%;}
+.preview-tbl th{background:#EBEBEA;padding:5px 8px;border-bottom:1px solid #ECECEA;border-right:1px solid #ECECEA;white-space:nowrap;font-size:10px;font-weight:600;color:#5A5A57;}
+.preview-tbl td{padding:5px 8px;border-bottom:1px solid #ECECEA;border-right:1px solid #ECECEA;}
+.map-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.map-row{display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:4px;}
+.map-lbl{width:130px;flex-shrink:0;color:#5A5A57;font-weight:500;}
+.map-row select{flex:1;padding:5px 8px;border:1px solid #D8D8D6;border-radius:8px;background:#fff;color:#1A1A18;font-size:12px;}
+.import-ok-msg{padding:8px 12px;border-radius:8px;font-size:12px;margin-top:10px;background:#E8F5EC;color:#2A7A3B;border:1px solid #7DC98A;}
+.import-err-msg{padding:8px 12px;border-radius:8px;font-size:12px;margin-top:10px;background:#FDEAEA;color:#B02020;border:1px solid #E08080;}
+
+.del-confirm-row{display:flex;align-items:center;gap:8px;background:#fff5f5;border:1px solid #E08080;padding:6px 10px;border-radius:8px;flex-wrap:wrap;}
+.del-confirm-row span{font-size:11px;font-weight:500;color:#B02020;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;}
+.modal-box{background:#fff;border:1px solid #D8D8D6;border-radius:12px;padding:24px;width:100%;max-width:640px;box-shadow:0 4px 12px rgba(0,0,0,0.10);}
+.modal-box h3{font-size:16px;font-weight:600;margin-bottom:16px;}
+.form-grid{display:grid;gap:10px;margin-bottom:10px;}
+.g2{grid-template-columns:1fr 1fr;}.g3{grid-template-columns:1fr 1fr 1fr;}.g4{grid-template-columns:1fr 1fr 1fr 1fr;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:10px;font-weight:600;color:#5A5A57;text-transform:uppercase;letter-spacing:.04em;}
+.fg input,.fg select{padding:7px 10px;border:1px solid #D8D8D6;border-radius:8px;background:#fff;color:#1A1A18;font-size:13px;outline:none;}
+.fg input:focus,.fg select:focus{border-color:#4A3FB5;}
+.sec-lbl{font-size:10px;font-weight:600;color:#5A5A57;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid #ECECEA;}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #ECECEA;}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#1A4A2A;color:#fff;font-size:12px;font-weight:500;padding:11px 18px;border-radius:8px;display:flex;align-items:center;gap:8px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.18);animation:toastin .25s ease;}
+@keyframes toastin{from{transform:translateY(16px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.tbl-footer{margin-top:8px;font-size:11px;color:#9A9A97;}
+@media(max-width:700px){.pipeline-cards{grid-template-columns:repeat(4,1fr);}.g3{grid-template-columns:1fr 1fr;}.g4{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <h1>📦 Fabric Order Manager</h1>
+    <p>Select your name to sign in</p>
+    <div class="login-grid" id="login-grid"></div>
+  </div>
+</div>
+
+<div id="main-app">
+  <div id="root">
+    <div class="topbar">
+      <div class="topbar-left"><span style="font-size:22px;">📦</span><h1>Fabric Export Orders</h1></div>
+      <div class="topbar-right" id="topbar-actions"></div>
+    </div>
+    <div class="tab-bar" id="tab-bar"></div>
+    <div id="banner"></div>
+    <div id="tab-content"></div>
+    <div id="modal-area"></div>
+    <div id="fs-modal-area"></div>
+    <div id="toast-area"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const STATUSES = [
+  {key:'In Printing', color:'#C8A000', bg:'#FFFBDD', tc:'#7A5E00'},
+  {key:'In Transfer', color:'#CC2200', bg:'#FFE8E5', tc:'#991A00'},
+  {key:'In Cutting',  color:'#2E7D32', bg:'#E6F4E7', tc:'#1B5E20'},
+  {key:'In Stitching',color:'#78909C', bg:'#F5F7F8', tc:'#37474F'},
+  {key:'Production',  color:'#7A4FB5', bg:'#F0EAF8', tc:'#4A2E80'},
+  {key:'QC Pending',  color:'#5B8A5B', bg:'#EAF2EA', tc:'#2E5E2E'},
+  {key:'QC OK',       color:'#37A820', bg:'#E4F8DF', tc:'#1E6B0E'},
+];
+const STATUS_KEYS = STATUSES.map(s=>s.key);
+const STAGE_IDX = {}; STATUS_KEYS.forEach((k,i)=>STAGE_IDX[k]=i);
+
+// Standard print pipeline (most fabrics)
+const PIPE_STD   = ['In Printing','In Transfer','In Cutting','In Stitching','QC Pending','QC OK'];
+// White: no print/transfer — starts at cutting
+const PIPE_WHITE = ['In Cutting','In Stitching','QC Pending','QC OK'];
+// 3D logos (Backlit + Edgelit): Cutting → Production → QC Pending → QC OK
+const PIPE_LOGO  = ['In Cutting','Production','QC Pending','QC OK'];
+
+// generic NEXT over the full status list (kept for any legacy callers)
+const NEXT = {'In Printing':'In Transfer','In Transfer':'In Cutting','In Cutting':'In Stitching','In Stitching':'QC Pending','QC Pending':'QC OK'};
+
+// Print fabric categories — each has its own ordered `stages` pipeline.
+const FAB_TYPES = [
+  {id:'vinyl',         label:'VIN', name:'Vinyl',           color:'#C9A7F0', stages:PIPE_STD},
+  {id:'sheer',         label:'SHR', name:'Sheer',           color:'#9AD0C2', stages:PIPE_STD},
+  {id:'nonlit',        label:'NON', name:'Nonlit',          color:'#F08AD6', stages:PIPE_STD},
+  {id:'backlit',       label:'BCK', name:'Backlit',         color:'#3FD0E0', stages:PIPE_STD},
+  {id:'white',         label:'WH',  name:'White',           color:'#B8B0F0', stages:PIPE_WHITE},
+  {id:'hanging',       label:'HNG', name:'Hanging print',   color:'#7AC77A', stages:PIPE_STD},
+  {id:'logo3dBacklit', label:'3DB', name:'3D Backlit logo', color:'#F5C518', stages:PIPE_LOGO},
+  {id:'logo3d',        label:'3DL', name:'3D Edgelit logo', color:'#E89B3C', stages:PIPE_LOGO},
+];
+const FAB_BY_ID={}; FAB_TYPES.forEach(f=>FAB_BY_ID[f.id]=f);
+// helpers — each fabric type uses its own pipeline
+const fabStages=fid=>(FAB_BY_ID[fid]?FAB_BY_ID[fid].stages:PIPE_STD);
+const fabStartStage=fid=>fabStages(fid)[0];
+const fabStageIdx=(fid,stage)=>{const i=fabStages(fid).indexOf(stage);return i<0?0:i;};
+const fabNext=(fid,stage)=>{const st=fabStages(fid);const i=st.indexOf(stage);return (i>=0&&i<st.length-1)?st[i+1]:null;};
+// Map a possibly out-of-pipeline status (e.g. legacy 'In Printing' on White) to a valid stage for this fabric.
+// Uses the global STATUS_KEYS order to find the earliest valid stage at-or-after the stored one.
+function normalizeFabStage(fid, stage){
+  const pipe=fabStages(fid);
+  if(!stage) return pipe[0];        // not started → first stage of its pipeline
+  if(pipe.includes(stage)) return stage;   // already valid
+  if(stage==='QC OK') return 'QC OK';
+  // find first pipeline stage whose global index >= the stored stage's global index
+  const gi=STAGE_IDX[stage];
+  if(gi==null) return pipe[0];
+  for(const s of pipe){ if(STAGE_IDX[s]>=gi) return s; }
+  return pipe[pipe.length-1];       // beyond pipeline → terminal
+}
+// Fix every fabric status on an order so it matches that fabric's pipeline
+function normalizeOrderStages(o){
+  if(!o.fabStatus) return o;
+  FAB_TYPES.forEach(f=>{
+    if((o[f.id]||0)>0){ o.fabStatus[f.id]=normalizeFabStage(f.id, o.fabStatus[f.id]); }
+  });
+  if((o[HW_ID]||0)>0 && !HW_STAGES.includes(o.fabStatus[HW_ID])) o.fabStatus[HW_ID]=HW_STAGES[0];
+  return o;
+}
+// Hardware is tracked separately (no print pipeline). Its own stages below.
+const HW_ID='hardware';
+const HW_NAME='Hardware';
+const HW_STAGES=['Ordered','Received & QC Pending','QC OK'];
+const HW_NEXT={'Ordered':'Received & QC Pending','Received & QC Pending':'QC OK'};
+const HW_IDX={}; HW_STAGES.forEach((k,i)=>HW_IDX[k]=i);
+
+// ============================================================
+// LOCAL PERSISTENCE (no backend) — localStorage + file export/import
+// ============================================================
+const LS_KEY = 'fom_data_v1';
+let dbReady = false;
+
+function saveLocal(){
+  try{
+    const payload = {
+      orders: orders.map(o=>({...o})),
+      timeLog,
+      planEdits,
+      nextId,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(payload));
+  }catch(e){ console.warn('saveLocal failed', e); }
+}
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return false;
+    const d = JSON.parse(raw);
+    orders = (d.orders||[]).map(o=>{
+      const base={...emptyFabStatus(), ...(o.fabStatus||{})};
+      const ord={ ...o, fabStatus:base };
+      FAB_TYPES.forEach(f=>{ ord[f.id]=o[f.id]||0; ord[f.id+'Sqm']=o[f.id+'Sqm']||0; });
+      ord[HW_ID]=o[HW_ID]||0;
+      return normalizeOrderStages(ord);
+    });
+    timeLog = d.timeLog||{};
+    planEdits = d.planEdits||{};
+    nextId = d.nextId || (orders.length?Math.max(...orders.map(o=>o.id))+1:1);
+    return true;
+  }catch(e){ console.warn('loadLocal failed', e); return false; }
+}
+
+// Export the entire dataset to a portable JSON file (durable backup / move between machines)
+function exportData(){
+  const payload = { orders, timeLog, planEdits, nextId, savedAt:new Date().toISOString(), app:'FabricOrderManager' };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'FabricOrders_data_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('💾 Data file downloaded');
+}
+
+// Import a previously exported JSON data file (replaces current data)
+function importDataFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const d = JSON.parse(e.target.result);
+      if(!d || !Array.isArray(d.orders)) throw new Error('Not a valid data file');
+      orders = d.orders.map(o=>{
+        const ord={ ...o, fabStatus:{...emptyFabStatus(), ...(o.fabStatus||{})} };
+        FAB_TYPES.forEach(f=>{ ord[f.id]=o[f.id]||0; ord[f.id+'Sqm']=o[f.id+'Sqm']||0; });
+        ord[HW_ID]=o[HW_ID]||0;
+        return normalizeOrderStages(ord);
+      });
+      timeLog = d.timeLog||{};
+      planEdits = d.planEdits||{};
+      nextId = d.nextId || (orders.length?Math.max(...orders.map(o=>o.id))+1:1);
+      saveLocal(); renderAll();
+      showToast('✓ Data file loaded ('+orders.length+' orders)');
+    }catch(err){ alert('Could not load data file: '+err.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+// LOCAL DATA OPS — keep the same function names the app already calls
+// ============================================================
+function dbLoadOrders(){ loadLocal(); return Promise.resolve(); }
+
+// insert returns a promise resolving to the new order (assign local id)
+function dbInsertOrder(o){
+  const newOrder = {...o, id: nextId++};
+  // timeLog already keyed under the temp id used by caller? caller used nextId before increment; handle in saveOrder
+  saveLocal();
+  return Promise.resolve(newOrder);
+}
+function dbUpdateOrder(o){ saveLocal(); return Promise.resolve(); }
+function dbDeleteOrder(id){ saveLocal(); return Promise.resolve(); }
+function dbSyncTeam(){ return Promise.resolve(); }
+function setupRealtimeSync(){ /* no backend — single-machine local storage */ }
+
+let _localUpdate=false; // retained for compatibility
+
+function renderWipOrCompletedTab(){
+  if(activeTab==='wip') renderWipTab(); else renderCompletedTab();
+}
+
+// ============================================================
+// LOADING OVERLAY
+// ============================================================
+function showLoader(msg){
+  let el=document.getElementById('db-loader');
+  if(!el){
+    el=document.createElement('div');el.id='db-loader';
+    el.style.cssText='position:fixed;inset:0;background:rgba(255,255,255,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,sans-serif;';
+    document.body.appendChild(el);
+  }
+  el.innerHTML=`<div style="text-align:center;">
+    <div style="width:40px;height:40px;border:3px solid #EBEBEA;border-top-color:#4A3FB5;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px;"></div>
+    <div style="font-size:15px;font-weight:600;color:#1A1A18;">${msg||'Loading…'}</div>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+}
+function hideLoader(){const el=document.getElementById('db-loader');if(el)el.remove();}
+
+
+const TEAM = [
+  {name:'Harish', role:'Printing Team',       password:'harish123',  canAdvance:['In Printing','In Transfer'],  color:'#B5D4F4',tc:'#0C447C'},
+  {name:'Rustom', role:'Printing Team',       password:'rustom123',  canAdvance:['In Printing','In Transfer'],  color:'#B5D4F4',tc:'#0C447C'},
+  {name:'Paras',  role:'Cutting & Stitching', password:'paras123',   canAdvance:['In Cutting','In Stitching','Production'],  color:'#C8C2F8',tc:'#3A2EA0'},
+  {name:'Omkar',  role:'Cutting & Stitching', password:'omkar123',   canAdvance:['In Cutting','In Stitching','Production'],  color:'#C8C2F8',tc:'#3A2EA0'},
+  {name:'Sufiyan',role:'QC Team',             password:'sufiyan123', canAdvance:['QC Pending'],                 color:'#F8D89A',tc:'#7A4A00'},
+  {name:'Nimesh', role:'QC Team',             password:'nimesh123',  canAdvance:['QC Pending'],                 color:'#F8D89A',tc:'#7A4A00'},
+  {name:'Kalyan', role:'Manager',             password:'kalyan123',  canAdvance:null,                           color:'#A8E8C8',tc:'#0A5030'},
+  {name:'Vaibhav',role:'Manager',             password:'vaibhav123', canAdvance:null,                           color:'#A8E8C8',tc:'#0A5030'},
+  {name:'Ashish', role:'Upload Only',          password:'ashish123',  canAdvance:[], canUpload:true,            color:'#FBD3A0',tc:'#7A3E00'},
+];
+
+const COLS = [
+  {id:'dispatchDt',  label:'Dispatch dt.',      w:'130px', always:true},
+  {id:'orderRecvDt', label:'Order recv. dt.',   w:'115px', always:false},
+  {id:'showDt',      label:'Show date',         w:'120px', always:false},
+  {id:'showName',    label:'Show name',         w:'170px', always:false},
+  {id:'showCity',    label:'Show city',         w:'120px', always:false},
+  {id:'shipTo',      label:'Ship to',           w:'95px',  always:false},
+  {id:'clientName',  label:'Client name',       w:'150px', always:true},
+  {id:'query',       label:'Query',             w:'110px', always:false},
+  {id:'courierName', label:'Courier',           w:'100px', always:false},
+  {id:'fabricQty',   label:'VIN/NON/BCK/WH',   w:'110px', always:false},
+  {id:'totalFabric', label:'Total',             w:'55px',  always:false},
+  {id:'fabricStatus',label:'Fabric Stage Status',w:'290px',always:true},
+
+  {id:'remarks',     label:'Remarks',           w:'180px', always:true},
+  {id:'actions',     label:'Actions',           w:'100px', always:true},
+];
+
+const FIELD_HINTS = {
+  dispatchDt:['dispatch','dispatch dt','dispatch date'],
+  orderRecvDt:['order rec','order recv','received'],
+  showDt:['show dt','show date'],showName:['show name','event name'],
+  showCity:['show city','city'],shipTo:['ship to','destination'],
+  clientName:['client','client name','customer'],
+  orderNo:['order no','order number','order name / number'],
+  query:['query','query if'],courierName:['courier','courier name'],
+  vinyl:['vin','vinyl'],nonlit:['non','nonlit'],
+  backlit:['bck','backlit'],white:['wh','white'],
+  remarks:['remarks','remark','notes'],
+};
+
+// ============================================================
+// STATE
+// ============================================================
+function mkFabStatus(data){
+  // data is the order-like object with per-fabric counts; init each present fabric to its start stage
+  const fs={};
+  FAB_TYPES.forEach(f=>{ fs[f.id]=(data&&(data[f.id]||0)>0)?fabStartStage(f.id):null; });
+  fs[HW_ID]=(data&&(data[HW_ID]||0)>0)?HW_STAGES[0]:null;
+  return fs;
+}
+function emptyFabStatus(){
+  const fs={}; FAB_TYPES.forEach(f=>fs[f.id]=null); fs[HW_ID]=null; return fs;
+}
+
+// timeLog: {[orderId]: {[fabId]: [{stage, startTs, endTs}]}}
+// startTs = Date.now() when stage began, endTs when moved out
+
+let timeLog = {};
+
+function initFabTimeLog(orderId, fabId, stage){
+  if(!timeLog[orderId]) timeLog[orderId]={};
+  if(!timeLog[orderId][fabId]) timeLog[orderId][fabId]=[];
+  // start first entry
+  timeLog[orderId][fabId].push({stage, startTs:Date.now(), endTs:null});
+}
+function initHwTimeLog(orderId, stage){ initFabTimeLog(orderId, HW_ID, stage); }
+
+function closeFabTimeLog(orderId, fabId){
+  if(!timeLog[orderId]||!timeLog[orderId][fabId]) return;
+  const arr=timeLog[orderId][fabId];
+  if(arr.length&&arr[arr.length-1].endTs===null){
+    arr[arr.length-1].endTs=Date.now();
+  }
+}
+
+function startFabTimeLog(orderId, fabId, stage){
+  if(!timeLog[orderId]) timeLog[orderId]={};
+  if(!timeLog[orderId][fabId]) timeLog[orderId][fabId]=[];
+  timeLog[orderId][fabId].push({stage, startTs:Date.now(), endTs:null});
+}
+
+function fmtDuration(ms){
+  if(!ms||ms<0) return '—';
+  const sec=Math.floor(ms/1000);
+  const min=Math.floor(sec/60);
+  const hr=Math.floor(min/60);
+  const day=Math.floor(hr/24);
+  if(day>0) return `${day}d ${hr%24}h`;
+  if(hr>0) return `${hr}h ${min%60}m`;
+  if(min>0) return `${min}m`;
+  return `<1m`;
+}
+
+function getFabTimeLogs(orderId, fabId){
+  return (timeLog[orderId]||{})[fabId]||[];
+}
+
+let orders = [];
+let nextId=1;
+let nextPlanId=1;
+let planningRows=[];            // derived (auto-generated) — not persisted directly
+let planEdits={};               // { pieceKey: {field:value,...} } persisted manual cell edits
+let planExpandedGroups={};      // which client/order groups are expanded
+let planSearch='';              // free-text filter on planning rows
+let planDateFilter='';          // date filter (matches Date column)
+let currentUser=null, editId=null;
+let stageFilter='', pendingDeleteId=null, filterDispatchDt='', fabricTotalsFilter='';
+let showColPanel=false, showUploadPanel=false;
+let visibleCols=new Set(COLS.map(c=>c.id));
+let uploadedRows=[], uploadedHeaders=[], colMapping={};
+let activeTab='wip'; // 'wip' | 'completed'
+
+// ============================================================
+// HELPERS
+// ============================================================
+function parseDt(s){
+  if(!s) return 0;
+  const p=s.split('.');
+  if(p.length===3) return parseInt(p[2])*10000+parseInt(p[1])*100+parseInt(p[0]);
+  return 0;
+}
+function todayDtStr(){
+  const n=new Date();
+  const dd=String(n.getDate()).padStart(2,'0');
+  const mm=String(n.getMonth()+1).padStart(2,'0');
+  const yyyy=n.getFullYear();
+  return `${dd}.${mm}.${yyyy}`;
+}
+// Convert DD.MM.YYYY → YYYY-MM-DD for <input type="date">
+function toISODate(s){
+  if(!s)return '';
+  const p=s.split('.');
+  if(p.length===3)return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  return '';
+}
+// Convert YYYY-MM-DD → DD.MM.YYYY
+function fromISODate(s){
+  if(!s)return '';
+  const p=s.split('-');
+  if(p.length===3)return `${p[2]}.${p[1]}.${p[0]}`;
+  return '';
+}
+const tot=o=>FAB_TYPES.reduce((s,f)=>s+(o[f.id]||0),0)+(o[HW_ID]||0);
+const totFabric=o=>FAB_TYPES.reduce((s,f)=>s+(o[f.id]||0),0);
+// compact qty summary: only non-zero categories, e.g. "VIN 3 · BCK 2 · HW 1"
+function fabQtySummary(o){
+  const parts=FAB_TYPES.filter(f=>o[f.id]>0).map(f=>`${f.label} ${o[f.id]}`);
+  if((o[HW_ID]||0)>0) parts.push(`HW ${o[HW_ID]}`);
+  return parts.length?parts.join(' · '):'—';
+}
+const isMgr=()=>currentUser&&currentUser.canAdvance===null;
+const canUpload=()=>isMgr()||(currentUser&&currentUser.canUpload===true);
+const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const gv=id=>document.getElementById(id)?.value||'';
+const gvi=id=>parseInt(document.getElementById(id)?.value)||0;
+
+function getStatusColor(s){const f=STATUSES.find(x=>x.key===s);return f?f.color:'#aaa';}
+function getStatusBg(s){const f=STATUSES.find(x=>x.key===s);return f?f.bg:'#eee';}
+function getStatusTc(s){const f=STATUSES.find(x=>x.key===s);return f?f.tc:'#555';}
+
+function isOrderComplete(o){
+  const active=FAB_TYPES.filter(f=>o[f.id]>0);
+  const hasHw=(o[HW_ID]||0)>0;
+  if(!active.length && !hasHw) return false;
+  const fabricsDone=active.every(f=>o.fabStatus[f.id]==='QC OK');
+  const hwDone=!hasHw || o.fabStatus[HW_ID]==='QC OK';
+  return fabricsDone && hwDone;
+}
+
+function orderProgress(o){
+  const active=FAB_TYPES.filter(f=>o[f.id]>0);
+  const hasHw=(o[HW_ID]||0)>0;
+  let total=0, done=0;
+  active.forEach(f=>{
+    const steps=fabStages(f.id).length-1;   // applicable steps to reach QC OK for this type
+    total+=steps;
+    done+=Math.max(0, fabStageIdx(f.id, o.fabStatus[f.id]||fabStartStage(f.id)));
+  });
+  if(hasHw){ total+=(HW_STAGES.length-1); done+=(o.fabStatus[HW_ID]?HW_IDX[o.fabStatus[HW_ID]]:0); }
+  if(!total) return 0;
+  return Math.round(done/total*100);
+}
+
+function orderMainStatus(o){
+  const active=FAB_TYPES.filter(f=>o[f.id]>0&&o.fabStatus[f.id]);
+  if(!active.length) return 'In Printing';
+  // use global STAGE_IDX for ordering across types (Production sits between Stitching and QC Pending)
+  let minIdx=999,minKey='QC OK';
+  active.forEach(f=>{
+    const idx=STAGE_IDX[o.fabStatus[f.id]];
+    if(idx<minIdx){minIdx=idx;minKey=o.fabStatus[f.id];}
+  });
+  return minKey;
+}
+
+function canUpdateFabric(o,fabId){
+  if(!currentUser) return false;
+  const st=o.fabStatus[fabId];
+  if(!st||st==='QC OK') return false;   // terminal — nothing to advance, even for managers
+  if(isMgr()) return true;
+  if(fabId===HW_ID){
+    // QC team handles hardware QC stages; allow anyone whose canAdvance covers QC Pending
+    return currentUser.canAdvance && currentUser.canAdvance.includes('QC Pending');
+  }
+  return currentUser.canAdvance&&currentUser.canAdvance.includes(st);
+}
+
+function getSortedOrders(){
+  return [...orders].sort((a,b)=>{
+    const da=parseDt(a.dispatchDt),db=parseDt(b.dispatchDt);
+    if(da!==db) return da-db; // ascending: oldest first
+    return a.id-b.id;
+  });
+}
+
+function showToast(msg){
+  const ta=document.getElementById('toast-area');
+  ta.innerHTML=`<div class="toast">${msg}</div>`;
+  setTimeout(()=>{ta.innerHTML='';},3000);
+}
+
+// ============================================================
+// LOGIN
+// ============================================================
+// ============================================================
+// LOGIN
+// ============================================================
+function renderLogin(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('main-app').style.display='none';
+  document.getElementById('login-grid').innerHTML=TEAM.map(m=>`
+    <button class="member-btn" onclick="login('${m.name}')">
+      <div class="m-avatar" style="background:${m.color};color:${m.tc};">${m.name.slice(0,2).toUpperCase()}</div>
+      <div class="m-name">${m.name}</div>
+      <div class="m-role">${m.role}</div>
+    </button>`).join('');
+  // clear any leftover password modal
+  const pm=document.getElementById('pw-modal');if(pm)pm.remove();
+}
+
+function promptPassword(name){ login(name); }
+
+function doLogin(name){ login(name); }
+
+function login(name){
+  const m=TEAM.find(x=>x.name===name);if(!m)return;
+  const pm=document.getElementById('pw-modal');if(pm)pm.remove();
+  currentUser=m;
+  stageFilter='';pendingDeleteId=null;activeTab='wip';filterDispatchDt='';fabricTotalsFilter='';
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-app').style.display='block';
+
+  showLoader('Loading orders…');
+  dbLoadOrders().then(()=>{
+    hideLoader();
+    renderAll();
+    if(!dbReady){
+      dbReady=true;
+      setupRealtimeSync();
+      dbSyncTeam();
+    }
+  });
+}
+function logout(){
+  currentUser=null;editId=null;stageFilter='';pendingDeleteId=null;
+  showColPanel=false;showUploadPanel=false;activeTab='wip';
+  renderLogin();
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll(){
+  renderTopbar();
+  renderTabs();
+  renderBanner();
+  if(activeTab==='wip') renderWipTab();
+  else if(activeTab==='completed') renderCompletedTab();
+  else if(activeTab==='planning') renderPlanningTab();
+}
+
+function renderTopbar(){
+  const u=currentUser;
+  document.getElementById('topbar-actions').innerHTML=`
+    <div class="user-pill">
+      <span style="width:24px;height:24px;border-radius:50%;background:${u.color};color:${u.tc};font-size:10px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;">${u.name.slice(0,2).toUpperCase()}</span>
+      <span style="font-weight:500;">${u.name}</span>
+      <span style="font-size:10px;color:#888;">· ${u.role}</span>
+    </div>
+    ${canUpload()?`<button class="btn${showUploadPanel?' btn-primary':''}" onclick="toggleUpload()">📋 Upload Orderform</button>`:''}
+    ${isMgr()?`<button class="btn btn-success" onclick="exportExcel()">📤 Export</button>`:''}
+    ${isMgr()?`<button class="btn" onclick="openLogReport()" title="Order-wise stage time log">📊 Log Report</button>`:''}
+    ${isMgr()?`<button class="btn btn-primary" onclick="openAdd()">＋ Add Order</button>`:''}
+    ${isMgr()?`<button class="btn" onclick="exportData()" title="Download a backup data file">💾 Save Data</button>`:''}
+    ${isMgr()?`<label class="btn" style="cursor:pointer;" title="Load a previously saved data file">📂 Load Data<input type="file" accept=".json" style="display:none;" onchange="importDataFile(this.files[0]);this.value='';"></label>`:''}
+    <button class="btn" onclick="logout()">⏎ Switch</button>`;
+}
+
+function renderTabs(){
+  const wip=getSortedOrders().filter(o=>!isOrderComplete(o)).length;
+  const done=getSortedOrders().filter(o=>isOrderComplete(o)).length;
+  const plan=planningRows.length;
+  document.getElementById('tab-bar').innerHTML=`
+    <button class="tab-btn${activeTab==='wip'?' active':''}" onclick="switchTab('wip')">
+      🔄 WIP Orders <span class="tab-badge tab-badge-wip">${wip}</span>
+    </button>
+    <button class="tab-btn${activeTab==='completed'?' active':''}" onclick="switchTab('completed')">
+      ✅ Completed <span class="tab-badge tab-badge-done">${done}</span>
+    </button>
+    <button class="tab-btn${activeTab==='planning'?' active':''}" onclick="switchTab('planning')">
+      📋 Order Planning <span class="tab-badge" style="background:#EEEDFC;color:#4A3FB5;">${plan}</span>
+    </button>`;
+}
+
+function switchTab(tab){
+  activeTab=tab;stageFilter='';filterDispatchDt='';fabricTotalsFilter='';pendingDeleteId=null;
+  renderTabs();renderBanner();
+  if(tab==='wip') renderWipTab();
+  else if(tab==='completed') renderCompletedTab();
+  else if(tab==='planning') renderPlanningTab();
+}
+
+// ============================================================
+// WIP TAB
+// ============================================================
+function renderWipTab(){
+  const wipOrders=getSortedOrders().filter(o=>!isOrderComplete(o));
+  const allOrders=getSortedOrders();
+  const stageCountMap={};
+  STATUS_KEYS.forEach(k=>{stageCountMap[k]=wipOrders.filter(o=>orderMainStatus(o)===k).length;});
+
+  const metricsHtml=``;
+
+  const allActive=stageFilter==='';
+  const pipelineCards=[
+    `<div class="stage-card all-card${allActive?' active':''}" onclick="setStageFilter('')">
+      <div class="st-name">All WIP</div><div class="st-count">${wipOrders.length}</div>
+      <div class="st-bar"><div class="st-bar-fill" style="width:100%;background:#4A3FB5;"></div></div>
+    </div>`,
+    ...STATUSES.map(s=>{
+      const cnt=stageCountMap[s.key]||0;
+      const pct=wipOrders.length>0?Math.round(cnt/wipOrders.length*100):0;
+      const isMyStage=currentUser&&currentUser.canAdvance&&currentUser.canAdvance.includes(s.key);
+      const isActive=stageFilter===s.key;
+      return `<div class="stage-card${isActive?' active':''}${isMyStage?' my-stage':''}" onclick="setStageFilter('${s.key.replace(/'/g,"\\'")}')">
+        <div class="st-name">${s.key}</div>
+        <div class="st-count" style="color:${isActive?s.color:'inherit'}">${cnt}</div>
+        <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%;background:${s.color};"></div></div>
+      </div>`;
+    })
+  ].join('');
+
+  const dests=[...new Set(wipOrders.map(o=>o.shipTo).filter(Boolean))].sort();
+  // all unique dispatch dates for WIP, sorted oldest→newest
+  const dispDates=[...new Set(
+    [...orders].filter(o=>!isOrderComplete(o)&&o.dispatchDt)
+      .sort((a,b)=>parseDt(a.dispatchDt)-parseDt(b.dispatchDt))
+      .map(o=>o.dispatchDt)
+  )];
+
+  // Fabric-wise totals per dispatch date (all WIP orders) — data-driven over FAB_TYPES
+  const blankTotals=()=>{ const t={total:0,totalSqm:0}; FAB_TYPES.forEach(f=>{t[f.id]=0;t[f.id+'Sqm']=0;}); return t; };
+  const fabTotalsMap={};
+  orders.filter(o=>!isOrderComplete(o)).forEach(o=>{
+    const dt=o.dispatchDt||'—';
+    if(!fabTotalsMap[dt]) fabTotalsMap[dt]=blankTotals();
+    const T=fabTotalsMap[dt];
+    FAB_TYPES.forEach(f=>{ T[f.id]+=(o[f.id]||0); T[f.id+'Sqm']+=(o[f.id+'Sqm']||0); T.totalSqm+=(o[f.id+'Sqm']||0); });
+    T.total+=totFabric(o);
+  });
+
+  // Totals for the fabric totals panel filter (fabricTotalsFilter)
+  const ftf=fabricTotalsFilter;
+  let ftTotals=blankTotals();
+  if(ftf&&fabTotalsMap[ftf]){
+    ftTotals=fabTotalsMap[ftf];
+  } else if(!ftf){
+    Object.values(fabTotalsMap).forEach(t=>{
+      FAB_TYPES.forEach(f=>{ ftTotals[f.id]+=t[f.id]; ftTotals[f.id+'Sqm']+=t[f.id+'Sqm']; });
+      ftTotals.total+=t.total; ftTotals.totalSqm+=t.totalSqm;
+    });
+  }
+
+  const fabTotalsHtml=`
+    <div style="background:#fff;border:1px solid #D8D8D6;border-radius:12px;padding:12px 16px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;letter-spacing:.05em;">📊 Fabric Totals by Dispatch Date</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label style="font-size:11px;font-weight:600;color:#5A5A57;">Filter date:</label>
+          <select id="fabricTotalsFilterSel" onchange="fabricTotalsFilter=this.value;renderWipTab()"
+            style="padding:4px 8px;border:1px solid #D8D8D6;border-radius:8px;background:#fff;color:#1A1A18;font-size:12px;outline:none;min-width:140px;">
+            <option value="">All dates</option>
+            ${dispDates.map(d=>`<option value="${esc(d)}"${ftf===d?' selected':''}>${esc(d)}${d===todayDtStr()?' ⭐ Today':''}</option>`).join('')}
+          </select>
+          ${ftf?`<button class="btn btn-sm" onclick="fabricTotalsFilter='';renderWipTab()">✕ Clear</button>`:''}
+        </div>
+      </div>
+      ${(()=>{
+        // one segment per fabric category (colors from FAB_TYPES)
+        const segs=FAB_TYPES.map(f=>({label:f.name, val:ftTotals[f.id]||0, sqm:ftTotals[f.id+'Sqm']||0, color:f.color}));
+        const total=segs.reduce((a,s)=>a+s.val,0);
+        // small SOLID pie
+        const R=42, cx=46, cy=46; let ang=-90;
+        const polar=(a,rad)=>[cx+rad*Math.cos(a*Math.PI/180), cy+rad*Math.sin(a*Math.PI/180)];
+        let paths='';
+        if(total>0){
+          segs.forEach(s=>{
+            if(s.val<=0) return;
+            const sweep=s.val/total*360;
+            if(sweep>=359.999){ paths+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${s.color}" stroke="#D8D8D6" stroke-width="1"/>`; return; }
+            const a0=ang, a1=ang+sweep; ang=a1;
+            const [x0,y0]=polar(a0,R), [x1,y1]=polar(a1,R);
+            const large=sweep>180?1:0;
+            paths+=`<path d="M${cx},${cy} L${x0},${y0} A${R},${R} 0 ${large} 1 ${x1},${y1} Z" fill="${s.color}" stroke="#D8D8D6" stroke-width="1"/>`;
+          });
+        } else {
+          paths=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="#F0F0EE" stroke="#D8D8D6" stroke-width="1"/>`;
+        }
+        const legend=segs.map(s=>{
+          const dim=s.val<=0?'opacity:.5;':'';
+          return `<div style="display:flex;align-items:center;gap:7px;font-size:11px;padding:1px 0;${dim}">
+            <span style="width:10px;height:10px;border-radius:2px;background:${s.color};border:1px solid #C8C8C6;flex-shrink:0;"></span>
+            <span style="font-weight:600;color:#1A1A18;min-width:52px;">${s.label}</span>
+            <span style="color:#5A5A57;">${s.val} pcs · ${s.sqm.toFixed(2)} m²</span>
+          </div>`;
+        }).join('');
+        return `
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          <svg width="92" height="92" viewBox="0 0 92 92" style="flex-shrink:0;">${paths}</svg>
+          <div style="flex:1;min-width:190px;">
+            ${legend}
+            <div style="display:flex;align-items:center;gap:7px;font-size:11px;padding:4px 0 0;margin-top:3px;border-top:1px solid #ECECEA;">
+              <span style="width:10px;height:10px;border-radius:2px;background:#1A1A18;flex-shrink:0;"></span>
+              <span style="font-weight:700;color:#1A1A18;min-width:52px;">Total</span>
+              <span style="color:#5A5A57;font-weight:600;">${ftTotals.total} pcs · ${ftTotals.totalSqm.toFixed(2)} m²</span>
+            </div>
+          </div>
+        </div>`;
+      })()}
+    </div>`;
+
+  const toolbarHtml=`
+    <div class="toolbar" id="toolbar">
+      <input type="text" id="search" placeholder="Search client / order / remarks..." style="min-width:200px;" oninput="reTable()">
+      <select id="filterStatus" onchange="stageFilter=this.value;pendingDeleteId=null;reTable()">
+        <option value="">All stages</option>
+        ${STATUS_KEYS.map(k=>`<option value="${k}"${stageFilter===k?' selected':''}>${k}</option>`).join('')}
+      </select>
+      <select id="filterDest" onchange="reTable()">
+        <option value="">All destinations</option>
+        ${dests.map(d=>`<option>${esc(d)}</option>`).join('')}
+      </select>
+      <select id="filterDispatchDt" onchange="filterDispatchDt=this.value;reTable()">
+        <option value="">All dispatch dates</option>
+        ${dispDates.map(d=>`<option value="${esc(d)}"${filterDispatchDt===d?' selected':''}>${esc(d)}${d===todayDtStr()?' ⭐ Today':''}</option>`).join('')}
+      </select>
+      <button class="btn" onclick="clearFilters()">✕ Clear</button>
+      <button class="btn${showColPanel?' btn-primary':''}" onclick="toggleColPanel()">
+        ⊞ Columns <span style="background:#EBEBEA;font-size:10px;padding:1px 7px;border-radius:10px;margin-left:2px;">${visibleCols.size}</span>
+      </button>
+    </div>`;
+
+  const colPanelHtml=showColPanel?`<div class="col-panel">
+    <div class="col-panel-title">Show / Hide Columns</div>
+    <div class="col-toggle-grid">
+      ${COLS.filter(c=>!c.always).map(c=>`
+        <label class="col-toggle-item">
+          <input type="checkbox" ${visibleCols.has(c.id)?'checked':''} onchange="toggleCol('${c.id}',this.checked)">
+          ${c.label}
+        </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn btn-sm" onclick="showAllCols()">Show all</button>
+      <button class="btn btn-sm" onclick="showEssentialCols()">Essential only</button>
+    </div>
+  </div>`:'';
+
+  const uploadPanelHtml=showUploadPanel?`<div class="upload-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;">📋 Import from Order Form</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">Upload the Order Form (.xlsx for data) + its exact PDF/image, and the Graphic Layout — all together. Name files with "order/form", "layout/graphic" to auto-sort.</div>
+      </div>
+      <button class="btn btn-sm" onclick="toggleUpload()">✕</button>
+    </div>
+    <div class="drop-zone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault();this.classList.remove('dragover');handleUploadFiles(event.dataTransfer.files)" onclick="document.getElementById('of-input').click()">
+      <input type="file" id="of-input" accept=".xlsx,.xls,application/pdf,image/*" multiple onchange="handleUploadFiles(this.files)">
+      <div style="font-size:32px;margin-bottom:8px;">📋</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Click to browse or drag &amp; drop</div>
+      <div style="font-size:12px;color:#888;">Order Form (.xlsx) + optional Layout (PDF / image) — select multiple files</div>
+    </div>
+    <div id="of-preview"></div>
+  </div>`:'';
+
+  document.getElementById('tab-content').innerHTML=`
+    ${metricsHtml}
+    <div class="pipeline-section">
+      <div class="pipeline-hdr">
+        <span>Pipeline — click to filter</span>
+        <span id="stage-clear-btn">${stageFilter?`<button class="btn btn-sm" onclick="setStageFilter('')">✕ Clear: <strong>${stageFilter}</strong></button>`:''}</span>
+      </div>
+      <div class="pipeline-cards">${pipelineCards}</div>
+      ${currentUser&&currentUser.canAdvance?`<div style="font-size:10px;color:#9A9A97;margin-top:5px;">★ = your stage</div>`:''}
+    </div>
+    ${uploadPanelHtml}
+    ${fabTotalsHtml}
+    ${toolbarHtml}
+    ${colPanelHtml}
+    <div class="tbl-wrap"><table id="main-table">${buildWipTableHTML()}</table></div>
+    <div class="tbl-footer" id="tbl-footer">${getFooterText()}</div>`;
+}
+
+function getFooterText(){
+  const f=getFilteredWip();
+  const wip=getSortedOrders().filter(o=>!isOrderComplete(o));
+  return `Showing ${f.length} of ${wip.length} WIP orders · Sorted by dispatch date · Remarks editable by everyone`;
+}
+
+function getFilteredWip(){
+  const q=(document.getElementById('search')?.value||'').toLowerCase();
+  const ds=document.getElementById('filterDest')?.value||'';
+  const fdd=filterDispatchDt;
+  return getSortedOrders().filter(o=>{
+    if(isOrderComplete(o)) return false;
+    if(q&&![o.clientName,o.showName,o.shipTo,o.courierName,o.remarks].join(' ').toLowerCase().includes(q)) return false;
+    if(stageFilter&&orderMainStatus(o)!==stageFilter) return false;
+    if(ds&&o.shipTo!==ds) return false;
+    if(fdd&&o.dispatchDt!==fdd) return false;
+    return true;
+  });
+}
+
+function buildWipTableHTML(){
+  const filtered=getFilteredWip();
+  const visCols=COLS.filter(c=>visibleCols.has(c.id));
+  const head=visCols.map(c=>{
+    const tag=c.id==='remarks'?' <span style="font-size:9px;background:#DFF5E5;color:#1A6830;padding:1px 5px;border-radius:10px;font-weight:500;">all</span>':'';
+    return `<th style="min-width:${c.w};width:${c.w};border-right:1px solid #D8D8D6;">${c.label}${tag}</th>`;
+  }).join('');
+  const today=todayDtStr();
+  const body=filtered.length
+    ?filtered.map(o=>{
+      const isToday=o.dispatchDt===today;
+      const rowStyle=isToday?' style="background:#FFFBCC;"':'';
+      return `<tr${rowStyle}>${visCols.map(c=>cellVal(o,c.id)).join('')}</tr>`;
+    }).join('')
+    :`<tr><td colspan="${visCols.length}" style="text-align:center;padding:28px;color:#aaa;">No WIP orders match filter.</td></tr>`;
+  return `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+}
+
+function reTable(){
+  const t=document.getElementById('main-table');
+  if(t) t.innerHTML=buildWipTableHTML();
+  const f=document.getElementById('tbl-footer');
+  if(f) f.textContent=getFooterText();
+}
+
+// ============================================================
+// COMPLETED TAB
+// ============================================================
+function renderCompletedTab(){
+  const done=getSortedOrders().filter(isOrderComplete);
+  document.getElementById('tab-content').innerHTML=`
+    <div class="completed-banner">✅ ${done.length} order${done.length!==1?'s':''} fully completed (all fabrics QC OK). These are moved out of the WIP dashboard.</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="min-width:110px;">Dispatch dt.</th>
+          <th style="min-width:150px;">Client name</th>
+          <th style="min-width:140px;">Order no.</th>
+          <th style="min-width:100px;">Ship to</th>
+          <th style="min-width:110px;">Fabric qty</th>
+          <th style="min-width:220px;">Fabric stages</th>
+          <th style="min-width:180px;">Remarks</th>
+          ${isMgr()?'<th style="min-width:80px;">Actions</th>':''}
+        </tr></thead>
+        <tbody>
+          ${done.length?done.map(o=>`
+            <tr>
+              <td style="white-space:nowrap;">${esc(o.dispatchDt)}</td>
+              <td style="font-weight:700;">${esc(o.clientName)}</td>
+              <td>${esc(o.orderNo)}</td>
+              <td>${esc(o.shipTo)}</td>
+              <td style="font-size:11px;color:#5A5A57;">${fabQtySummary(o)} <span style="font-weight:600;">(${tot(o)})</span></td>
+              <td>${completedFabricCell(o)}</td>
+              <td style="color:#5A5A57;font-size:12px;">${esc(o.remarks)||'—'}</td>
+              ${isMgr()?`<td><button class="btn btn-sm btn-danger" onclick="doDelete(${o.id})">🗑</button></td>`:''}
+            </tr>`).join('')
+          :`<tr><td colspan="9" style="text-align:center;padding:28px;color:#aaa;">No completed orders yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function completedFabricCell(o){
+  const active=FAB_TYPES.filter(f=>o[f.id]>0);
+  return active.map(f=>`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:#DFF5E5;color:#1A6830;margin:1px 2px;display:inline-block;">${f.name} ✓</span>`).join('');
+}
+
+// ============================================================
+// CELL RENDERERS
+// ============================================================
+// Hanging banner line items on an order (classified as hanging / hangingBacklit)
+function hangingLineItems(o){
+  return (o.lineItems||[]).filter(li=>{
+    const c=classifyLineType(li);
+    return c==='hanging'||c==='hangingBacklit'||(li.section||'').toLowerCase().includes('hanging');
+  });
+}
+// Manager-editable manual size field(s) for hanging banners.
+// Order form lists 2 lines per physical banner (inside + outside print),
+// so the number of size boxes = ceil(hanging lines / 2).
+function hangingSizeInputs(o){
+  const hangs=hangingLineItems(o);
+  if(!hangs.length) return '';
+  o.hangSizes=o.hangSizes||{};
+  const boxCount=Math.max(1, Math.ceil(hangs.length/2));
+  const rows=Array.from({length:boxCount}).map((_,idx)=>{
+    const key='banner'+idx;            // stable key per size box
+    const val=o.hangSizes[key]||'';
+    const safeKey=key;
+    const inId=`hang-${o.id}-${idx}`;
+    const label=boxCount>1?`<span style="font-size:9px;color:#7AC77A;font-weight:700;min-width:46px;">Banner ${idx+1}</span>`:'';
+    if(isMgr()){
+      return `<div style="display:flex;align-items:center;gap:5px;margin-top:4px;">
+        ${label}
+        <input type="text" id="${inId}" data-hkey="${esc(key)}" value="${esc(val)}" placeholder="Enter banner size"
+          onchange="saveHangSize(${o.id},'${safeKey}',this.value)"
+          style="flex:1;min-width:90px;padding:3px 7px;border:1px solid #D8D8D6;border-radius:6px;font-size:11px;font-weight:500;color:#1A1A18;outline:none;">
+      </div>`;
+    }
+    return val?`<div style="display:flex;align-items:center;gap:5px;margin-top:4px;font-size:11px;color:#5A5A57;">
+      ${label}<span>📐 ${esc(val)}</span></div>`:'';
+  }).join('');
+  if(!rows.trim()) return '';
+  return `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #E2E2E0;">
+    <div style="font-size:9px;color:#7AC77A;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">🎌 Hanging banner size</div>
+    ${rows}
+  </div>`;
+}
+function saveHangSize(orderId,key,val){
+  if(!isMgr()) return;
+  const o=orders.find(x=>x.id===orderId); if(!o) return;
+  o.hangSizes=o.hangSizes||{};
+  o.hangSizes[key]=val.trim();
+  _localUpdate=true;
+  dbUpdateOrder(o);
+  showToast('✓ Banner size saved');
+}
+
+// Suggest a square/rect size from layout text:
+//  - L & W from the TOP frame (the largest dimension; for a square top L=W)
+//  - H from the panel/graphic height (the smallest distinct dimension, e.g. 36" → 3')
+// Returns {shape, dims:[L,W,H]} or null.
+function suggestTopFrameSize(allText, cands){
+  if(!cands||!cands.length) return null;
+  const fts=cands.map(c=>c.ft);
+  const maxFt=Math.max(...fts);
+  const minFt=Math.min(...fts);
+  // Try to read the TOP-frame W×L: look at dimensions near the word "TOP"
+  let L=maxFt, W=maxFt;
+  const clean=(allText||'').replace(/\[[^\]]*\]/g,' ');
+  // dims appearing within ~60 chars before/after "TOP"
+  const topIdx=clean.toUpperCase().indexOf('TOP');
+  if(topIdx>=0){
+    const window=clean.slice(Math.max(0,topIdx-80), topIdx+80);
+    const near=[...window.matchAll(/(\d{2,4}(?:\.\d+)?)\s*(?:″|"|in\b|inch)/gi)].map(x=>Math.round(parseFloat(x[1])/12)).filter(v=>v>0);
+    if(near.length>=2){ L=near[0]; W=near[1]; }
+    else if(near.length===1){ L=W=near[0]; }
+  }
+  // Height = smallest distinct (panel height like 36"→3'); if only one value, no separate height
+  const H = (minFt<maxFt) ? minFt : null;
+  const dims = H!=null ? [L,W,H] : [L,W];
+  return {shape:'Square', dims};
+}
+
+// Extract every inch dimension from PDF text and convert to feet (÷12, rounded).
+// Returns unique ft values (e.g. 144"→12, 36"→3), sorted desc, with their source.
+function extractFtCandidates(txt){
+  if(!txt) return [];
+  const found=new Map();   // ft -> source inch label
+  // match numbers followed by inch mark (" or in/inch), ignore mm in [..]
+  // strip the [..mm] metric notes first so we don't pick those numbers
+  const clean=txt.replace(/\[[^\]]*\]/g,' ');
+  const re=/(\d{1,4}(?:\.\d+)?)\s*(?:″|"|''|in\b|inch(?:es)?\b)/gi;
+  let m;
+  while((m=re.exec(clean))){
+    const inches=parseFloat(m[1]);
+    if(!inches||inches<=0||inches>2000) continue;
+    const ft=Math.round(inches/12);
+    if(ft<=0) continue;
+    if(!found.has(ft)) found.set(ft, `${m[1]}"`);
+  }
+  // also catch plain "144 x 144" patterns (no inch mark) as a fallback
+  if(found.size===0){
+    const re2=/(\d{2,4})\s*(?:x|×)\s*(\d{2,4})(?:\s*(?:x|×)\s*(\d{2,4}))?/i;
+    const m2=clean.match(re2);
+    if(m2){ [m2[1],m2[2],m2[3]].filter(Boolean).forEach(v=>{const ft=Math.round(parseFloat(v)/12);if(ft>0&&!found.has(ft))found.set(ft,`${v}"`);}); }
+  }
+  return [...found.entries()].map(([ft,src])=>({ft,src})).sort((a,b)=>b.ft-a.ft);
+}
+
+// Compose the final size string from shape + chosen ft dims
+function composeHangSize(shape, dims){
+  const d=dims.filter(x=>x!=null&&x!=='').map(x=>x);
+  if(shape==='Custom') return 'Custom shape';
+  if(shape==='Round'){
+    if(d.length>=2) return `Round ${d[0]}×${d[1]}'`;
+    if(d.length===1) return `Round ${d[0]}' dia`;
+    return 'Round';
+  }
+  // Square / Rectangle
+  if(!d.length) return shape==='Square'?'Square':'';
+  return `${shape} ${d.join('×')}'`;
+}
+
+// Try to read the attached PDF layout, then open a picker with detected ft candidates.
+async function autoDetectHangSizes(orderId){
+  if(!isMgr()) return;
+  const o=orders.find(x=>x.id===orderId); if(!o||!o.layout||o.layout.type!=='application/pdf'){ alert('Auto-detect needs a PDF layout.'); return; }
+  const pdfjs=window.pdfjsLib||(typeof pdfjsLib!=='undefined'?pdfjsLib:null);
+  if(!pdfjs){ alert('PDF reader not loaded (needs internet on first use).'); return; }
+  try{
+    pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    showToast('🔍 Reading layout…');
+    const b64=o.layout.data.split(',')[1];
+    const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+    const pdf=await pdfjs.getDocument({data:bytes}).promise;
+    let allText='';
+    for(let p=1;p<=pdf.numPages;p++){
+      const page=await pdf.getPage(p);
+      const tc=await page.getTextContent();
+      allText+=' '+tc.items.map(i=>i.str).join(' ');
+    }
+    allText=allText.replace(/\s+/g,' ').trim();
+    if(!allText){ alert('No readable text found in this PDF (it may be a flattened image). Please enter sizes manually.'); return; }
+    const cands=extractFtCandidates(allText);
+    if(!cands.length){ alert('No inch dimensions found in the PDF. Please enter sizes manually.'); return; }
+    const suggestion=suggestTopFrameSize(allText, cands);
+    openHangSizePicker(orderId, cands, suggestion);
+  }catch(err){
+    console.warn('PDF detect failed',err);
+    alert('Could not read the PDF layout. Please enter sizes manually.');
+  }
+}
+
+// state for the picker
+let _hangPick={orderId:null, shape:'Square', dims:[], cands:[]};
+function openHangSizePicker(orderId, cands, suggestion){
+  _hangPick={orderId, shape:(suggestion&&suggestion.shape)||'Square', dims:(suggestion&&suggestion.dims)?[...suggestion.dims]:[], cands};
+  renderHangPicker();
+}
+function renderHangPicker(){
+  const {orderId, shape, dims, cands}=_hangPick;
+  const o=orders.find(x=>x.id===orderId); if(!o) return;
+  const hangs=hangingLineItems(o);
+  const chips=cands.map(c=>{
+    const count=dims.filter(d=>d===c.ft).length;
+    return `<button onclick="hangPickAdd(${c.ft})" style="padding:6px 12px;border:1.5px solid #7AC77A;border-radius:8px;background:${count?'#E8F5EC':'#fff'};font-size:13px;font-weight:600;color:#2A7A3B;cursor:pointer;">
+      ${c.ft}'${count?` ×${count}`:''} <span style="font-size:9px;color:#9A9A97;font-weight:400;">(${c.src})</span></button>`;
+  }).join('');
+  const shapeBtn=(s,lbl)=>`<button onclick="hangPickShape('${s}')" style="flex:1;padding:8px;border:1.5px solid ${shape===s?'#1A1A18':'#D8D8D6'};border-radius:8px;background:${shape===s?'#1A1A18':'#fff'};color:${shape===s?'#fff':'#5A5A57'};font-size:12px;font-weight:600;cursor:pointer;">${lbl}</button>`;
+  const preview=composeHangSize(shape, dims);
+  // which banner(s) to apply to
+  const applyOpts=hangs.map((li,idx)=>{
+    const key=(li.graphicRef||('hang'+idx)).toString();
+    return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0;">
+      <input type="checkbox" class="hang-apply" data-key="${esc(key)}" checked> ${esc(li.graphicRef||('Banner '+(idx+1)))}</label>`;
+  }).join('');
+  document.getElementById('modal-area').innerHTML=`
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box" style="max-width:460px;">
+      <h3 style="margin:0 0 4px;">🎌 Set hanging banner size</h3>
+      <div style="font-size:11px;color:#9A9A97;margin-bottom:14px;">Pre-filled from the layout's TOP frame (L×W) and panel height (inches → feet). Confirm, or tap to adjust.</div>
+
+      <div style="font-size:11px;font-weight:600;color:#5A5A57;margin-bottom:6px;">SHAPE</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">${shapeBtn('Square','Square')}${shapeBtn('Rectangle','Rectangle')}${shapeBtn('Round','Round')}${shapeBtn('Custom','Custom shape')}</div>
+
+      ${shape!=='Custom'?`
+      <div style="font-size:11px;font-weight:600;color:#5A5A57;margin-bottom:6px;">DETECTED SIZES (ft) — tap to add</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">${chips||'<span style="font-size:12px;color:#9A9A97;">none</span>'}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:11px;color:#5A5A57;">Selected:</span>
+        <span style="font-size:13px;font-weight:600;color:#1A1A18;">${dims.length?dims.join(' × ')+" '":'—'}</span>
+        ${dims.length?`<button onclick="hangPickClear()" style="font-size:10px;padding:2px 7px;border:1px solid #D8D8D6;border-radius:6px;background:#fff;cursor:pointer;">clear</button>`:''}
+      </div>`:''}
+
+      <div style="background:#F5F5F3;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+        <span style="font-size:11px;color:#5A5A57;">Result:</span>
+        <span style="font-size:15px;font-weight:700;color:#2A7A3B;margin-left:6px;">${esc(preview||'—')}</span>
+      </div>
+
+      <div style="font-size:11px;font-weight:600;color:#5A5A57;margin-bottom:4px;">APPLY TO</div>
+      <div style="margin-bottom:16px;">${applyOpts}</div>
+
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="hangPickApply()">✓ Apply size</button>
+      </div>
+    </div>
+  </div>`;
+}
+function hangPickShape(s){ _hangPick.shape=s; if(s==='Custom')_hangPick.dims=[]; renderHangPicker(); }
+function hangPickAdd(ft){ _hangPick.dims.push(ft); renderHangPicker(); }
+function hangPickClear(){ _hangPick.dims=[]; renderHangPicker(); }
+function hangPickApply(){
+  const {orderId, shape, dims}=_hangPick;
+  const o=orders.find(x=>x.id===orderId); if(!o) return;
+  const size=composeHangSize(shape, dims);
+  if(!size||(shape!=='Custom'&&!dims.length)){ alert('Pick at least one dimension, or choose Custom shape.'); return; }
+  const checks=[...document.querySelectorAll('.hang-apply')].filter(c=>c.checked).map(c=>c.getAttribute('data-key'));
+  if(!checks.length){ alert('Select at least one banner to apply to.'); return; }
+  o.hangSizes=o.hangSizes||{};
+  checks.forEach(k=>{ o.hangSizes[k]=size; });
+  _localUpdate=true; dbUpdateOrder(o); closeModal(); reTable();
+  showToast(`✓ Applied "${size}" to ${checks.length} banner(s)`);
+}
+
+
+
+function cellVal(o,cid){
+  const br='border-right:1px solid #ECECEA;';
+  if(cid==='dispatchDt') return dispatchDateCell(o);
+  if(cid==='totalFabric') return `<td style="text-align:center;font-weight:600;${br}">${tot(o)}</td>`;
+  if(cid==='fabricQty') return `<td style="${br};font-size:11px;color:#5A5A57;">${fabQtySummary(o)}</td>`;
+  if(cid==='fabricStatus') return fabricStatusCell(o);
+  if(cid==='remarks') return remarkCell(o);
+  if(cid==='clientName') return `<td style="${br}font-weight:700;" title="${esc(String(o.clientName||''))}">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="overflow:hidden;text-overflow:ellipsis;">${esc(String(o.clientName||'—'))}</span>
+      <button class="btn btn-sm view-btn" title="View Order Form & Layout" onclick="openOrderView(${o.id})">👁 View</button>
+    </div>
+    ${hangingSizeInputs(o)}</td>`;
+  if(cid==='actions') return actionsCell(o);
+  return `<td style="${br}" title="${esc(String(o[cid]||''))}">${esc(String(o[cid]||'—'))}</td>`;
+}
+
+// Inline editable dispatch date (manager only)
+function dispatchDateCell(o){
+  const br='border-right:1px solid #ECECEA;';
+  if(isMgr()){
+    const iso=toISODate(o.dispatchDt);
+    return `<td style="${br}padding:5px 8px;">
+      <div class="disp-cell">
+        <input type="date" class="disp-input" id="dd-${o.id}" value="${iso}"
+          style="width:130px;cursor:pointer;"
+          onchange="saveDispatchDateFromPicker(${o.id},this.value)"
+          title="${esc(o.dispatchDt)||'Pick date'}">
+      </div>
+    </td>`;
+  }
+  return `<td style="${br}white-space:nowrap;">${esc(o.dispatchDt)||'—'}</td>`;
+}
+
+function saveDispatchDate(id){
+  const inp=document.getElementById('dd-'+id);
+  if(!inp) return;
+  const o=orders.find(x=>x.id===id);
+  if(o&&inp.value.trim()!==o.dispatchDt){
+    o.dispatchDt=inp.value.trim();
+    showToast('✓ Dispatch date updated');
+  }
+}
+function saveDispatchDateFromPicker(id, isoVal){
+  const o=orders.find(x=>x.id===id);
+  if(o){
+    const newDt=fromISODate(isoVal);
+    if(newDt&&newDt!==o.dispatchDt){
+      o.dispatchDt=newDt;
+      showToast('✓ Dispatch date updated');
+      _localUpdate=true;
+      dbUpdateOrder(o);
+      reTable();renderTabs();
+    }
+  }
+}
+
+// Fabric status cell
+function fabricStatusCell(o){
+  const THREE_HR=3*60*60*1000;
+  const active=FAB_TYPES.filter(f=>o[f.id]>0);
+  const hasHw=(o[HW_ID]||0)>0;
+  if(!active.length && !hasHw) return `<td style="border-right:1px solid #ECECEA;"><span style="font-size:10px;color:#aaa;">No items</span></td>`;
+
+  // Stage header labels with individual stage colors
+  const stageHeaderRow=active.length?`<div class="stage-headers">
+    ${STATUS_KEYS.map(sk=>{
+      const sc=getStatusColor(sk);
+      return `<div class="stage-hdr" style="color:${sc};border-bottom-color:${sc};">${sk.replace('In ','').replace('QC ','QC ')}</div>`;
+    }).join('')}
+  </div>`:'';
+
+  const rows=active.map(f=>{
+    const st=o.fabStatus[f.id];
+    const stIdx=st?STAGE_IDX[st]:0;
+    const stBg=st?getStatusBg(st):'#eee';
+    const stTc=st?getStatusTc(st):'#777';
+    const logs=getFabTimeLogs(o.id,f.id);
+    // build map: stage → total ms
+    const stageMs={};
+    logs.forEach(l=>{
+      const ms=(l.endTs||Date.now())-l.startTs;
+      stageMs[l.stage]=(stageMs[l.stage]||0)+ms;
+    });
+    const isFinalDone = st==='QC OK';   // fabric fully complete (terminal stage reached)
+    const myStages = fabStages(f.id);                 // this type's own pipeline
+    const myIdx = fabStageIdx(f.id, st||myStages[0]); // index within its own pipeline
+    // QC time source = the stage right before QC OK in this pipeline (QC Pending)
+    const miniStages=STATUS_KEYS.map((sk)=>{
+      // is this column part of this fabric's pipeline?
+      if(!myStages.includes(sk)){
+        return `<div class="fab-stage na"><div class="fab-stage-tip">${sk}: not applicable</div><span class="fab-stage-na">–</span></div>`;
+      }
+      const colIdx = myStages.indexOf(sk);
+      const isDone = myIdx>colIdx || (isFinalDone && sk==='QC OK');
+      const isCur  = myIdx===colIdx && !isDone;
+      // QC OK box reflects the QC work time = time spent in QC Pending
+      const ms = (sk==='QC OK') ? (stageMs['QC Pending']||0) : (stageMs[sk]||0);
+      const isLive=isCur&&logs.some(l=>!l.endTs&&l.stage===sk);
+      const isOver=(isDone||isCur)&&ms>=THREE_HR;   // ≥3h flags both completed and in-progress stages
+      let cls='fab-stage';
+      if(isOver) cls+=' over3h';
+      else if(isDone) cls+=' done';
+      else if(isCur) cls+=' current';
+      const timeStr=isCur&&!ms?'…':fmtDuration(ms);
+      const innerHtml=(isDone||isCur)
+        ?`<span class="fab-stage-time">${timeStr}</span>${isLive?'<span class="fab-stage-livedot">●</span>':''}`
+        :'';
+      const tipContent=`${sk==='QC OK'?'QC time':sk}${ms?': '+fmtDuration(ms)+(isOver?' ⚠ ≥3h':''):''}`;
+      return `<div class="${cls}">
+        <div class="fab-stage-tip">${tipContent}</div>
+        ${innerHtml}
+      </div>`;
+    }).join('');
+    const canUpd=canUpdateFabric(o,f.id)&&st&&fabNext(f.id,st);
+    const nextSt=st?fabNext(f.id,st):'';
+    return `<div class="fabric-status-row">
+      <span class="fabric-label" style="color:${f.color};">${f.label}</span>
+      <div class="fabric-stages">${miniStages}</div>
+      <span class="fabric-status-text" style="background:${stBg};color:${stTc};">${st||'—'}</span>
+      ${canUpd?`<button class="fabric-adv-btn" onclick="quickAdvanceFabric(${o.id},'${f.id}')" title="→ ${nextSt}">→</button>`:''}
+    </div>`;
+  }).join('');
+
+  // Hardware row (separate pipeline: Ordered → Received & QC Pending → QC OK)
+  let hwRow='';
+  if(hasHw){
+    const st=o.fabStatus[HW_ID]||HW_STAGES[0];
+    const stIdx=HW_IDX[st]!=null?HW_IDX[st]:0;
+    const stBg=getStatusBg(st)||'#EDEAE3'; const stTc=getStatusTc(st)||'#5A5A57';
+    const logs=getFabTimeLogs(o.id,HW_ID);
+    const stageMs={}; logs.forEach(l=>{ const ms=(l.endTs||Date.now())-l.startTs; stageMs[l.stage]=(stageMs[l.stage]||0)+ms; });
+    const isFinalDone=st==='QC OK';
+    const miniStages=HW_STAGES.map((sk,si)=>{
+      const isDone=stIdx>si||(isFinalDone&&sk==='QC OK');
+      const isCur=stIdx===si&&!isDone;
+      const ms=(sk==='QC OK')?(stageMs['Received & QC Pending']||0):(stageMs[sk]||0);
+      const isLive=isCur&&logs.some(l=>!l.endTs&&l.stage===sk);
+      const isOver=(isDone||isCur)&&ms>=THREE_HR;
+      let cls='fab-stage'; if(isOver)cls+=' over3h'; else if(isDone)cls+=' done'; else if(isCur)cls+=' current';
+      const timeStr=isCur&&!ms?'…':fmtDuration(ms);
+      const innerHtml=(isDone||isCur)?`<span class="fab-stage-time">${timeStr}</span>${isLive?'<span class="fab-stage-livedot">●</span>':''}`:'';
+      const tip=`${sk==='QC OK'?'QC time':sk}${ms?': '+fmtDuration(ms)+(isOver?' ⚠ ≥3h':''):''}`;
+      return `<div class="${cls}" style="min-width:64px;"><div class="fab-stage-tip">${tip}</div>${innerHtml}</div>`;
+    }).join('');
+    const canUpd=canUpdateFabric(o,HW_ID)&&st&&HW_NEXT[st];
+    const nextSt=st?HW_NEXT[st]:'';
+    hwRow=`<div class="fabric-status-row" style="border-top:1px dashed #E2E2E0;margin-top:3px;padding-top:3px;">
+      <span class="fabric-label" style="color:#6B7280;" title="Hardware">HW</span>
+      <div class="fabric-stages">${miniStages}</div>
+      <span class="fabric-status-text" style="background:${stBg};color:${stTc};">${st||'—'}</span>
+      ${canUpd?`<button class="fabric-adv-btn" onclick="quickAdvanceFabric(${o.id},'${HW_ID}')" title="→ ${nextSt}">→</button>`:''}
+    </div>`;
+  }
+
+  const pct=orderProgress(o);
+  const canOpen=isMgr()||FAB_TYPES.some(f=>canUpdateFabric(o,f.id))||canUpdateFabric(o,HW_ID);
+  return `<td style="padding:6px 10px;border-right:1px solid #ECECEA;">
+    ${stageHeaderRow}
+    <div class="fabric-status-grid">${rows}${hwRow}</div>
+    <div class="order-progress-wrap">
+      <div class="order-progress-bar"><div class="order-progress-fill" style="width:${pct}%;"></div></div>
+      <span class="order-progress-pct">${pct}%</span>
+      ${canOpen?`<button class="btn btn-sm" onclick="openFabricStatusModal(${o.id})" style="padding:2px 7px;font-size:10px;margin-left:4px;">✏️ Edit</button>`:''}
+    </div>
+  </td>`;
+}
+
+// Time summary cell — show per-fabric time logs
+function timeSummaryCell(o){
+  const active=FAB_TYPES.filter(f=>o[f.id]>0);
+  if(!active.length) return '<span style="color:#aaa;font-size:10px;">—</span>';
+  const rows=active.map(f=>{
+    const logs=getFabTimeLogs(o.id,f.id);
+    if(!logs.length) return `<div class="time-log-entry"><span class="time-log-stage" style="color:${f.color};">${f.name}</span>: <span style="color:#aaa;">not started</span></div>`;
+    const totalMs=logs.reduce((sum,l)=>{
+      const end=l.endTs||Date.now();
+      return sum+(end-l.startTs);
+    },0);
+    const stageLines=logs.map(l=>{
+      const end=l.endTs||Date.now();
+      const dur=fmtDuration(end-l.startTs);
+      const ongoing=!l.endTs?` <span style="color:#B86000;font-size:9px;">● live</span>`:'';
+      return `<span style="font-size:9px;color:#5A5A57;">${l.stage}: <b style="color:#4A3FB5;">${dur}</b>${ongoing}</span>`;
+    }).join(' · ');
+    return `<div class="time-log-entry">
+      <span class="time-log-stage" style="color:${f.color};">${f.name}</span>
+      <span class="time-log-dur"> ${fmtDuration(totalMs)}</span><br>
+      <span style="font-size:9px;color:#9A9A97;">${stageLines}</span>
+    </div>`;
+  }).join('');
+  return rows;
+}
+
+function remarkCell(o){
+  const br='border-right:1px solid #ECECEA;';
+  return `<td style="${br}padding:5px 8px;">
+    <div class="remark-wrap">
+      <input class="remark-input" id="ri-${o.id}" value="${esc(o.remarks||'')}" placeholder="Add remark…"
+        onfocus="document.getElementById('rb-${o.id}').style.display='inline-block'"
+        onblur="setTimeout(()=>{const b=document.getElementById('rb-${o.id}');if(b)b.style.display='none'},200)"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();saveRemark(${o.id});}">
+      <button class="remark-save-btn" id="rb-${o.id}" onmousedown="saveRemark(${o.id})">✓</button>
+      <span class="remark-ok" id="ro-${o.id}">✓ Saved</span>
+    </div></td>`;
+}
+
+function actionsCell(o){
+  if(pendingDeleteId===o.id){
+    return `<td style="border-right:none;padding:6px 8px;">
+      <div class="del-confirm-row">
+        <span>Delete?</span>
+        <button class="btn btn-sm btn-danger" onclick="confirmDelete(${o.id})">Yes</button>
+        <button class="btn btn-sm" onclick="cancelDelete()">No</button>
+      </div></td>`;
+  }
+  return `<td style="border-right:none;padding:5px 8px;">
+    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+      ${isMgr()?`<button class="btn btn-sm" onclick="openEdit(${o.id})">✏️</button>`:''}
+      ${isMgr()?`<button class="btn btn-sm btn-danger" onclick="doDelete(${o.id})">🗑</button>`:''}
+      ${!isMgr()?`<span style="font-size:10px;color:#aaa;">—</span>`:''}
+    </div></td>`;
+}
+
+// ---- Combined order view: Order Form details + Graphic Layout ----
+let orderViewTab='form';   // 'form' | 'layout'
+function openOrderView(id, tab){
+  const o=orders.find(x=>x.id===id); if(!o) return;
+  orderViewTab = tab || 'form';
+  const has=!!(o.layout&&o.layout.data);
+  const active = orderViewTab;
+  const tabBtn=(key,label,badge)=>`<button class="btn btn-sm${active===key?' btn-primary':''}" onclick="openOrderView(${id},'${key}')">${label}${badge?` <span style="opacity:.8;">${badge}</span>`:''}</button>`;
+  const body = active==='layout' ? layoutPaneHTML(o,id) : orderFormPaneHTML(o);
+  document.getElementById('modal-area').innerHTML=`
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box" style="max-width:900px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div>
+          <h3 style="margin-bottom:2px;">${esc(o.clientName||'Order')}</h3>
+          <div style="font-size:11px;color:#9A9A97;">${esc(o.showName||'')}${o.showCity?(' · '+esc(o.showCity)):''}${o.projectNo?(' · '+esc(o.projectNo)):''}</div>
+        </div>
+        <button class="btn btn-sm" onclick="closeModal()" title="Close (Esc)">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;margin:12px 0 14px;">
+        ${tabBtn('form','📋 Order Form')}
+        ${tabBtn('layout','📎 Graphic Layout'+(has?' ✓':''))}
+      </div>
+      <div id="ov-body">${body}</div>
+      <div class="modal-footer"><span style="font-size:11px;color:#9A9A97;">Press Esc to close</span><button class="btn" onclick="closeModal()">Close</button></div>
+    </div>
+  </div>`;
+}
+
+// Render the order-form sheet as a clean, read-only document preview (no row/col headers, no editable look)
+function sheetGridHTML(aoa, merges){
+  if(!Array.isArray(aoa)||!aoa.length) return '';
+  let maxC=0, maxR=0;
+  aoa.forEach((row,r)=>{ (row||[]).forEach((v,c)=>{ if(v!==''&&v!=null){ if(c>maxC)maxC=c; if(r>maxR)maxR=r; } }); });
+  merges=merges||[];
+  const covered={}; const anchorSpan={};
+  merges.forEach(m=>{
+    const {s,e}=m;
+    anchorSpan[s.r+':'+s.c]={rs:e.r-s.r+1, cs:e.c-s.c+1};
+    for(let r=s.r;r<=e.r;r++) for(let c=s.c;c<=e.c;c++){ if(r===s.r&&c===s.c) continue; covered[r+':'+c]=true; }
+  });
+  // section header rows (used to emphasize): rows whose first non-empty cell is a known section name
+  const SECTIONS=/^(non[ -]?backlight|backlight|vinyl|hanging banner|hanging|graphic ref|exponents graphics order form|t&c)/i;
+  let html='<div class="of-doc"><table class="of-doc-tbl"><tbody>';
+  for(let r=0;r<=maxR;r++){
+    const rowVals=(aoa[r]||[]).slice(0,maxC+1).map(v=>v==null?'':String(v).trim());
+    const isEmpty=rowVals.every(v=>v==='');
+    if(isEmpty){ html+='<tr class="of-doc-spacer"><td colspan="'+(maxC+1)+'"></td></tr>'; continue; }
+    const firstVal=(rowVals.find(v=>v!=='')||'');
+    const isSection=SECTIONS.test(firstVal);
+    const isTitle=/exponents graphics order form/i.test(firstVal);
+    html+='<tr'+(isSection?' class="of-doc-section"':'')+(isTitle?' class="of-doc-title"':'')+'>';
+    for(let c=0;c<=maxC;c++){
+      if(covered[r+':'+c]) continue;
+      const span=anchorSpan[r+':'+c];
+      const attr=span?`${span.rs>1?` rowspan="${span.rs}"`:''}${span.cs>1?` colspan="${span.cs}"`:''}`:'';
+      const val=(aoa[r]&&aoa[r][c]!=null)?String(aoa[r][c]):'';
+      const numeric=val!==''&&!isNaN(val)&&/^-?\d/.test(val);
+      html+=`<td${attr}${numeric?' style="text-align:right;"':''}>${esc(val)}</td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody></table></div>';
+  return html;
+}
+
+function orderFormPaneHTML(o){
+  // Best: exact uploaded PDF/image of the order form (pixel-perfect)
+  if(o.formPreview && o.formPreview.data){
+    const F=o.formPreview;
+    const dlXlsx = o.formFile && o.formFile.b64
+      ? `<a class="btn btn-sm" style="text-decoration:none;" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${o.formFile.b64}" download="${esc(o.formFile.name||'order_form.xlsx')}">⬇ .xlsx</a>` : '';
+    let view='';
+    if((F.type||'').startsWith('image/')) view=`<div style="text-align:center;"><img src="${F.data}" alt="${esc(F.name)}" style="max-width:100%;max-height:64vh;border:1px solid #D8D8D6;border-radius:8px;"></div>`;
+    else if((F.type||'')==='application/pdf') view=`<embed src="${F.data}" type="application/pdf" style="width:100%;height:64vh;border:1px solid #D8D8D6;border-radius:8px;">`;
+    else view=`<div style="padding:14px;">📄 ${esc(F.name)}</div>`;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="font-size:12px;color:#5A5A57;">Order form: <strong>${esc(F.name)}</strong></div>
+        <div style="display:flex;gap:6px;">
+          <a class="btn btn-sm" style="text-decoration:none;" href="${F.data}" download="${esc(F.name)}">⬇ ${(F.type||'')==='application/pdf'?'PDF':'Image'}</a>
+          ${dlXlsx}
+        </div>
+      </div>
+      ${view}`;
+  }
+
+  // Next: re-rendered document preview from the stored sheet values
+  if(o.formSheet && o.formSheet.length){
+    const dl = o.formFile && o.formFile.b64
+      ? `<a class="btn btn-sm" style="text-decoration:none;" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${o.formFile.b64}" download="${esc(o.formFile.name||'order_form.xlsx')}">⬇ Download .xlsx</a>` : '';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="font-size:12px;color:#5A5A57;">Order form (re-rendered): <strong>${esc((o.formFile&&o.formFile.name)||'Graphics Order Form')}</strong> <span style="color:#9A9A97;">— upload a PDF/image of the form for an exact preview</span></div>
+        ${dl}
+      </div>
+      ${sheetGridHTML(o.formSheet, o.formMerges)}`;
+  }
+
+  // Fallback (manual orders / older imports with no stored file): reconstructed summary
+  const meta=[
+    ['Client Name',o.clientName],['EF Project No',o.projectNo],
+    ['Ship To',o.shipTo],['Show Date',o.showDt],['Show Name',o.showName],
+    ['Show City',o.showCity],['Order Recv.',o.orderRecvDt],['Dispatch',o.dispatchDt||'—'],
+  ].map(([k,v])=>`<div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">${k}</span><br><strong>${esc(String(v||'—'))}</strong></div>`).join('');
+
+  const fabRows=[...FAB_TYPES.filter(f=>o[f.id]>0).map(f=>[f.name,o[f.id],o[f.id+'Sqm']||0,f.color]), ...((o[HW_ID]||0)>0?[[HW_NAME,o[HW_ID],0,'#6B7280']]:[])];
+  const fabHtml=fabRows.map(([l,v,s,c])=>`<div style="flex:1;min-width:74px;background:#F5F5F3;border:1px solid #D8D8D6;border-radius:8px;padding:8px 10px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:${c};text-transform:uppercase;">${l}</div>
+      <div style="font-size:22px;font-weight:700;color:${c};">${v||0}</div>
+      <div style="font-size:10px;color:${c};opacity:.85;">${(s||0).toFixed(2)} m²</div></div>`).join('');
+
+  let linesHtml='';
+  if(Array.isArray(o.lineItems)&&o.lineItems.length){
+    const rows=o.lineItems.map(li=>`<tr>
+      <td>${esc(li.section||'')}</td><td>${esc(li.graphicRef||'')}</td><td>${esc(li.printOn||'')}</td>
+      <td>${esc(li.goToFix||'')}</td><td>${esc(li.visualSize||'')}</td><td style="text-align:right;">${li.qty||0}</td></tr>`).join('');
+    linesHtml=`
+      <div style="font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;margin:14px 0 6px;">Line Items (${o.lineItems.length})</div>
+      <div class="tbl-wrap"><table style="width:100%;font-size:11px;">
+        <thead><tr><th>Section</th><th>Graphic Ref</th><th>Print On</th><th>GoTo fix Hardware</th><th>Visual Size</th><th>Qty</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`;
+  } else {
+    linesHtml=`<div style="margin-top:12px;font-size:12px;color:#9A9A97;">No order-form file stored for this order (added manually or imported before this feature). Re-upload the order form to see the original sheet here.</div>`;
+  }
+
+  return `
+    <div style="font-size:12px;color:#9A9A97;margin-bottom:10px;">No original file stored — showing summary from saved data.</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;font-size:13px;">${meta}</div>
+    <div style="font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;margin-bottom:6px;">Fabric Quantities</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">${fabHtml}</div>
+    ${linesHtml}`;
+}
+
+function layoutPaneHTML(o,id){
+  const has=!!(o.layout&&o.layout.data);
+  return `
+    <div id="layout-view">${layoutViewHTML(o)}</div>
+    ${canUpload()?`<div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <label class="btn btn-primary" style="cursor:pointer;">${has?'Replace file':'⬆ Upload layout'}
+        <input type="file" accept="application/pdf,image/*" style="display:none;" onchange="handleLayoutFile(${id},this.files[0])"></label>
+      ${has&&isMgr()?`<button class="btn btn-danger" onclick="removeLayout(${id})">🗑 Remove</button>`:''}
+      <span style="font-size:11px;color:#9A9A97;">Max ~4 MB (stored locally)</span>
+    </div>`:''}`;
+}
+
+function layoutViewHTML(o){
+  if(!(o.layout&&o.layout.data)) return `<div style="padding:28px;text-align:center;color:#9A9A97;background:#FAFAF9;border:1px dashed #D8D8D6;border-radius:8px;">No layout attached yet.${canUpload()?' Upload one below.':''}</div>`;
+  const L=o.layout;
+  if((L.type||'').startsWith('image/')){
+    return `<div style="text-align:center;"><img src="${L.data}" alt="${esc(L.name)}" style="max-width:100%;max-height:60vh;border:1px solid #D8D8D6;border-radius:8px;"><div style="font-size:11px;color:#888;margin-top:6px;">${esc(L.name)}</div></div>`;
+  }
+  if((L.type||'')==='application/pdf'){
+    return `<embed src="${L.data}" type="application/pdf" style="width:100%;height:60vh;border:1px solid #D8D8D6;border-radius:8px;"><div style="font-size:11px;color:#888;margin-top:6px;">${esc(L.name)} · <a href="${L.data}" download="${esc(L.name)}">download</a></div>`;
+  }
+  return `<div style="padding:14px;background:#FAFAF9;border-radius:8px;">📎 ${esc(L.name)} · <a href="${L.data}" download="${esc(L.name)}">download</a></div>`;
+}
+
+function handleLayoutFile(id,file){
+  if(!canUpload()){ return; }
+  if(!file) return;
+  if(file.size > 4*1024*1024){ alert('File is '+(file.size/1048576).toFixed(1)+' MB — too large to store locally (max ~4 MB). Please use a smaller file or compress the PDF.'); return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const o=orders.find(x=>x.id===id); if(!o) return;
+    o.layout={ name:file.name, type:file.type, size:file.size, data:e.target.result, addedAt:new Date().toISOString() };
+    try{ saveLocal(); }catch(err){ alert('Could not save — storage may be full. Try a smaller file or use Save Data to back up.'); o.layout=null; return; }
+    reTable();
+    showToast('📎 Layout attached');
+    openOrderView(id,'layout'); // refresh view on layout tab
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLayout(id){
+  if(!isMgr()){ return; }
+  const o=orders.find(x=>x.id===id); if(!o) return;
+  if(!confirm('Remove the attached layout?')) return;
+  o.layout=null; saveLocal(); reTable(); openOrderView(id,'layout');
+  showToast('🗑 Layout removed');
+}
+
+// ============================================================
+// FABRIC STATUS MODAL
+// ============================================================
+function quickAdvanceFabric(orderId,fabId){
+  const o=orders.find(x=>x.id===orderId);
+  if(!o||!canUpdateFabric(o,fabId)) return;
+  const cur=o.fabStatus[fabId];
+  const isHw=(fabId===HW_ID);
+  const nx=isHw?(HW_NEXT[cur]):fabNext(fabId,cur);
+  if(!cur||!nx) return;
+  closeFabTimeLog(orderId,fabId);
+  o.fabStatus[fabId]=nx;
+  if(o.fabStatus[fabId]!=='QC OK'){
+    startFabTimeLog(orderId,fabId,o.fabStatus[fabId]);
+  }
+  const fabName=isHw?HW_NAME:FAB_TYPES.find(f=>f.id===fabId).name;
+  showToast(`✓ ${fabName} → ${o.fabStatus[fabId]}`);
+  _localUpdate=true;
+  dbUpdateOrder(o);
+  if(isOrderComplete(o)){
+    showToast(`🎉 "${o.clientName}" — all items QC OK! Moved to Completed tab.`);
+    activeTab='completed';renderAll();return;
+  }
+  reTable();renderTabs();
+}
+
+function openFabricStatusModal(orderId){
+  const o=orders.find(x=>x.id===orderId);if(!o)return;
+  const buildBlock=(fid,fname,fcolor,stages,qcSrc)=>{
+    const cur=o.fabStatus[fid];
+    const canUpd=canUpdateFabric(o,fid)||isMgr();
+    const stagesBtns=stages.map(sk=>{
+      const isCur=cur===sk;
+      const bg=isCur?(getStatusColor(sk)||'#6B7280'):'#fff';
+      const disabled=!canUpd?'disabled':'';
+      return `<button class="fs-stage-btn${isCur?' selected':''}" 
+        style="${isCur?`background:${bg};`:''}${!canUpd?'opacity:0.4;cursor:not-allowed;':''}"
+        onclick="setFabricStage(${orderId},'${fid}','${sk.replace(/'/g,"\\'")}')" ${disabled}>${sk}</button>`;
+    }).join('');
+    const logs=getFabTimeLogs(orderId,fid);
+    const timeLogHtml=logs.length?`<div class="fs-timelog">
+      <div class="fs-timelog-title">⏱ Time log</div>
+      ${logs.map(l=>{
+        const end=l.endTs||Date.now();
+        const dur=fmtDuration(end-l.startTs);
+        const ongoing=!l.endTs?' <span style="color:#B86000;font-size:9px;">● live</span>':'';
+        return `<div class="fs-timelog-row"><span class="fs-timelog-stage">${l.stage}</span>${ongoing}<span class="fs-timelog-dur">${dur}</span></div>`;
+      }).join('')}
+    </div>`:'<div style="font-size:10px;color:#aaa;margin-top:6px;">No time log yet — advance to start recording.</div>';
+    return `<div class="fs-fabric-block">
+      <div class="fs-fabric-name">
+        <span style="width:10px;height:10px;border-radius:50%;background:${fcolor};display:inline-block;"></span>
+        ${fname} <span class="fs-fabric-qty">${o[fid]} pcs</span>
+        ${!canUpd?'<span style="font-size:10px;color:#aaa;margin-left:4px;">🔒 view only</span>':''}
+      </div>
+      <div class="fs-stages">${stagesBtns}</div>
+      ${timeLogHtml}
+    </div>`;
+  };
+  const blocks=[
+    ...FAB_TYPES.filter(f=>o[f.id]>0).map(f=>buildBlock(f.id,f.name,f.color,fabStages(f.id),'QC Pending')),
+    ...((o[HW_ID]||0)>0?[buildBlock(HW_ID,HW_NAME,'#6B7280',HW_STAGES,'Received & QC Pending')]:[])
+  ].join('');
+
+  document.getElementById('fs-modal-area').innerHTML=`
+    <div class="fs-modal-overlay" onclick="if(event.target===this)closeFabricModal()">
+      <div class="fs-modal">
+        <h3>Fabric Stage Status</h3>
+        <div class="fs-modal-sub">📦 ${esc(o.clientName)} · ${esc(o.orderNo)} · Dispatch: ${esc(o.dispatchDt)}</div>
+        ${blocks}
+        <div style="background:#F5F5F3;border-radius:8px;padding:10px 12px;">
+          <div style="font-size:11px;font-weight:600;color:#5A5A57;margin-bottom:4px;">Overall progress</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;height:8px;background:#E2E2E0;border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${orderProgress(o)}%;background:#4A3FB5;border-radius:4px;"></div>
+            </div>
+            <span style="font-size:13px;font-weight:600;color:#4A3FB5;">${orderProgress(o)}%</span>
+          </div>
+        </div>
+        <div class="fs-modal-footer"><button class="btn" onclick="closeFabricModal()">Close</button></div>
+      </div>
+    </div>`;
+}
+
+function setFabricStage(orderId,fabId,stage){
+  const o=orders.find(x=>x.id===orderId);if(!o)return;
+  const cur=o.fabStatus[fabId];
+  if(!isMgr()){
+    if(!currentUser||!currentUser.canAdvance||!currentUser.canAdvance.includes(cur)){
+      showToast('⛔ You can only update fabrics at your stage');return;
+    }
+  }
+  if(cur!==stage){
+    closeFabTimeLog(orderId,fabId);
+    if(stage!=='QC OK') startFabTimeLog(orderId,fabId,stage);
+  }
+  o.fabStatus[fabId]=stage;
+  const fabName=(fabId===HW_ID)?HW_NAME:FAB_TYPES.find(f=>f.id===fabId).name;
+  showToast(`✓ ${fabName} → ${stage}`);
+  _localUpdate=true;
+  dbUpdateOrder(o);
+  openFabricStatusModal(orderId);
+  if(isOrderComplete(o)){
+    closeFabricModal();
+    showToast(`🎉 "${o.clientName}" — all fabrics QC OK! Moved to Completed tab.`);
+    activeTab='completed';renderAll();return;
+  }
+  reTable();renderTabs();
+}
+
+function closeFabricModal(){document.getElementById('fs-modal-area').innerHTML='';}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function doDelete(id){pendingDeleteId=id;if(activeTab==='wip')reTable();else renderCompletedTab();}
+function confirmDelete(id){
+  const o=orders.find(x=>x.id===id);
+  const name=o?o.clientName:'order';
+  orders=orders.filter(x=>x.id!==id);
+  delete timeLog[id];
+  pendingDeleteId=null;renderAll();
+  showToast(`🗑 "${name}" deleted`);
+  dbDeleteOrder(id);
+}
+function cancelDelete(){pendingDeleteId=null;if(activeTab==='wip')reTable();else renderCompletedTab();}
+
+function saveRemark(id){
+  const inp=document.getElementById('ri-'+id);if(!inp)return;
+  const o=orders.find(x=>x.id===id);
+  if(o){
+    o.remarks=inp.value;
+    const rb=document.getElementById('rb-'+id);
+    const ro=document.getElementById('ro-'+id);
+    if(rb)rb.style.display='none';
+    if(ro){ro.style.display='inline';setTimeout(()=>{ro.style.display='none';},1800);}
+    _localUpdate=true;
+    dbUpdateOrder(o);
+  }
+}
+
+function setStageFilter(s){
+  stageFilter=s;pendingDeleteId=null;
+  const dd=document.getElementById('filterStatus');if(dd)dd.value=s;
+  reTable();
+  const scb=document.getElementById('stage-clear-btn');
+  if(scb)scb.innerHTML=s?`<button class="btn btn-sm" onclick="setStageFilter('')">✕ Clear: <strong>${s}</strong></button>`:'';
+}
+
+function clearFilters(){
+  const s=document.getElementById('search');if(s)s.value='';
+  const fs=document.getElementById('filterStatus');if(fs)fs.value='';
+  const fd=document.getElementById('filterDest');if(fd)fd.value='';
+  const fdd=document.getElementById('filterDispatchDt');if(fdd)fdd.value='';
+  stageFilter='';filterDispatchDt='';pendingDeleteId=null;reTable();
+  const scb=document.getElementById('stage-clear-btn');if(scb)scb.innerHTML='';
+}
+
+// ============================================================
+// COLUMN TOGGLE
+// ============================================================
+function toggleColPanel(){showColPanel=!showColPanel;renderAll();}
+function toggleCol(id,val){if(val)visibleCols.add(id);else visibleCols.delete(id);reTable();}
+function showAllCols(){COLS.forEach(c=>visibleCols.add(c.id));renderAll();}
+function showEssentialCols(){
+  visibleCols=new Set(['dispatchDt','clientName','shipTo','fabricQty','totalFabric','fabricStatus','remarks','actions']);
+  renderAll();
+}
+
+// ============================================================
+// ORDER FORM UPLOAD — Exponents Graphics Order Form parser
+// ============================================================
+function toggleUpload(){ if(!canUpload()) return; showUploadPanel=!showUploadPanel; pendingLayout=null; pendingOrderData=null; pendingFormPreview=null; renderAll();}
+
+let pendingLayout=null;       // {name,type,size,data} staged layout file
+let pendingFormPreview=null;  // {name,type,size,data} staged order-form PDF/image (exact preview)
+let pendingOrderData=null;    // parsed order-form data awaiting confirm
+
+// Accept multiple mixed files: route .xlsx → order-form parser, PDF/image → layout
+function handleUploadFiles(fileList){
+  const files=Array.from(fileList||[]);
+  if(!files.length) return;
+  let orderFile=null, formPreviewFile=null, layoutFile=null;
+  const media=[];
+  files.forEach(f=>{
+    const nm=(f.name||'').toLowerCase();
+    if(nm.endsWith('.xlsx')||nm.endsWith('.xls')||/spreadsheet|excel/.test(f.type)) orderFile=f;
+    else if(f.type==='application/pdf' || (f.type||'').startsWith('image/')) media.push(f);
+  });
+  // classify PDF/image files: name containing order/form → order-form preview; layout/graphic → layout
+  media.forEach(f=>{
+    const nm=(f.name||'').toLowerCase();
+    if(/order|form/.test(nm) && !formPreviewFile) formPreviewFile=f;
+    else if(/layout|graphic/.test(nm) && !layoutFile) layoutFile=f;
+  });
+  // assign any leftover unclassified media: prefer form preview first (if none), then layout
+  media.forEach(f=>{
+    if(f===formPreviewFile||f===layoutFile) return;
+    if(!formPreviewFile) formPreviewFile=f;
+    else if(!layoutFile) layoutFile=f;
+  });
+
+  const readMedia=(file,assign,then)=>{
+    if(file.size>4*1024*1024){ alert((file.name||'File')+' is '+(file.size/1048576).toFixed(1)+' MB — too large to store locally (max ~4 MB). Use a smaller file.'); then&&then(); return; }
+    const rr=new FileReader();
+    rr.onload=e=>{ assign({name:file.name,type:file.type,size:file.size,data:e.target.result}); then&&then(); };
+    rr.readAsDataURL(file);
+  };
+
+  const refresh=()=>showOfPreview(pendingOrderData,null);
+  if(layoutFile) readMedia(layoutFile, v=>{pendingLayout=v;}, refresh);
+  if(formPreviewFile) readMedia(formPreviewFile, v=>{pendingFormPreview=v;}, refresh);
+
+  if(orderFile) handleOrderForm(orderFile);
+  else if(formPreviewFile||layoutFile){ setTimeout(refresh,60); }
+  else { showOfPreview(null,'❌ No order form (.xlsx), order-form PDF/image, or layout recognised in your selection.'); }
+}
+
+function handleOrderForm(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const parsed = parseOrderForm(ws, file);
+      if(!parsed){
+        showOfPreview(null,'❌ Could not parse this file — please check it matches the Exponents Graphics Order Form format.');
+        return;
+      }
+      // capture the sheet as a 2-D grid (for Excel-like display) and the raw file (for download)
+      try{
+        parsed.formSheet = XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+        parsed.formMerges = (ws['!merges']||[]).map(m=>({s:m.s,e:m.e}));
+      }catch(_){ parsed.formSheet=null; }
+      const bytes=new Uint8Array(e.target.result); let bin='';
+      for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+      parsed.formFile = { name:file.name, size:file.size, b64:btoa(bin) };
+      pendingOrderData=parsed;
+      showOfPreview(parsed, null);
+    } catch(err) {
+      showOfPreview(null,'❌ Error reading file: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function getCellVal(ws, col, row){
+  // col is letter (e.g. 'C'), row is 1-based number
+  const addr = col + row;
+  const cell = ws[addr];
+  if(!cell) return '';
+  if(cell.t === 'n') return cell.v; // raw number
+  if(cell.t === 'd') return cell.v; // date object
+  return cell.v ? String(cell.v).trim() : '';
+}
+
+// Parse a "W" x H"" visual-size string (inches, supports fractions like 7/8, 9/16)
+// and return area in square metres. Returns 0 if unparseable.
+function sqmFromSize(raw){
+  if(raw===null||raw===undefined) return 0;
+  const s=String(raw).replace(/[″"]/g,'').trim();
+  const parts=s.split(/\s*[x×X]\s*/);
+  if(parts.length<2) return 0;
+  const toInches=t=>{
+    const m=String(t).trim().match(/^(\d+(?:\.\d+)?)?\s*(?:(\d+)\s*\/\s*(\d+))?/);
+    if(!m) return null;
+    let val=m[1]?parseFloat(m[1]):0;
+    if(m[2]&&m[3]) val+=parseFloat(m[2])/parseFloat(m[3]);
+    return val;
+  };
+  const w=toInches(parts[0]), h=toInches(parts[1]);
+  if(w===null||h===null||!w||!h) return 0;
+  return (w*h)/1550.0031; // sq inches -> sq metres
+}
+
+// Parse a Visual Size string like '120 7/8" x 95 3/8"' into physical area in sqmtr.
+// Handles whole+fraction inches (e.g. 85 13/16"), x/X/× separators. Returns 0 if unparseable.
+function sqmFromSize(raw){
+  if(raw==null) return 0;
+  const s=String(raw).trim();
+  if(!s) return 0;
+  const parts=s.split(/[xX×]/);
+  if(parts.length<2) return 0;
+  const toInches=t=>{
+    t=String(t).replace(/["”]/g,'').trim();
+    const m=t.match(/^\s*(\d+)?\s*(?:(\d+)\s*\/\s*(\d+))?\s*$/);
+    if(!m) return null;
+    let val=m[1]?parseFloat(m[1]):0;
+    if(m[2]&&m[3]) val+=parseFloat(m[2])/parseFloat(m[3]);
+    return val;
+  };
+  const w=toInches(parts[0]), h=toInches(parts[1]);
+  if(w==null||h==null||w<=0||h<=0) return 0;
+  return (w*h)/1550.0031; // sq inches -> sq metres
+}
+
+function parseOrderForm(ws, file){
+  // Header fields (col C values; project no in H5)
+  const shipTo    = String(getCellVal(ws,'C',4)||'').trim();
+  const clientName= String(getCellVal(ws,'C',5)||'').trim();
+  const projectNo = String(getCellVal(ws,'H',5)||'').trim();   // "EF Project No #"
+  const showDt    = String(getCellVal(ws,'C',9)||'').trim();
+  const showName  = String(getCellVal(ws,'C',10)||'').trim();
+  const showCity  = String(getCellVal(ws,'C',11)||'').trim();
+
+  if(!clientName) return null;
+
+  const orderRecvDt = todayDtStr();
+
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:O31');
+  // per-category accumulators (all 8 print types)
+  const cnt={}, sqmAcc={}; FAB_TYPES.forEach(f=>{ cnt[f.id]=0; sqmAcc[f.id]=0; });
+  let section = null;
+  const lineItems = [];   // detailed per-line capture (B=GraphicRef, C=PrintOn, D=GoToFix, E=VisualSize, F=FinishedSize, G=Qty, H=Remarks)
+
+  for(let r = range.s.r; r <= range.e.r; r++){
+    const rowNum = r + 1;
+    const bVal = String(getCellVal(ws,'B',rowNum)||'').trim();
+    const bLow = bVal.toLowerCase();
+    const cVal = String(getCellVal(ws,'C',rowNum)||'').trim();
+
+    // Section headers in col B
+    if(bLow === 'non backlight' || bLow === 'non-backlight' || bLow === 'non backlit'){ section='nonbacklight'; continue; }
+    if(bLow === 'backlight' || bLow === 'backlit'){ section='backlight'; continue; }
+    if(bLow === 'vinyl'){ section='vinyl'; continue; }
+    if(bLow.includes('hanging banner') || bLow.includes('hanging print') || (bLow.includes('hanging') && !bLow.includes('total'))){ section='hanging'; continue; }
+    if(bLow.includes('total panel') || bLow.includes('total hanging') || bLow.includes('total qty') || bLow === 't&c' || bLow.includes('graphic ref')){ section=null; continue; }
+    if(!section) continue;
+
+    const qtyRaw = getCellVal(ws,'G',rowNum);
+    const qty = parseInt(String(qtyRaw).replace(/[^0-9]/g,'')) || 0;
+    if(qty <= 0) continue;
+
+    const sizeRaw = String(getCellVal(ws,'E',rowNum)||'').trim();   // Visual Size
+    const finRaw  = String(getCellVal(ws,'F',rowNum)||'').trim();   // Finished Size
+    const goToFix = String(getCellVal(ws,'D',rowNum)||'').trim();   // GoTo fix Hardware
+    const printOn = cVal;                                           // Print On
+    const sqmEach = sqmFromSize(sizeRaw);
+    const sqm = sqmEach * qty;
+
+    // section label for classification
+    const secLabel = section==='backlight'?'Backlight':(section==='vinyl'?'Vinyl':(section==='hanging'?'Hanging Banner':'Non Backlight'));
+    const li={
+      section: secLabel,
+      graphicRef: bVal,            // e.g. "7#"
+      printOn,                     // e.g. "Fabric Print", "White Reflection Fabric"
+      goToFix,                     // e.g. "Luminy", "Outer Hanging Banner"
+      visualSize: sizeRaw,
+      finishedSize: finRaw,
+      qty,
+      sqm: Math.round(sqm*10000)/10000,
+    };
+    lineItems.push(li);
+
+    // summary buckets — classify each line into its real category (matches planning)
+    const cat=classifyLineType(li);   // vinyl/sheer/nonlit/backlit/white/hanging/logo3d/logo3dBacklit/hangingBacklit
+    const bucket = (cat==='hangingBacklit') ? 'hanging' : cat;   // hangingBacklit shares the Hanging print column
+    if(cnt[bucket]!==undefined){ cnt[bucket]+=qty; sqmAcc[bucket]+=sqm; }
+    else { cnt.nonlit+=qty; sqmAcc.nonlit+=sqm; }   // safety fallback
+  }
+
+  const r2=x=>Math.round(x*100)/100;
+  const out={orderRecvDt, shipTo, clientName, projectNo, showDt, showName, showCity, lineItems};
+  FAB_TYPES.forEach(f=>{ out[f.id]=cnt[f.id]; out[f.id+'Sqm']=r2(sqmAcc[f.id]); });
+  return out;
+}
+
+function stagedFormPreviewHTML(){
+  if(!pendingFormPreview) return '';
+  const F=pendingFormPreview;
+  let body='';
+  if((F.type||'').startsWith('image/')) body=`<img src="${F.data}" alt="${esc(F.name)}" style="max-width:100%;max-height:300px;border:1px solid #D8D8D6;border-radius:6px;">`;
+  else if((F.type||'')==='application/pdf') body=`<embed src="${F.data}" type="application/pdf" style="width:100%;height:300px;border:1px solid #D8D8D6;border-radius:6px;">`;
+  else body=`📄 ${esc(F.name)}`;
+  return `
+    <div style="margin-top:14px;padding:12px 14px;background:#EEEDFC;border:1px solid #C8C2F8;border-radius:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:600;color:#4A3FB5;">📄 Order-form preview: ${esc(F.name)} <span style="font-weight:500;color:#5A5A57;">(${(F.size/1024).toFixed(0)} KB)</span></div>
+        <button class="btn btn-sm" onclick="pendingFormPreview=null;showOfPreview(pendingOrderData,null)">✕ Remove</button>
+      </div>
+      ${body}
+    </div>`;
+}
+
+function stagedLayoutHTML(){
+  if(!pendingLayout) return `
+    <div style="margin-top:14px;padding:12px 14px;background:#F5F5F3;border:1px dashed #D8D8D6;border-radius:8px;font-size:12px;color:#9A9A97;">
+      📎 No layout file attached. You can include a PDF/image in the same upload, or add one later from the order's 👁 View.
+    </div>`;
+  const L=pendingLayout;
+  let body='';
+  if((L.type||'').startsWith('image/')) body=`<img src="${L.data}" alt="${esc(L.name)}" style="max-width:100%;max-height:300px;border:1px solid #D8D8D6;border-radius:6px;">`;
+  else if((L.type||'')==='application/pdf') body=`<embed src="${L.data}" type="application/pdf" style="width:100%;height:300px;border:1px solid #D8D8D6;border-radius:6px;">`;
+  else body=`📎 ${esc(L.name)}`;
+  return `
+    <div style="margin-top:14px;padding:12px 14px;background:#E8F5EC;border:1px solid #7DC98A;border-radius:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:600;color:#2A7A3B;">📎 Layout attached: ${esc(L.name)} <span style="font-weight:500;color:#5A5A57;">(${(L.size/1024).toFixed(0)} KB)</span></div>
+        <button class="btn btn-sm" onclick="pendingLayout=null;showOfPreview(pendingOrderData,null)">✕ Remove layout</button>
+      </div>
+      ${body}
+    </div>`;
+}
+
+function showOfPreview(data, errMsg){
+  const el = document.getElementById('of-preview');
+  if(!el) return;
+  if(errMsg){
+    el.innerHTML=`<div style="margin-top:14px;padding:12px 14px;background:#FDEAEA;border:1px solid #E08080;border-radius:8px;color:#B02020;font-size:13px;">${errMsg}</div>`;
+    return;
+  }
+
+  // no parsed order form yet (only media staged)
+  if(!data){
+    el.innerHTML=`
+      ${stagedFormPreviewHTML()}
+      ${stagedLayoutHTML()}
+      <div style="margin-top:12px;font-size:12px;color:#7A4A08;background:#FEF3E2;border:1px solid #F0B840;border-radius:8px;padding:10px 12px;">
+        ⚠ Add the Order Form (.xlsx) to create the order with its data. The files above will attach to it automatically.
+      </div>`;
+    return;
+  }
+
+  const fabRows = [
+    {label:'Vinyl',   val:data.vinyl,   sqm:data.vinylSqm,   color:'#4A3FB5'},
+    {label:'Nonlit',  val:data.nonlit,  sqm:data.nonlitSqm,  color:'#2A7A3B'},
+    {label:'Backlit', val:data.backlit, sqm:data.backlitSqm, color:'#B86000'},
+    {label:'White',   val:data.white,   sqm:data.whiteSqm,   color:'#5B47C4'},
+  ];
+  const fabHtml = fabRows.map(f=>`
+    <div style="flex:1;min-width:80px;background:#F5F5F3;border:1px solid #D8D8D6;border-radius:8px;padding:10px 12px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:${f.color};text-transform:uppercase;margin-bottom:4px;">${f.label}</div>
+      <div style="font-size:26px;font-weight:700;color:${f.color};">${f.val}</div>
+      <div style="font-size:11px;font-weight:600;color:${f.color};opacity:.85;margin-top:2px;">${(f.sqm||0).toFixed(2)} m²</div>
+    </div>`).join('');
+  const totSqm=((data.vinylSqm||0)+(data.nonlitSqm||0)+(data.backlitSqm||0)+(data.whiteSqm||0)).toFixed(2);
+
+  el.innerHTML=`
+    <div style="margin-top:16px;padding:16px;background:#F9F9F8;border:1px solid #D8D8D6;border-radius:10px;">
+      <div style="font-size:13px;font-weight:600;color:#1A1A18;margin-bottom:12px;">✅ Order Form Parsed — Please Review</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;font-size:13px;">
+        <div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">Client Name</span><br><strong>${esc(data.clientName)}</strong></div>
+        <div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">Order Recv. Date</span><br><strong>${esc(data.orderRecvDt)}</strong> <span style="font-size:10px;color:#9A9A97;">(today)</span></div>
+        <div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">Ship To</span><br><strong>${esc(data.shipTo)||'—'}</strong></div>
+        <div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">Show Date</span><br><strong>${esc(data.showDt)||'—'}</strong></div>
+        <div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">Show Name</span><br><strong>${esc(data.showName)||'—'}</strong></div>
+        <div><span style="color:#5A5A57;font-size:11px;font-weight:600;text-transform:uppercase;">Show City</span><br><strong>${esc(data.showCity)||'—'}</strong></div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:#5A5A57;text-transform:uppercase;margin-bottom:8px;">Fabric Quantities <span style="color:#9A9A97;font-weight:500;text-transform:none;">· total ${totSqm} m²</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">${fabHtml}</div>
+      ${stagedFormPreviewHTML()}
+      ${stagedLayoutHTML()}
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FEF3E2;border:1px solid #F0B840;border-radius:8px;margin:14px 0;font-size:12px;color:#7A4A08;">
+        ⚠ Dispatch date not set in this form — please set it after adding the order.
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary" onclick="confirmOrderFormImport()">✓ Add as New Order${pendingFormPreview?' + Form':''}${pendingLayout?' + Layout':''}</button>
+        <button class="btn" onclick="pendingLayout=null;pendingFormPreview=null;pendingOrderData=null;document.getElementById('of-preview').innerHTML='';document.getElementById('of-input').value='';">✕ Cancel</button>
+      </div>
+    </div>`;
+}
+
+function confirmOrderFormImport(){
+  if(!canUpload()){ return; }
+  const data=pendingOrderData;
+  if(!data){ alert('Please upload the Order Form (.xlsx) first.'); return; }
+  const id=nextId++;
+  const o={
+    id,
+    dispatchDt:'', orderRecvDt:data.orderRecvDt,
+    showDt:data.showDt, showName:data.showName, showCity:data.showCity,
+    shipTo:data.shipTo, clientName:data.clientName,
+    projectNo:data.projectNo||'',
+    orderNo:'', query:'', courierName:'',
+    remarks:'',
+    lineItems:data.lineItems||[],
+    formSheet:data.formSheet||null,
+    formMerges:data.formMerges||null,
+    formFile:data.formFile||null,
+    formPreview: pendingFormPreview ? {...pendingFormPreview, addedAt:new Date().toISOString()} : null,
+    layout: pendingLayout ? {...pendingLayout, addedAt:new Date().toISOString()} : null,
+    [HW_ID]:0,
+  };
+  FAB_TYPES.forEach(f=>{ o[f.id]=data[f.id]||0; o[f.id+'Sqm']=data[f.id+'Sqm']||0; });
+  o.fabStatus=mkFabStatus(o);
+  FAB_TYPES.forEach(f=>{ if(o[f.id]>0) initFabTimeLog(o.id,f.id,fabStartStage(f.id)); });
+  orders.push(o);
+  try{ saveLocal(); }catch(err){ alert('Saved order, but storage may be full for the attached files. Consider smaller files.'); }
+  const hadLayout=!!pendingLayout;
+  pendingLayout=null; pendingFormPreview=null; pendingOrderData=null;
+  showUploadPanel=false;
+  renderAll();
+  showToast(`✓ "${data.clientName}" added${hadLayout?' with layout':''} — set dispatch date!`);
+}
+
+
+// ============================================================
+// EXPORT
+// ============================================================
+function exportExcel(){
+  const allSorted=getSortedOrders();
+  const rows=allSorted.map(o=>{
+    const r={
+      'Dispatch Dt.':o.dispatchDt,'Order Rec. Date':o.orderRecvDt,'Show Date':o.showDt,
+      'Show Name':o.showName,'Show City':o.showCity,'Ship to Location':o.shipTo,
+      'Client Name':o.clientName,'Query':o.query,'Courier Name':o.courierName,
+    };
+    let totSqm=0;
+    FAB_TYPES.forEach(f=>{ r[f.name]=o[f.id]||0; });
+    r['Hardware']=o[HW_ID]||0;
+    r['Total Pcs']=tot(o);
+    FAB_TYPES.forEach(f=>{ r[f.name+' m²']=(o[f.id+'Sqm']||0).toFixed(2); totSqm+=(o[f.id+'Sqm']||0); });
+    r['Total m²']=totSqm.toFixed(2);
+    FAB_TYPES.forEach(f=>{ r[f.name+' Stage']=o.fabStatus[f.id]||'—'; });
+    r['Hardware Stage']=o.fabStatus[HW_ID]||'—';
+    r['Progress']=orderProgress(o)+'%';
+    r['Status']=isOrderComplete(o)?'Completed':'WIP';
+    r['Remarks']=o.remarks;
+    return r;
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'All Orders');
+  // WIP sheet
+  const wip=allSorted.filter(o=>!isOrderComplete(o));
+  const ws2=XLSX.utils.json_to_sheet(wip.map(o=>{
+    const r={'Dispatch Dt.':o.dispatchDt,'Client Name':o.clientName,'Ship to':o.shipTo};
+    FAB_TYPES.forEach(f=>{ r[f.name]=o[f.id]||0; });
+    r['Hardware']=o[HW_ID]||0;
+    FAB_TYPES.forEach(f=>{ r[f.name+' Stage']=o.fabStatus[f.id]||'—'; });
+    r['Hardware Stage']=o.fabStatus[HW_ID]||'—';
+    r['Progress']=orderProgress(o)+'%'; r['Remarks']=o.remarks;
+    return r;
+  }));
+  XLSX.utils.book_append_sheet(wb,ws2,'WIP Orders');
+  XLSX.writeFile(wb,'FabricOrders_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('✓ Exported all orders (2 sheets: All + WIP)');
+}
+
+// ============================================================
+// ORDER-WISE STAGE TIME LOG REPORT
+// ============================================================
+const THREE_HR_MS=3*60*60*1000;
+function fmtTs(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  const pad=n=>String(n).padStart(2,'0');
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Build report rows: one row per order/fabric/stage, with durations + flags
+function buildLogReportData(){
+  const out=[];
+  getSortedOrders().forEach(o=>{
+    const tracks=[
+      ...FAB_TYPES.filter(f=>o[f.id]>0).map(f=>({id:f.id,name:f.name,stages:fabStages(f.id),qcSrc:'QC Pending'})),
+      ...((o[HW_ID]||0)>0?[{id:HW_ID,name:HW_NAME,stages:HW_STAGES,qcSrc:'Received & QC Pending'}]:[])
+    ];
+    tracks.forEach(tr=>{
+      const logs=getFabTimeLogs(o.id,tr.id);
+      const fabQty=o[tr.id]||0;
+      const fabSqm=o[tr.id+'Sqm']||0;
+      const stageInfo={};
+      logs.forEach(l=>{
+        const end=l.endTs||Date.now();
+        if(!stageInfo[l.stage]) stageInfo[l.stage]={ms:0,start:l.startTs,end:l.endTs,live:!l.endTs};
+        stageInfo[l.stage].ms+=(end-l.startTs);
+        stageInfo[l.stage].start=Math.min(stageInfo[l.stage].start,l.startTs);
+        stageInfo[l.stage].end=l.endTs?Math.max(stageInfo[l.stage].end||0,l.endTs):stageInfo[l.stage].end;
+        if(!l.endTs) stageInfo[l.stage].live=true;
+      });
+      let fabTotal=0;
+      tr.stages.forEach(sk=>{
+        const info=stageInfo[sk];
+        if(!info) return;
+        fabTotal+=info.ms;
+        out.push({
+          orderId:o.id, client:o.clientName, projectNo:o.projectNo||'', shipTo:o.shipTo||'',
+          dispatchDt:o.dispatchDt||'', showDt:o.showDt||'', orderRecvDt:o.orderRecvDt||'',
+          fabric:tr.name, qty:fabQty, sqm:fabSqm, stage:sk,
+          start:info.start, end:info.end, live:info.live,
+          ms:info.ms, over:info.ms>=THREE_HR_MS,
+          status:isOrderComplete(o)?'Completed':'WIP',
+          isFabTotal:false
+        });
+      });
+      out.push({orderId:o.id, client:o.clientName, projectNo:o.projectNo||'', shipTo:o.shipTo||'', dispatchDt:o.dispatchDt||'', showDt:o.showDt||'', orderRecvDt:o.orderRecvDt||'', fabric:tr.name, qty:fabQty, sqm:fabSqm, stage:'— Fabric total —', ms:fabTotal, isFabTotal:true, status:isOrderComplete(o)?'Completed':'WIP'});
+    });
+  });
+  return out;
+}
+
+function openLogReport(){
+  const data=buildLogReportData();
+  // group by order
+  const byOrder={};
+  data.forEach(r=>{(byOrder[r.orderId]=byOrder[r.orderId]||[]).push(r);});
+  const orderIds=Object.keys(byOrder);
+
+  let bodyHtml;
+  if(!orderIds.length){
+    bodyHtml=`<div style="padding:36px;text-align:center;color:#9A9A97;">No stage activity logged yet.</div>`;
+  } else {
+    bodyHtml=orderIds.map(oid=>{
+      const rows=byOrder[oid];
+      const head=rows.find(r=>!r.isFabTotal)||rows[0];
+      const orderTotal=rows.filter(r=>!r.isFabTotal).reduce((a,r)=>a+r.ms,0);
+      const lines=rows.map(r=>{
+        if(r.isFabTotal){
+          return `<tr style="background:#F5F5F3;font-weight:600;">
+            <td>${esc(r.fabric)}</td><td style="text-align:right;font-size:10px;">${r.qty||0} pc · ${(r.sqm||0).toFixed(2)} m²</td>
+            <td colspan="3" style="text-align:right;">Fabric total</td>
+            <td style="text-align:right;">${fmtDuration(r.ms)}</td><td></td></tr>`;
+        }
+        const flag=r.over?`<span style="color:#fff;background:#8B0000;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;">≥3h</span>`:(r.live?`<span style="color:#E07B00;font-size:9px;font-weight:700;">● live</span>`:'');
+        return `<tr${r.over?' style="background:#FBE9E9;"':''}>
+          <td>${esc(r.fabric)}</td>
+          <td style="text-align:right;font-size:10px;color:#5A5A57;">${r.qty||0} pc · ${(r.sqm||0).toFixed(2)} m²</td>
+          <td>${esc(r.stage==='QC OK'?'QC OK (QC time)':r.stage)}</td>
+          <td style="white-space:nowrap;font-size:10px;color:#5A5A57;">${fmtTs(r.start)}</td>
+          <td style="white-space:nowrap;font-size:10px;color:#5A5A57;">${r.live?'<i>running…</i>':fmtTs(r.end)}</td>
+          <td style="text-align:right;font-weight:600;${r.over?'color:#8B0000;':''}">${fmtDuration(r.ms)}</td>
+          <td>${flag}</td></tr>`;
+      }).join('');
+      return `
+        <div style="margin-bottom:16px;border:1px solid #E2E2E0;border-radius:10px;overflow:hidden;">
+          <div style="padding:9px 12px;background:#EEEDFC;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:700;font-size:13px;">${esc(head.client||'Order')} ${head.projectNo?'· '+esc(head.projectNo):''}</div>
+              <div style="font-size:10px;color:#5A5A57;margin-top:2px;">📅 Show: <strong>${esc(head.showDt||'—')}</strong> · 🚚 Dispatch: <strong>${esc(head.dispatchDt||'—')}</strong></div>
+            </div>
+            <div style="font-size:11px;color:#5A5A57;text-align:right;">${esc(head.shipTo||'')} · ${head.status}<br><strong>Order total: ${fmtDuration(orderTotal)}</strong></div>
+          </div>
+          <div class="tbl-wrap" style="border:none;box-shadow:none;border-radius:0;"><table style="width:100%;font-size:11px;">
+            <thead><tr><th>Fabric</th><th style="text-align:right;">Qty / m²</th><th>Stage</th><th>Start</th><th>End</th><th style="text-align:right;">Duration</th><th></th></tr></thead>
+            <tbody>${lines}</tbody></table></div>
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('modal-area').innerHTML=`
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box" style="max-width:920px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <h3 style="margin:0;">📊 Order-wise Stage Log Report</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-success btn-sm" onclick="exportLogReport()">📤 Export Excel</button>
+          <button class="btn btn-sm" onclick="closeModal()" title="Close (Esc)">✕</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#9A9A97;margin:4px 0 12px;">All orders (incl. completed). Stages ≥3h are flagged. "QC OK" shows the QC work time.</div>
+      <div style="max-height:64vh;overflow:auto;">${bodyHtml}</div>
+      <div class="modal-footer"><span style="font-size:11px;color:#9A9A97;">Press Esc to close</span><button class="btn" onclick="closeModal()">Close</button></div>
+    </div>
+  </div>`;
+}
+
+function exportLogReport(){
+  const data=buildLogReportData();
+  if(!data.length){ showToast('No log data to export'); return; }
+
+  const stageCols=['Client','Project No','Ship To','Show Date','Dispatch Dt.','Order Recv.','Order Status','Fabric','Qty','Sq. Mtr','Stage','Start','End','Duration','Minutes','≥3h Flag'];
+  const stageData=data.filter(r=>!r.isFabTotal).map(r=>([
+    r.client, r.projectNo, r.shipTo, r.showDt, r.dispatchDt, r.orderRecvDt, r.status,
+    r.fabric, r.qty||0, +((r.sqm||0).toFixed(2)),
+    r.stage==='QC OK'?'QC OK (QC time)':r.stage,
+    fmtTs(r.start), r.live?'running':fmtTs(r.end),
+    fmtDuration(r.ms), Math.round(r.ms/60000), r.over?'YES':''
+  ]));
+  const stageWidths=[22,11,14,16,13,13,12,10,6,9,18,17,17,11,9,9];
+  const overFlagIdx=stageData.length?15:-1; // ≥3h Flag column index
+
+  const totCols=['Client','Project No','Show Date','Dispatch Dt.','Fabric','Qty','Sq. Mtr','Fabric Total','Minutes','Order Status'];
+  const totData=data.filter(r=>r.isFabTotal).map(r=>([
+    r.client, r.projectNo||'', r.showDt||'', r.dispatchDt||'', r.fabric,
+    r.qty||0, +((r.sqm||0).toFixed(2)), fmtDuration(r.ms), Math.round(r.ms/60000), r.status
+  ]));
+  const totWidths=[22,11,16,13,10,6,9,14,9,12];
+
+  const fileName='StageLogReport_'+new Date().toISOString().slice(0,10)+'.xlsx';
+
+  // Preferred: ExcelJS (real borders + grey header)
+  if(typeof ExcelJS!=='undefined'){
+    const wbk=new ExcelJS.Workbook();
+    const thinBorder={top:{style:'thin',color:{argb:'FFBFBFBF'}},left:{style:'thin',color:{argb:'FFBFBFBF'}},bottom:{style:'thin',color:{argb:'FFBFBFBF'}},right:{style:'thin',color:{argb:'FFBFBFBF'}}};
+    const headFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9D9D9'}}; // light grey
+    const buildSheet=(name,cols,rowsArr,widths,flagColIdx)=>{
+      const sh=wbk.addWorksheet(name,{views:[{state:'frozen',ySplit:1}]});
+      sh.columns=cols.map((c,i)=>({header:c,width:widths[i]||12}));
+      // header styling
+      sh.getRow(1).eachCell(cell=>{
+        cell.font={bold:true,color:{argb:'FF1A1A18'}};
+        cell.fill=headFill;
+        cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+        cell.border=thinBorder;
+      });
+      sh.getRow(1).height=20;
+      // data rows
+      rowsArr.forEach(rowVals=>{
+        const row=sh.addRow(rowVals);
+        const isOverRow = flagColIdx>=0 && String(rowVals[flagColIdx]).toUpperCase()==='YES';
+        row.eachCell({includeEmpty:true},cell=>{
+          cell.border=thinBorder;
+          cell.alignment={vertical:'middle',wrapText:false};
+          if(isOverRow){ cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFBE9E9'}}; cell.font={color:{argb:'FF8B0000'}}; }
+        });
+      });
+      return sh;
+    };
+    buildSheet('Stage Log', stageCols, stageData, stageWidths, stageCols.indexOf('≥3h Flag'));
+    if(totData.length) buildSheet('Fabric Totals', totCols, totData, totWidths, -1);
+    wbk.xlsx.writeBuffer().then(buf=>{
+      const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=fileName; a.click(); URL.revokeObjectURL(url);
+      showToast('✓ Log report exported (with borders)');
+    }).catch(err=>{ alert('Export failed: '+err.message); });
+    return;
+  }
+
+  // Fallback: SheetJS (no borders) if ExcelJS unavailable
+  const aoa1=[stageCols,...stageData];
+  const ws=XLSX.utils.aoa_to_sheet(aoa1); ws['!cols']=stageWidths.map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Stage Log');
+  if(totData.length){ const ws2=XLSX.utils.aoa_to_sheet([totCols,...totData]); ws2['!cols']=totWidths.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,ws2,'Fabric Totals'); }
+  XLSX.writeFile(wb,fileName);
+  showToast('✓ Log report exported');
+}
+
+
+// ============================================================
+function openAdd(){
+  editId=null;
+  const seed={id:0,dispatchDt:'',orderRecvDt:'',showDt:'',showName:'',showCity:'',shipTo:'',clientName:'',orderNo:'',query:'',courierName:'',remarks:'',[HW_ID]:0,fabStatus:emptyFabStatus()};
+  FAB_TYPES.forEach(f=>{seed[f.id]=0;seed[f.id+'Sqm']=0;});
+  showModal(seed);
+}
+function openEdit(id){editId=id;showModal({...orders.find(x=>x.id===id)});}
+
+function showModal(o){
+  document.getElementById('modal-area').innerHTML=`
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+      <h3>${editId?'Edit Order':'Add New Order'}</h3>
+      <div class="sec-lbl">Dates</div>
+      <div class="form-grid g3">
+        <div class="fg"><label>Dispatch date</label><input type="date" id="f-disp" value="${toISODate(o.dispatchDt)}"></div>
+        <div class="fg"><label>Order received</label><input id="f-recvd" value="${esc(o.orderRecvDt)}" placeholder="DD.MM.YYYY"></div>
+        <div class="fg"><label>Show date</label><input id="f-showdt" value="${esc(o.showDt)}" placeholder="e.g. Jun 15-17, 2026"></div>
+      </div>
+      <div class="sec-lbl">Show / Event</div>
+      <div class="form-grid g2">
+        <div class="fg"><label>Show name</label><input id="f-showname" value="${esc(o.showName)}" placeholder="e.g. AIA 2026"></div>
+        <div class="fg"><label>Show city</label><input id="f-showcity" value="${esc(o.showCity)}" placeholder="e.g. San Diego, CA"></div>
+      </div>
+      <div class="sec-lbl">Client & Order</div>
+      <div class="form-grid g3">
+        <div class="fg"><label>Client name *</label><input id="f-client" value="${esc(o.clientName)}" placeholder="Client / company name"></div>
+        <div class="fg"><label>Order no.</label><input id="f-orderno" value="${esc(o.orderNo)}" placeholder="Order number"></div>
+        <div class="fg"><label>Query / if any</label><input id="f-query" value="${esc(o.query)}" placeholder="Any query"></div>
+      </div>
+      <div class="sec-lbl">Logistics</div>
+      <div class="form-grid g2">
+        <div class="fg"><label>Ship to location</label><input id="f-shipto" value="${esc(o.shipTo)}" placeholder="e.g. San Diego, NL"></div>
+        <div class="fg"><label>Courier name</label><input id="f-courier" value="${esc(o.courierName)}" placeholder="e.g. DHL CSB4"></div>
+      </div>
+      <div class="sec-lbl">Fabric Pieces ${editId?'<span style="font-weight:400;color:#9A9A97;text-transform:none;">(from order form — read only)</span>':''}</div>
+      <div class="form-grid g4">
+        ${FAB_TYPES.map(f=>`<div class="fg"><label>${f.name}</label>
+          <input id="f-${f.id}" type="number" min="0" value="${o[f.id]||0}" readonly disabled style="background:#F2F2F0;color:#5A5A57;"></div>`).join('')}
+      </div>
+      <div class="sec-lbl">Hardware <span style="font-weight:400;color:#9A9A97;text-transform:none;">(added here — stages: Ordered → Received & QC Pending → QC OK)</span></div>
+      <div class="form-grid g4">
+        <div class="fg"><label>Hardware qty</label><input id="f-hardware" type="number" min="0" value="${o[HW_ID]||0}"></div>
+      </div>
+      <div class="sec-lbl">Remarks</div>
+      <div class="form-grid">
+        <div class="fg"><label>Remarks</label><input id="f-remarks" value="${esc(o.remarks)}" placeholder="Any remarks..."></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveOrder()">✓ ${editId?'Save Changes':'Add Order'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function closeModal(){document.getElementById('modal-area').innerHTML='';}
+
+function saveOrder(){
+  const client=gv('f-client').trim();if(!client){alert('Please enter a client name.');return;}
+  const hw=gvi('f-hardware');
+  const baseData={dispatchDt:fromISODate(gv('f-disp')),orderRecvDt:gv('f-recvd'),showDt:gv('f-showdt'),showName:gv('f-showname'),showCity:gv('f-showcity'),shipTo:gv('f-shipto'),clientName:client,orderNo:gv('f-orderno'),query:gv('f-query'),courierName:gv('f-courier'),remarks:gv('f-remarks')};
+
+  if(editId){
+    const i=orders.findIndex(x=>x.id===editId);
+    const existing=orders[i];
+    const fs={...existing.fabStatus};
+    // hardware: init/clear its stage based on new qty
+    const prevHw=existing[HW_ID]||0;
+    if(hw>0 && !fs[HW_ID]){ fs[HW_ID]=HW_STAGES[0]; if(!prevHw) initHwTimeLog(editId,HW_STAGES[0]); }
+    if(hw===0){ fs[HW_ID]=null; }
+    // keep all print category counts/sqm + their statuses unchanged (they come from the form)
+    const merged={...existing, ...baseData, [HW_ID]:hw, fabStatus:fs};
+    orders[i]=merged;
+    dbUpdateOrder(orders[i]);
+  } else {
+    // manual add: no fabric categories (form-only); hardware allowed
+    const id=nextId++;
+    const newOrder={id, ...baseData, [HW_ID]:hw, fabStatus:mkFabStatus({[HW_ID]:hw})};
+    FAB_TYPES.forEach(f=>{ newOrder[f.id]=0; newOrder[f.id+'Sqm']=0; });
+    if(hw>0) initHwTimeLog(id,HW_STAGES[0]);
+    orders.push(newOrder);
+    saveLocal();
+  }
+  closeModal();renderAll();
+  showToast(editId?'✓ Order updated':'✓ New order added');
+}
+
+// ============================================================
+// ORDER PLANNING TAB — AUTO-GENERATED per piece from orders
+// (no upload / no manual add; one row per individual piece;
+//  rows auto-refresh when orders change; manual cell edits persist)
+// ============================================================
+const PLAN_FIELDS = [
+  {k:'date',        label:'Date',          w:'95px',  edit:true},
+  {k:'client',      label:'Client / Order',w:'240px', edit:true},
+  {k:'shipTo',      label:'Ship to',       w:'90px',  edit:true},
+  {k:'hsn',         label:'HSN Code',      w:'90px',  edit:true},
+  {k:'navItem',     label:'Navision Item', w:'110px', edit:true},
+  {k:'itemNo',      label:'Item No',       w:'90px',  edit:true},
+  {k:'description', label:'Description',   w:'220px', edit:true},
+  {k:'visualSize',  label:'Size (W×H)',    w:'110px', edit:true},
+  {k:'qty',         label:'Qty',           w:'55px',  num:true},
+  {k:'qtySqmtr',    label:'Qty Sqmtr',     w:'80px',  num:true, edit:true},
+  {k:'uom',         label:'UOM',           w:'70px',  edit:true},
+  {k:'rate',        label:'Rate',          w:'70px',  num:true, edit:true},
+  {k:'totalAmt',    label:'Total Amt',     w:'85px',  num:true, edit:true},
+  {k:'actualWeight',label:'Act. Wt',       w:'70px',  num:true, edit:true},
+  {k:'netWt',       label:'NT WT',         w:'65px',  num:true, edit:true},
+  {k:'grWt',        label:'GR WT',         w:'65px',  num:true, edit:true},
+  {k:'boxNo',       label:'Box No',        w:'60px',  edit:true},
+  {k:'dimension',   label:'Dim L×W×H',     w:'110px', edit:true},
+  {k:'awb',         label:'AWB',           w:'90px',  edit:true},
+  {k:'invoiceNo',   label:'Invoice No',    w:'95px',  edit:true},
+  {k:'freight',     label:'Freight',       w:'70px',  num:true, edit:true},
+  {k:'shipmentType',label:'Shipment Type', w:'110px', edit:true},
+];
+
+function planNum(v){const n=parseFloat(v);return isNaN(n)?0:n;}
+function planGroupKey(r){ return (r.client||'(Unassigned)').trim(); }
+
+// ---- USA item-code / HSN mapping rules (per line item) ----
+function isUSAShip(shipTo){
+  const s=(shipTo||'').toLowerCase();
+  // treat blank/explicit USA city/state markers as USA; common US show cities & "usa"/"us"
+  return /usa|united states|u\.s|san diego|dallas|las vegas|orlando|chicago|atlanta|new york|nevada|texas|california|, ca|, tx|, nv|, ny|, il|, ga|, fl/.test(s);
+}
+
+// classify a line item into a logical type used for code mapping
+// ----------------------------------------------------------------------
+// LINE-TYPE NAMING EQUIVALENCES (to avoid confusion from form wording):
+//   1. "Backlit" == "Backlite" == "Backlight"          → all treated as backlit
+//   2. "Vinyl Print" == "Backlit/Backlight Vinyl Print" → all treated as VINYL
+//      (a vinyl print stays vinyl even if "backlit/backlight" appears with it)
+//   3. "3D Backlit Logo" == "3D Backlight Logo" == "3D Backlite Logo" → logo3dBacklit
+//   4. "3D Logo" == "3D Edgelite" == "Edgelit Logo" == "Solid Logo"   → logo3d
+// ----------------------------------------------------------------------
+function classifyLineType(li){
+  const printOn = (li.printOn||'').toLowerCase();
+  const ref = (li.graphicRef||'').toLowerCase();
+  const sec = (li.section||'').toLowerCase();
+  const goTo = (li.goToFix||'').toLowerCase();
+  const txt = printOn+' '+ref;   // NOTE: section excluded here — "Non Backlight" contains "backl"
+  // text used for hanging/banner detection (includes section + go-to-fix hardware)
+  const hangTxt = txt+' '+goTo+' '+sec;
+
+  // equivalence helpers ---------------------------------------------------
+  const backlitWord = /back\s*li(?:t|te|ght)/;                 // rule 1: backlit / backlite / backlight
+  const has3dLogo   = /\b3d\b[\s\w+]*\blogo\b|\blogo\b[\s\w+]*\b3d\b/.test(txt);     // "3d ... logo" / "logo ... 3d" (words allowed between)
+  const edgelit     = /edge\s*li(?:t|te)|edgelit|edgelite/.test(txt);                // rule 4: edgelit / edgelite
+  const solidLogo   = /solid\s*logo/.test(txt);                                       // rule 4: solid logo
+  const acrylicLogo = /acrylic\s*logo/.test(txt);
+
+  // rule 3: 3D Backlit/Backlight/Backlite Logo → logo3dBacklit (wins over incidental "vinyl print" on same line)
+  if(has3dLogo && backlitWord.test(txt)) return 'logo3dBacklit';
+  // rule 4: 3D logo / edgelit / edgelite / solid logo / acrylic logo → logo3d
+  if(has3dLogo || edgelit || solidLogo || acrylicLogo) return 'logo3d';
+  // rule 2: any vinyl print (incl. "backlit/backlight vinyl print") → vinyl
+  if(/vinyl/.test(txt)) return 'vinyl';
+  if(/sheer/.test(txt)) return 'sheer';
+  // is this a backlit context? Print On text says backlit, OR section is Backlight (but NOT "Non Backlight"/"Hanging")
+  const backlitCtx = backlitWord.test(txt) || (backlitWord.test(sec) && !sec.includes('non') && !sec.includes('hanging'));
+  const isHanging = /hanging|banner/.test(hangTxt);   // section "Hanging Banner", or hardware "Outer/Inner Hanging Banner", or print-on
+  // backlit hanging must be checked before plain hanging and before white
+  if(isHanging && backlitCtx) return 'hangingBacklit';
+  if(/white|reflection/.test(txt)) return 'white';
+  if(isHanging) return 'hanging';
+  // otherwise decide by SECTION: Backlight → backlit, Non Backlight → nonlit
+  if(sec.includes('non')) return 'nonlit';
+  if(backlitWord.test(sec)) return 'backlit';
+  // fallback: text mentions backlit?
+  if(backlitWord.test(txt)) return 'backlit';
+  return 'nonlit';
+}
+
+// Navision Item code + HSN by line type (USA rules)
+function navAndHsn(type){
+  switch(type){
+    case 'vinyl':         return {nav:'DPBS10192', hsn:'49111010'};
+    case 'logo3d':        return {nav:'DPBS10190', hsn:'39211900'};   // 3D logo / Edgelit logo
+    case 'logo3dBacklit': return {nav:'DPBS10189', hsn:'39211900'};   // 3D backlit logo
+    // sheer, backlit-hanging, fabric print, hanging, backlit, nonlit, white → fabric
+    default:              return {nav:'NPBS10130', hsn:'49111010'};
+  }
+}
+
+// Item No by line type (USA rules)
+function itemNoFor(type){
+  switch(type){
+    case 'nonlit':         return 'NPBS10121';
+    case 'backlit':        return 'NPBS10122';
+    case 'white':          return 'NPBS10125';
+    case 'hanging':        return 'NPBS10124';
+    case 'sheer':          return 'NPBS10129';
+    case 'hangingBacklit': return 'NPBS10128';
+    case 'vinyl':          return 'DPBS10187';
+    case 'logo3dBacklit':  return 'DPBS10189';
+    case 'logo3d':         return 'DPBS10190';
+    default:               return '';
+  }
+}
+
+// Price per sqmtr (USD) by line type — used to auto-calc Total Amount
+function rateFor(type){
+  switch(type){
+    case 'white':          return 9.7;
+    case 'nonlit':         return 16.7;
+    case 'sheer':          return 6.5;
+    case 'backlit':        return 13.8;
+    case 'hanging':        return 19.6;
+    case 'hangingBacklit': return 18.3;
+    case 'vinyl':          return 9.2;
+    case 'logo3dBacklit':  return 215.3;
+    case 'logo3d':         return 67.11;
+    default:               return 0;
+  }
+}
+
+// Per-sqmtr weight (kg) by Item No code — used for Actual Weight = weight × Qty Sqmtr
+const ITEM_WT = {
+  'NPBS10121':0.43, 'NPBS10125':0.36, 'NPBS10120':0.41, 'NPBS10122':0.35,
+  'NPBS10124':0.35, 'NPBS10123':0.42, 'DPBS10189':9.38, 'DPBS10190':3.20,
+  'DPBS10187':0.38, 'NPBS10128':0.15, 'DPBS10188':0.38, 'NPBS10129':0.1775,
+};
+function weightPerSqmtr(itemNo){ return ITEM_WT[(itemNo||'').toUpperCase()] || 0; }
+
+// map a parsed order-form line type to the order's summary fabric bucket (vinyl/nonlit/backlit/white)
+function lineTypeToFab(type){
+  if(type==='vinyl') return 'vinyl';
+  if(type==='white') return 'white';
+  if(type==='backlit'||type==='logo3dBacklit'||type==='hangingBacklit') return 'backlit';
+  // nonlit, hanging, sheer, logo3d → nonlit bucket
+  return 'nonlit';
+}
+
+function renderBanner(){
+  if(activeTab==='planning'){
+    document.getElementById('banner').innerHTML=
+      `<div class="banner banner-mgr">📋 Order Planning — auto-generated from orders, one row per piece, grouped by client/order. ${isMgr()?'Click a highlighted cell to edit; your edits are saved and kept even when orders change.':'View only.'}</div>`;
+    return;
+  }
+  if(currentUser&&currentUser.canUpload&&!isMgr()){
+    document.getElementById('banner').innerHTML=`<div class="banner banner-team">⬆ Upload access — you can upload order forms and graphic layouts. Everything else is view-only.</div>`;
+    return;
+  }
+  document.getElementById('banner').innerHTML=isMgr()
+    ?`<div class="banner banner-mgr">🛡️ Manager — Dispatch dates are editable inline. Orders sorted oldest → latest. Today's dispatch rows are highlighted in yellow. Once all fabrics reach QC OK, order moves to Completed tab.</div>`
+    :`<div class="banner banner-team">🔒 Stage rights: <strong>${(currentUser.canAdvance||[]).join(' → ')||'view only'}</strong>. Remarks editable by everyone.</div>`;
+}
+
+// stable key for one piece so manual edits survive auto-regeneration
+function pieceKey(orderId,tag,pieceIdx){ return `o${orderId}-${tag}-${pieceIdx}`; }
+
+// USA combined client/order label: Project No + Client + Show Date + Show Name
+function usaClientLabel(o){
+  // Format: "CLIENT NAME  Project :#PROJNO - (SHOW DATE SHOW NAME)"
+  const client = (o.clientName||'').toString().trim();
+  const proj   = (o.projectNo||'').toString().trim();
+  const showDt = (o.showDt||'').toString().trim();
+  const showNm = (o.showName||'').toString().trim();
+  let label = client;
+  if(proj) label += `  Project :${proj}`;
+  const inner = [showDt, showNm].filter(Boolean).join(' ');
+  if(inner) label += ` - (${inner})`;
+  return label.trim() || client || '(Unassigned)';
+}
+
+// Build the planning rows automatically from orders. Manual edits in planEdits override.
+// If an order has detailed lineItems (from an uploaded order form) AND ships to USA,
+// apply the USA mapping rules; otherwise fall back to the simple per-fabric pieces.
+function buildPlanningRows(){
+  const rows=[];
+  getSortedOrders().forEach(o=>{
+    const usa = isUSAShip(o.shipTo);
+    const hasLines = Array.isArray(o.lineItems) && o.lineItems.length>0;
+
+    if(hasLines && usa){
+      const clientLabel = usaClientLabel(o);
+      o.lineItems.forEach((li,liIdx)=>{
+        const type = classifyLineType(li);
+        const {nav,hsn} = navAndHsn(type);
+        const itemNo = itemNoFor(type);
+        const rate = rateFor(type);
+        const qty = li.qty>0?li.qty:1;
+        const perPieceRaw = qty>0 ? (li.sqm||0)/qty : 0;
+        const perPieceSqm = Math.round(perPieceRaw);   // round to nearest whole m² (1.4→1, 1.6→2)
+        const descParts=[li.graphicRef, li.printOn, li.goToFix].map(x=>(x||'').toString().trim()).filter(Boolean);
+        const desc = descParts.join(' · ');
+        for(let i=1;i<=qty;i++){
+          const tag = `L${liIdx}p${i}`;
+          const key = pieceKey(o.id,tag,i);
+          const totalAmt = rate ? +(perPieceSqm*rate).toFixed(2) : '';
+          const wpsm = weightPerSqmtr(itemNo);
+          const actWt = wpsm ? +(wpsm*perPieceSqm).toFixed(4) : '';
+          const base = {
+            key, orderId:o.id, fabId:lineTypeToFab(type), pieceIdx:i,
+            date: o.orderRecvDt || o.dispatchDt || '',
+            client: clientLabel,
+            shipTo: o.shipTo||'',
+            hsn, navItem:nav, itemNo,
+            description: desc || (li.printOn||''),
+            visualSize: li.visualSize||'',
+            qty: 1,
+            qtySqmtr: perPieceSqm,
+            uom: 'SQMTR',
+            rate: rate || '', totalAmt,
+            actualWeight:actWt, netWt:'', grWt:'',
+            boxNo:'', dimension:'', awb:'', invoiceNo:'', freight:'', shipmentType:'',
+          };
+          const ov = planEdits[key];
+          rows.push(ov ? {...base, ...ov, key, orderId:o.id, pieceIdx:i} : base);
+        }
+      });
+      return;
+    }
+
+    // fallback: simple per-fabric pieces (manual orders or non-USA / no line detail)
+    const clientLabel = (usa ? usaClientLabel(o) : (o.clientName + (o.orderNo?(' '+o.orderNo):'')));
+    FAB_TYPES.forEach(f=>{
+      const qty = o[f.id]||0;
+      if(qty<=0) return;
+      const totalSqm = o[f.id+'Sqm']||0;
+      const perPieceSqm = qty>0 ? totalSqm/qty : 0;
+      const map = usa ? navAndHsn(f.id==='white'?'white':(f.id==='backlit'?'backlit':(f.id==='vinyl'?'vinyl':'nonlit'))) : {nav:'',hsn:''};
+      const itemNo = usa ? itemNoFor(f.id==='white'?'white':f.id) : '';
+      for(let i=1;i<=qty;i++){
+        const key = pieceKey(o.id,f.id,i);
+        const base = {
+          key, orderId:o.id, fabId:f.id, pieceIdx:i,
+          date: o.orderRecvDt || o.dispatchDt || '',
+          client: clientLabel,
+          shipTo: o.shipTo||'',
+          hsn: map.hsn, navItem: map.nav, itemNo,
+          description: `${f.name} — piece ${i} of ${qty}`,
+          visualSize: '',
+          qty: 1,
+          qtySqmtr: perPieceSqm ? +perPieceSqm.toFixed(4) : 0,
+          uom: 'SQMTR',
+          rate: '', totalAmt: '',
+          actualWeight:'', netWt:'', grWt:'',
+          boxNo:'', dimension:'', awb:'', invoiceNo:'', freight:'', shipmentType:'',
+        };
+        const ov = planEdits[key];
+        rows.push(ov ? {...base, ...ov, key, orderId:o.id, fabId:f.id, pieceIdx:i} : base);
+      }
+    });
+  });
+  return rows;
+}
+
+function planRowMatches(r){
+  // date filter: planDateFilter is yyyy-mm-dd from <input type=date>; r.date is dd.mm.yyyy or similar
+  if(planDateFilter){
+    const d=(r.date||'').toString();
+    // normalize r.date dd.mm.yyyy -> yyyy-mm-dd for compare
+    const m=d.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
+    let iso='';
+    if(m){ const yr=m[3].length===2?('20'+m[3]):m[3]; iso=`${yr}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+    else { const m2=d.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m2) iso=m2[0]; }
+    if(iso!==planDateFilter) return false;
+  }
+  if(planSearch){
+    const q=planSearch.toLowerCase();
+    const hay=[r.client,r.shipTo,r.hsn,r.navItem,r.itemNo,r.description,r.visualSize,r.awb,r.invoiceNo,r.boxNo].map(x=>(x==null?'':String(x))).join(' ').toLowerCase();
+    if(!hay.includes(q)) return false;
+  }
+  return true;
+}
+
+function setPlanSearch(v){ planSearch=v; renderPlanningTab(true); }
+function setPlanDate(v){ planDateFilter=v; renderPlanningTab(); }
+function clearPlanFilters(){ planSearch=''; planDateFilter=''; renderPlanningTab(); }
+function expandAllPlanGroups(keys){ keys.forEach(k=>planExpandedGroups[k]=true); renderPlanningTab(); }
+function collapseAllPlanGroups(keys){ keys.forEach(k=>planExpandedGroups[k]=false); renderPlanningTab(); }
+
+function renderPlanningTab(keepSearchFocus){
+  const allRows = buildPlanningRows();   // always fresh from orders
+  planningRows = allRows;
+  const rowsFiltered = allRows.filter(planRowMatches);
+  const groups={};
+  rowsFiltered.forEach(r=>{const k=planGroupKey(r);(groups[k]=groups[k]||[]).push(r);});
+  const keys=Object.keys(groups).sort();
+  const allKeys=[...new Set(allRows.map(planGroupKey))];
+  const filtering = !!(planSearch||planDateFilter);
+
+  const filterBar=`
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
+      <input id="plan-search" type="text" placeholder="🔍 Search client, item code, description…" value="${esc(planSearch)}"
+        oninput="setPlanSearch(this.value)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #D8D8D6;border-radius:7px;font-size:13px;">
+      <input id="plan-date" type="date" value="${esc(planDateFilter)}" onchange="setPlanDate(this.value)" title="Filter by date"
+        style="padding:5px 8px;border:1px solid #D8D8D6;border-radius:7px;font-size:13px;">
+      ${filtering?`<button class="btn btn-sm" onclick="clearPlanFilters()">✕ Clear</button>`:''}
+      <button class="btn btn-sm" onclick="expandAllPlanGroups(${JSON.stringify(allKeys).replace(/"/g,'&quot;')})">▼ Expand all</button>
+      <button class="btn btn-sm" onclick="collapseAllPlanGroups(${JSON.stringify(allKeys).replace(/"/g,'&quot;')})">▶ Collapse all</button>
+    </div>`;
+
+  const toolbar=`
+    <div class="toolbar">
+      <span style="font-size:12px;color:#5A5A57;">📋 Auto-generated from orders — one row per piece. ${isMgr()?'Click any highlighted cell to edit; edits are saved and kept on refresh.':'View only.'}</span>
+      ${allRows.length?`<button class="btn" style="margin-left:auto;" onclick="exportPlanning()">📤 Export Planning</button>`:'<span style="margin-left:auto;"></span>'}
+      ${isMgr()&&Object.keys(planEdits).length?`<button class="btn btn-danger" onclick="resetPlanEdits()">↺ Reset edits</button>`:''}
+      <span style="font-size:11px;color:#888;">${rowsFiltered.length}${filtering?(' / '+allRows.length):''} piece(s) · ${keys.length} order group(s)</span>
+    </div>`;
+
+  if(!allRows.length){
+    document.getElementById('tab-content').innerHTML=toolbar+
+      `<div style="padding:48px;text-align:center;color:#9A9A97;background:#fff;border:1px dashed #D8D8D6;border-radius:12px;">
+        <div style="font-size:32px;margin-bottom:8px;">📋</div>
+        <div style="font-size:14px;font-weight:600;color:#5A5A57;">No pieces to plan yet</div>
+        <div style="font-size:12px;margin-top:4px;">Add an order (with fabric quantities) and its pieces will appear here automatically.</div>
+      </div>`;
+    return;
+  }
+
+  if(!rowsFiltered.length){
+    document.getElementById('tab-content').innerHTML=toolbar+filterBar+
+      `<div style="padding:36px;text-align:center;color:#9A9A97;background:#fff;border:1px dashed #D8D8D6;border-radius:12px;">
+        <div style="font-size:14px;font-weight:600;color:#5A5A57;">No pieces match your filter</div>
+        <div style="font-size:12px;margin-top:4px;">Try a different search term or date, or clear the filters.</div>
+      </div>`;
+    restorePlanSearchFocus(keepSearchFocus);
+    return;
+  }
+
+  const headCells=PLAN_FIELDS.map(f=>`<th style="min-width:${f.w};">${f.label}</th>`).join('');
+  const groupsHtml=keys.map(k=>{
+    const rows=groups[k];
+    // when filtering, default to expanded so matches are visible
+    const expanded=filtering?true:(planExpandedGroups[k]!==false);
+    const sumQty=rows.reduce((a,r)=>a+planNum(r.qty),0);
+    const sumSqm=rows.reduce((a,r)=>a+planNum(r.qtySqmtr),0);
+    const sumAmt=rows.reduce((a,r)=>a+planNum(r.totalAmt),0);
+    const body=rows.map(r=>`<tr>
+      ${PLAN_FIELDS.map(f=>{
+        let v=r[f.k];
+        let disp=(f.num&&(v||v===0)&&v!=='')?planNum(v).toLocaleString('en-IN',{maximumFractionDigits:2}):(v??'');
+        if(isMgr()&&f.edit){
+          return `<td${f.num?' style="text-align:right;"':''} class="plan-edit"
+            contenteditable="true" data-key="${r.key}" data-field="${f.k}"
+            onblur="planCellEdit(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+            >${esc(String(disp))}</td>`;
+        }
+        return `<td${f.num?' style="text-align:right;"':''}>${esc(String(disp))}</td>`;
+      }).join('')}
+    </tr>`).join('');
+    return `
+      <div class="col-panel" style="padding:0;overflow:hidden;">
+        <div onclick="togglePlanGroup('${k.replace(/'/g,"\\'")}')" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:11px 14px;background:#EEEDFC;border-bottom:1px solid #D8D8D6;">
+          <span style="font-size:12px;color:#4A3FB5;">${expanded?'▼':'▶'}</span>
+          <span style="font-weight:600;font-size:13px;flex:1;">${esc(k)}</span>
+          <span style="font-size:11px;color:#5A5A57;">${rows.length} piece(s) · ${sumSqm.toLocaleString('en-IN',{maximumFractionDigits:2})} m²${sumAmt?(' · Amt '+sumAmt.toLocaleString('en-IN',{maximumFractionDigits:2})):''}</span>
+        </div>
+        ${expanded?`<div class="tbl-wrap" style="border:none;border-radius:0;box-shadow:none;">
+          <table style="min-width:100%;">
+            <thead><tr>${headCells}</tr></thead>
+            <tbody>${body}</tbody>
+          </table></div>`:''}
+      </div>`;
+  }).join('');
+
+  document.getElementById('tab-content').innerHTML=toolbar+filterBar+groupsHtml;
+  restorePlanSearchFocus(keepSearchFocus);
+}
+
+function restorePlanSearchFocus(keep){
+  if(!keep) return;
+  const el=document.getElementById('plan-search');
+  if(el){ el.focus(); const v=el.value; el.value=''; el.value=v; }  // move caret to end
+}
+
+function togglePlanGroup(k){ planExpandedGroups[k]=planExpandedGroups[k]===false?true:false; renderPlanningTab(); }
+
+// save a manual cell edit into planEdits (keyed by piece + field)
+function planCellEdit(td){
+  const key=td.getAttribute('data-key');
+  const field=td.getAttribute('data-field');
+  const fieldDef=PLAN_FIELDS.find(f=>f.k===field);
+  let val=td.textContent.trim();
+  if(fieldDef.num) val = val===''? '' : planNum(val.replace(/,/g,''));
+  if(!planEdits[key]) planEdits[key]={};
+  planEdits[key][field]=val;
+  saveLocal();
+  // refresh totals (re-render) so group sums update
+  renderPlanningTab();
+}
+
+function resetPlanEdits(){
+  if(!confirm('Clear all manual edits and regenerate planning from orders?'))return;
+  planEdits={};saveLocal();renderPlanningTab();
+  showToast('↺ Planning edits reset');
+}
+
+function exportPlanning(){
+  const data=buildPlanningRows();
+  const cols=PLAN_FIELDS.map(f=>f.label);
+  const aoaRows=data.map(r=>PLAN_FIELDS.map(f=>{
+    let v=r[f.k];
+    if(f.num){ const n=parseFloat(v); return isNaN(n)? '' : n; }   // numbers stay numeric
+    return (v==null?'':v);
+  }));
+  const fileName='OrderPlanning_'+new Date().toISOString().slice(0,10)+'.xlsx';
+
+  // auto-fit width per column = max content length (clamped)
+  const widths=cols.map((c,ci)=>{
+    let w=String(c).length;
+    aoaRows.forEach(row=>{ const s=String(row[ci]==null?'':row[ci]); if(s.length>w) w=s.length; });
+    return Math.min(Math.max(w+2,6),48);   // +2 padding, min 6, max 48
+  });
+
+  if(typeof ExcelJS!=='undefined'){
+    const wbk=new ExcelJS.Workbook();
+    const sh=wbk.addWorksheet('Order planning',{views:[{state:'frozen',ySplit:1}]});
+    const thin={top:{style:'thin',color:{argb:'FFBFBFBF'}},left:{style:'thin',color:{argb:'FFBFBFBF'}},bottom:{style:'thin',color:{argb:'FFBFBFBF'}},right:{style:'thin',color:{argb:'FFBFBFBF'}}};
+    const headFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9D9D9'}};
+    sh.columns=cols.map((c,i)=>({header:c,width:widths[i]}));
+    sh.getRow(1).eachCell(cell=>{
+      cell.font={bold:true,color:{argb:'FF1A1A18'}};
+      cell.fill=headFill;
+      cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+      cell.border=thin;
+    });
+    sh.getRow(1).height=20;
+    aoaRows.forEach(rowVals=>{
+      const row=sh.addRow(rowVals);
+      row.eachCell({includeEmpty:true},cell=>{ cell.border=thin; cell.alignment={vertical:'middle'}; });
+    });
+    wbk.xlsx.writeBuffer().then(buf=>{
+      const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=fileName; a.click(); URL.revokeObjectURL(url);
+      showToast('✓ Planning exported (with borders)');
+    }).catch(err=>{ alert('Export failed: '+err.message); });
+    return;
+  }
+
+  // Fallback: SheetJS (no borders)
+  const ws=XLSX.utils.aoa_to_sheet([cols,...aoaRows]);
+  ws['!cols']=widths.map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Order planning');
+  XLSX.writeFile(wb,fileName);
+  showToast('✓ Planning exported');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+// Press Esc to close any open modal/window
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    const m=document.getElementById('modal-area');
+    if(m && m.innerHTML.trim()) closeModal();
+  }
+});
+renderLogin();
+</script>
+</body>
+</html>

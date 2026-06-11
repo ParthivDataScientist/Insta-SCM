@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Order Manager — Graphics &amp; Hardware</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter','Segoe UI',Arial,sans-serif;background:#f1f3f7;color:#1a2233;-webkit-font-smoothing:antialiased;letter-spacing:.1px}
+  ::-webkit-scrollbar{height:10px;width:10px}
+  ::-webkit-scrollbar-thumb{background:#c2c8d4;border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:#a9b1c1}
+  ::-webkit-scrollbar-track{background:transparent}
+  input,select,textarea,button{font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#1f4e8c !important;box-shadow:0 0 0 3px rgba(31,78,140,.13)}
+  tr.rowhover{transition:background .12s}
+  tr.rowhover:nth-child(even){background:#fafbfd}
+  tr.rowhover:hover{background:#eef4fc !important}
+  .btn{transition:filter .15s,box-shadow .15s,transform .05s}
+  .btn:active{transform:translateY(1px)}
+  .tile{transition:transform .12s,box-shadow .15s,border-color .15s}
+  .tile:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(20,30,60,.10)}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .fade{animation:fade .28s cubic-bezier(.2,.7,.3,1)}
+  .modalbg{position:fixed;inset:0;background:rgba(16,22,38,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px}
+  h2,h3,h4{letter-spacing:-.2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const ROLES = {
+  sales:          { label: "Sales Person",       icon: "🧾", canCreate: true,  canApprove: true,  canPrint: false, canShip: false, canStore: false },
+  printing:       { label: "Printing Team",       icon: "🖨️", canCreate: false, canApprove: false, canPrint: true,  canShip: false, canStore: false },
+  stores:         { label: "Stores Dept",         icon: "📦", canCreate: false, canApprove: false, canPrint: false, canShip: false, canStore: true  },
+  logistics_exec: { label: "Logistics Executive", icon: "🚚", canCreate: false, canApprove: false, canPrint: false, canShip: true,  canStore: false },
+  logistics_mgr:  { label: "Logistics Manager",   icon: "📋", canCreate: false, canApprove: false, canPrint: false, canShip: true,  canStore: false },
+  senior:         { label: "Senior / Admin",      icon: "⭐", canCreate: true,  canApprove: true,  canPrint: true,  canShip: true,  canStore: true  },
+};
+const STATUS = {
+  NEW:              { label: "Order Placed",                            color: "#1d5fb0", bg: "#e7f0fb" },
+  GRAPHIC_PENDING:  { label: "Graphic Approval Pending",                color: "#9a6a05", bg: "#fdf2dc" },
+  WIP:              { label: "WIP",                                     color: "#5848bd", bg: "#eeecfb" },
+  READY_PAYMENT:    { label: "Ready, Awaiting Payment Confirmation!",   color: "#0f7a5a", bg: "#e2f6ee" },
+  READY_DISPATCH:   { label: "Ready for Dispatch",                      color: "#0b6ea8", bg: "#e2f1fa" },
+  SHIPPED:          { label: "Shipped",                                 color: "#a4451f", bg: "#fbeae2" },
+  DELIVERED:        { label: "Delivered",                               color: "#3d7211", bg: "#ecf5df" },
+};
+const STORE_KEY = "orders:list:v3";
+
+const now = () => new Date().toISOString();
+const fmt = (iso) => iso ? new Date(iso).toLocaleString(undefined,{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"}) : "—";
+const inr = (n) => (typeof n==="number"&&!isNaN(n)) ? "₹"+n.toLocaleString("en-IN",{maximumFractionDigits:2}) : "—";
+const taxable = (it) => (typeof it.amount==="number"&&it.amount) ? it.amount : ((parseFloat(it.rate)||0)*(parseFloat(it.qty)||0)*(1-(parseFloat(it.disc)||0)/100));
+const gstOf = (it) => (typeof it.gstAmt==="number"&&it.gstAmt) ? it.gstAmt : taxable(it)*((parseFloat(it.gstRate)||0)/100);
+const lineTotal = (it) => taxable(it) + gstOf(it);
+const isChargeItem = (it) => /\b(transport|freight|packing|insurance|cartage|loading|unloading|service charge|delivery charge|labour)\b/i.test((it&&it.desc)||"");
+// Classify a line as PRINT (fabric/graphic only), HW (hardware only), or BOTH (hardware that also carries print/graphic)
+const lineType = (it) => {
+  const d = ((it&&it.desc)||"").toLowerCase();
+  const hasPrint = /\bwith\b[^.]*\b(print|graphic|graphics|canopy|roof|backwall|back wall)\b/.test(d) || /\b(incl\.?|including)\b[^.]*\bprint\b/.test(d);
+  const isPureFabric = /\b(fabric|graphic|graphics|vinyl|flex|poster|banner|sticker|decal)\b/.test(d) && !/\b(standee|counter|structure|frame|panel|case|post|foot|table|tent|stall|booth|kiosk|stand|board|light|guard|knob|bolt|connector|backdrop)\b/.test(d);
+  const isPrintWord = /\bprint\b/.test(d) && /\b(fabric|graphic|graphics|vinyl|flex|poster|banner|sticker|decal)\b/.test(d) && !/\b(standee|counter|structure|frame|panel|case|post|foot|table|tent|stall|booth|kiosk|stand|board)\b/.test(d);
+  if (hasPrint) return "BOTH";
+  if (isPureFabric || isPrintWord) return "PRINT";
+  return "HW";
+};
+const uid = () => "ORD-" + Math.random().toString(36).slice(2,7).toUpperCase();
+const effTypeOf = (it) => it.type || lineType(it);
+// Printing (graphic) capsule — JPEG flow, then Prints Ready once all print lines are Ready
+const printingSummary = (o) => {
+  const printItems = (o.items||[]).filter(it=>!isChargeItem(it) && (effTypeOf(it)==="PRINT"||effTypeOf(it)==="BOTH"));
+  const hasPrint = printItems.length>0;
+  if (!hasPrint && !o.hasGraphic) return null;
+  if (o.approval && hasPrint && printItems.every(it=>it.printStatus==="READY"))
+    return {label:"Prints Ready", c:"#0f7a5a", bg:"#e2f6ee"};
+  if (o.approval) return {label:"Graphic Approved", c:"#0f7a5a", bg:"#e2f6ee"};
+  if (o.status==="GRAPHIC_PENDING") return {label:"Graphic Approval Pending", c:"#9a6a05", bg:"#fdf2dc"};
+  return {label:"New Order", c:"#1d5fb0", bg:"#e7f0fb"};
+};
+// Hardware capsule — awaiting confirmation, then available / ordered
+const hardwareSummary = (o) => {
+  const items = (o.items||[]).filter(it=>!isChargeItem(it) && (effTypeOf(it)==="HW"||effTypeOf(it)==="BOTH"));
+  if (items.length===0) return null; // no hardware
+  const anyUnset = items.some(it=>!it.status||it.status==="PENDING");
+  const ordered = items.filter(it=>it.status==="ORDERED");
+  if (ordered.length>0) {
+    const dates = ordered.map(it=>it.hwRecBy).filter(Boolean).sort();
+    const eta = dates.length? dates[dates.length-1] : null;
+    return {label: eta?("Hardware Ordered · ETA "+fmtDate(eta)):"Hardware Ordered", c:"#9a6a05", bg:"#fdf2dc"};
+  }
+  if (anyUnset) return {label:"Awaiting for Hardware Confirmation", c:"#6b7384", bg:"#eef0f4"};
+  return {label:"All Hardware Available", c:"#0f7a5a", bg:"#e2f6ee"};
+};
+// True when graphic approved + every print line Ready + every hardware line Ready
+const allLinesReady = (o) => {
+  const graphicOk = !o.hasGraphic || !!o.approval;
+  const items = (o.items||[]).filter(it=>!isChargeItem(it));
+  const hw = items.filter(it=>effTypeOf(it)==="HW"||effTypeOf(it)==="BOTH");
+  const pr = items.filter(it=>effTypeOf(it)==="PRINT"||effTypeOf(it)==="BOTH");
+  const hwOk = hw.length===0 ? true : hw.every(it=>it.status==="AVAILABLE");
+  const prOk = pr.length===0 ? true : pr.every(it=>it.printStatus==="READY");
+  return graphicOk && hwOk && prOk && items.length>0;
+};
+const loadOrders = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; } };
+const saveOrders = (o) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(o)); } catch(e){ alert("Storage full — large images can exceed the browser limit."); } };
+
+function pick(rows, labels) {
+  for (const row of rows) {
+    for (let c = 0; c < row.length; c++) {
+      const cell = (row[c] ?? "").toString().toLowerCase().replace(/\s+/g,"");
+      for (const lab of labels) {
+        if (cell.startsWith(lab)) {
+          const same = (row[c] ?? "").toString().split(":").slice(1).join(":").trim();
+          if (same) return same;
+          for (let k = c+1; k < row.length; k++) { const v = (row[k] ?? "").toString().trim(); if (v) return v; }
+        }
+      }
+    }
+  }
+  return "";
+}
+function extractFromRows(rows) {
+  const out = { clientName:"", deliveryLocation:"", contact:"", gstNo:"", items:[] };
+  out.clientName = pick(rows, ["name"]);
+  out.gstNo = pick(rows, ["gstno"]);
+  out.contact = pick(rows, ["contactno"]);
+  const addr = pick(rows, ["address"]); const state = pick(rows, ["state"]);
+  out.deliveryLocation = [addr, state].filter(Boolean).join(", ");
+  let hdr = -1, col = {};
+  rows.forEach((row, i) => {
+    const joined = row.map(x => (x??"").toString().toLowerCase()).join("|");
+    if (hdr === -1 && joined.includes("item code") && (joined.includes("product") || joined.includes("service"))) {
+      hdr = i;
+      row.forEach((x,ci) => {
+        const t = (x??"").toString().toLowerCase().trim().replace(/\s+/g," ");
+        if (t.includes("item code")) col.code = ci;
+        else if (t.includes("product")||t.includes("service")) col.desc = ci;
+        else if (t==="qty") col.qty = ci;
+        else if (t==="rate" && col.rate===undefined) col.rate = ci;
+        else if (t==="amount" && col.amount===undefined) col.amount = ci;
+        else if (t.startsWith("dis")) col.disc = ci;
+        else if (t.includes("taxable")) col.taxable = ci;
+        else if (t.includes("gst rate")||t.includes("gst rate")) col.gstRate = ci;
+        else if (t.includes("gst amount")) col.gstAmt = ci;
+      });
+    }
+  });
+  if (hdr >= 0) {
+    for (let i = hdr+1; i < rows.length; i++) {
+      const row = rows[i];
+      const desc = (row[col.desc] ?? "").toString().trim();
+      const code = (row[col.code] ?? "").toString().trim();
+      const joined = row.map(x=>(x??"").toString().toLowerCase()).join(" ");
+      if (joined.includes("total taxable") || joined.includes("amount after tax") || joined.includes("total amount")) break;
+      if (!desc && !code) continue;
+      const num = (v)=>{const n=parseFloat((v??"").toString().replace(/[^0-9.\-]/g,""));return isNaN(n)?0:n;};
+      const pct = (v)=>{let p=num(v); if(p>0&&p<=1)p*=100; return Math.round(p*100)/100;};
+      const qty = (row[col.qty]??"").toString().trim();
+      let rate = col.rate!==undefined ? num(row[col.rate]) : 0;
+      let disc = col.disc!==undefined ? pct(row[col.disc]) : 0;
+      // "Amount" = the value shown to user = Taxable Value (rate*qty after discount) per your spec
+      let amount = col.taxable!==undefined ? num(row[col.taxable]) : (col.amount!==undefined ? num(row[col.amount]) : 0);
+      if (!amount && rate && qty) amount = rate * num(qty) * (1 - disc/100);
+      if (!rate && qty && num(qty)) { const gross = col.amount!==undefined?num(row[col.amount]):amount; if(gross) rate = gross/num(qty); }
+      const gstRate = col.gstRate!==undefined ? pct(row[col.gstRate]) : 0;
+      let gstAmt = col.gstAmt!==undefined ? num(row[col.gstAmt]) : 0;
+      if (!gstAmt && amount && gstRate) gstAmt = amount * gstRate/100;
+      gstAmt = Math.round(gstAmt*100)/100;
+      // skip empty charge/placeholder rows (e.g. Insurance, Packing) that carry no value; keep charges like Freight that have an amount
+      if (/^(freight|insurance|packing|service charges?|incidental|cartage)/i.test(desc) && !amount && !gstAmt) continue;
+      out.items.push({ code, desc, qty, rate, disc, amount, gstRate, gstAmt, status:"PENDING" });
+    }
+  }
+  return out;
+}
+async function parseOrderFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".xlsx")||name.endsWith(".xls")||name.endsWith(".csv")) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf,{type:"array"});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""});
+    return { kind:"xlsx", rows, ...extractFromRows(rows) };
+  }
+  if (name.endsWith(".pdf")) {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let lines = [];
+    for (let p=1;p<=pdf.numPages;p++){
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const byY = {};
+      tc.items.forEach(it=>{const y=Math.round(it.transform[5]);(byY[y]=byY[y]||[]).push(it.str);});
+      Object.keys(byY).sort((a,b)=>b-a).forEach(y=>lines.push(byY[y]));
+    }
+    return { kind:"pdf", rows:lines, ...extractFromRows(lines) };
+  }
+  return { kind:"other", rows:[] };
+}
+
+const C = { brand:"#1f4e8c", brand2:"#2563a8", ink:"#1a2233", sub:"#677085", line:"#e3e7ef", panel:"#ffffff", soft:"#f1f3f7" };
+const S = {
+  btn:{padding:"9px 16px",border:"none",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:600,transition:"filter .15s",display:"inline-flex",alignItems:"center",gap:6,letterSpacing:".1px"},
+  card:{background:C.panel,borderRadius:12,border:"1px solid "+C.line,padding:18,boxShadow:"0 1px 3px rgba(20,30,60,.05)"},
+  input:{width:"100%",padding:"9px 11px",border:"1px solid #d4d9e3",borderRadius:8,fontSize:14,transition:"border .15s,box-shadow .15s",background:"#fff"},
+  label:{fontSize:11,fontWeight:700,color:C.sub,display:"block",marginBottom:5,marginTop:12,letterSpacing:".5px",textTransform:"uppercase"},
+  th:{textAlign:"left",padding:"12px 12px",fontSize:10.5,fontWeight:700,color:"#7a8295",borderBottom:"1px solid "+C.line,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px",background:"#f7f8fb"},
+  td:{padding:"12px 12px",fontSize:13,borderBottom:"1px solid #f1f3f8",verticalAlign:"middle"},
+};
+const Btn = ({color="#2b4f9e", text="#fff", children, ...p}) =>
+  <button className="btn" style={{...S.btn, background:color, color:text, opacity:p.disabled?0.5:1}} onMouseEnter={e=>e.currentTarget.style.filter="brightness(.94)"} onMouseLeave={e=>e.currentTarget.style.filter="none"} {...p}>{children}</button>;
+const Badge = ({status, role}) => {
+  const s=STATUS[status]||STATUS.NEW;
+  let label=s.label;
+  if(status==="WIP" && role && role!=="sales") label="Graphic Approved";
+  return <span style={{background:s.bg,color:s.color,padding:"4px 11px",borderRadius:20,fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;
+};
+const ItemPill = ({st}) => { const m={AVAILABLE:{t:"Ready",c:"#0f7a5a",b:"#e2f6ee"},ORDERED:{t:"Ordered",c:"#9a6a05",b:"#fdf2dc"},PENDING:{t:"Pending",c:"#6b7384",b:"#eef0f4"}}[st||"PENDING"]; return <span style={{background:m.b,color:m.c,padding:"3px 9px",borderRadius:14,fontSize:11,fontWeight:700}}>{m.t}</span>; };
+const PrintPill = ({st}) => { const m={READY:{t:"Ready",c:"#0f7a5a",b:"#e2f6ee"},PENDING:{t:"Pending",c:"#6b7384",b:"#eef0f4"}}[st||"PENDING"]; return <span style={{background:m.b,color:m.c,padding:"3px 9px",borderRadius:14,fontSize:11,fontWeight:700}}>{m.t}</span>; };
+const MiniCap = ({s, big}) => s ? <span style={{background:s.bg,color:s.c,padding:big?"4px 11px":"2px 8px",borderRadius:big?20:12,fontSize:big?11:10,fontWeight:700,whiteSpace:"nowrap",display:"inline-block"}}>{s.label}</span> : null;
+const StatusCell = ({o, role}) => {
+  const shippedOrDone = o.status==="SHIPPED" || o.status==="DELIVERED";
+  // Once shipped/delivered, show the single shipping status only
+  if (shippedOrDone) return <Badge status={o.status} role={role} />;
+
+  // Sales: single capsule reflecting overall stage (no per-team detail)
+  if (role==="sales") {
+    let g;
+    if (o.status==="READY_DISPATCH") g={label:"Ready for Dispatch",c:"#0b6ea8",bg:"#e2f1fa"};
+    else if (allLinesReady(o)) g={label:"Order Ready for Dispatch",c:"#0b6ea8",bg:"#e2f1fa"};
+    else if (o.approval) g={label:"Graphic Approved",c:"#0f7a5a",bg:"#e2f6ee"};
+    else if (o.status==="GRAPHIC_PENDING") g={label:"Graphic Approval Pending",c:"#9a6a05",bg:"#fdf2dc"};
+    else g={label:"Order Placed",c:"#1d5fb0",bg:"#e7f0fb"};
+    return <MiniCap s={g} big />;
+  }
+  // Printing: graphic capsule only
+  if (role==="printing") {
+    const ps=printingSummary(o);
+    return ps ? <MiniCap s={ps} big /> : <span style={{color:"#c0c4cd"}}>—</span>;
+  }
+  // Stores: hardware capsule only
+  if (role==="stores") {
+    const hs=hardwareSummary(o);
+    return hs ? <MiniCap s={hs} big /> : <span style={{color:"#c0c4cd"}}>—</span>;
+  }
+  // Logistics / Manager / Senior: both lines (graphic + hardware)
+  const ps=printingSummary(o), hs=hardwareSummary(o);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-start"}}>
+      {ps && <MiniCap s={ps} big />}
+      {hs && <MiniCap s={hs} big />}
+      {!ps && !hs && <span style={{color:"#c0c4cd"}}>—</span>}
+    </div>
+  );
+};
+const PaymentCap = ({o, role}) => {
+  const hw = (o.items||[]).filter(it=>!isChargeItem(it) && (effTypeOf(it)==="HW"||effTypeOf(it)==="BOTH"));
+  const pr = (o.items||[]).filter(it=>!isChargeItem(it) && (effTypeOf(it)==="PRINT"||effTypeOf(it)==="BOTH"));
+  const hwReady = hw.length===0 ? true : hw.every(it=>it.status==="AVAILABLE");
+  const prReady = pr.length===0 ? true : pr.every(it=>it.printStatus==="READY");
+  const graphicOk = !o.hasGraphic || !!o.approval;
+  const ready = graphicOk && hwReady && prReady;
+  if (o.status==="READY_PAYMENT" && ready) return <span style={{background:"#fdecea",color:"#c0392b",padding:"3px 10px",borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:"nowrap",border:"1px solid #f3c2bc"}}>Awaiting Payment</span>;
+  if (o.paymentReceived) return <span style={{background:"#e2f6ee",color:"#0f7a5a",padding:"3px 10px",borderRadius:14,fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>Payment Received</span>;
+  return <span style={{color:"#c0c4cd"}}>—</span>;
+};
+
+const PEOPLE = [
+  { name: "Kavita",   role: "sales" },
+  { name: "Harish",   role: "printing" },
+  { name: "Vipul",    role: "printing" },
+  { name: "Rushi",    role: "logistics_exec" },
+  { name: "Azad",     role: "stores" },
+  { name: "P. Walia", role: "logistics_mgr" },
+  { name: "Manager",  role: "senior" },
+];
+
+function Login({ onLogin }) {
+  const [role,setRole]=useState("sales");
+  const peopleInRole = PEOPLE.filter(p=>p.role===role);
+  const [name,setName]=useState(peopleInRole[0]?.name || "");
+  const changeRole=(r)=>{setRole(r);const first=PEOPLE.find(p=>p.role===r);setName(first?first.name:"");};
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"radial-gradient(120% 120% at 0% 0%,#1f4e8c 0%,#16386b 45%,#0f2547 100%)"}}>
+      <div className="fade" style={{...S.card,width:390,padding:"34px 32px",borderRadius:16,boxShadow:"0 24px 60px rgba(8,20,45,.45)",border:"none"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:6}}>
+          <div style={{width:44,height:44,borderRadius:11,background:"linear-gradient(135deg,#1f4e8c,#2563a8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 4px 12px rgba(31,78,140,.35)"}}>📦</div>
+          <div>
+            <h2 style={{margin:0,color:C.ink,fontSize:20}}>Order Manager</h2>
+            <p style={{color:C.sub,fontSize:12,margin:"2px 0 0",letterSpacing:".3px"}}>Graphics &amp; Hardware Order Tracking</p>
+          </div>
+        </div>
+        <div style={{height:1,background:C.line,margin:"16px 0 4px"}}></div>
+        <label style={S.label}>Login as</label>
+        <select style={S.input} value={role} onChange={e=>changeRole(e.target.value)}>
+          {Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+        </select>
+        <label style={S.label}>Your name</label>
+        <select style={S.input} value={name} onChange={e=>setName(e.target.value)}>
+          {peopleInRole.length===0 && <option value="">— no one listed —</option>}
+          {peopleInRole.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
+        </select>
+        <div style={{marginTop:20}}><Btn color={C.brand} style={{...S.btn,width:"100%",justifyContent:"center",padding:"11px"}} onClick={()=>name.trim()&&onLogin({name:name.trim(),role})}>Enter →</Btn></div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewModal({ att, onClose }) {
+  const isImg = att.data.startsWith("data:image");
+  const isPdf = att.data.startsWith("data:application/pdf");
+  const isSheet = /sheet|excel|spreadsheet/i.test(att.data.slice(0,90)) || /\.(xlsx|xls|csv)$/i.test(att.name);
+  const [sheetHtml,setSheetHtml]=useState("");
+  useEffect(()=>{
+    const onKey=(e)=>{ if(e.key==="Escape") onClose(); };
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[onClose]);
+  useEffect(()=>{
+    if (isSheet && att.data.includes("base64,")) {
+      try {
+        const b64=att.data.split("base64,")[1]; const bin=atob(b64); const arr=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+        const wb=XLSX.read(arr,{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]];
+        setSheetHtml(XLSX.utils.sheet_to_html(ws));
+      } catch(e){ setSheetHtml("<p>Could not render preview.</p>"); }
+    }
+  },[att]);
+  return (
+    <div className="modalbg" onClick={onClose}>
+      <div className="fade" style={{...S.card,maxWidth:900,width:"100%",maxHeight:"86vh",overflow:"auto",padding:0}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",borderBottom:"1px solid "+C.line,position:"sticky",top:0,background:"#fff",zIndex:2}}>
+          <b style={{fontSize:14}}>📎 {att.name}</b>
+          <div style={{display:"flex",gap:8}}>
+            <a href={att.data} download={att.name} style={{...S.btn,background:"#eef0f4",color:C.ink,textDecoration:"none"}}>Download</a>
+            <Btn color="#e4e7ee" text={C.ink} onClick={onClose}>✕ Close</Btn>
+          </div>
+        </div>
+        <div style={{padding:18}}>
+          {isImg && <img src={att.data} alt={att.name} style={{maxWidth:"100%",borderRadius:8}} />}
+          {isPdf && <iframe title="pdf" src={att.data} style={{width:"100%",height:"70vh",border:"1px solid "+C.line,borderRadius:8}} />}
+          {isSheet && <div style={{overflow:"auto"}} className="sheetwrap" dangerouslySetInnerHTML={{__html:sheetHtml}} />}
+          {!isImg && !isPdf && !isSheet && <p style={{color:C.sub}}>No inline preview for this file type. Use Download.</p>}
+        </div>
+      </div>
+      <style>{`.sheetwrap table{border-collapse:collapse;font-size:12px}.sheetwrap td{border:1px solid #e4e7ee;padding:4px 7px}`}</style>
+    </div>
+  );
+}
+
+function NewOrderForm({ user, onSave, onCancel }) {
+  const [f,setF]=useState({clientName:"",deliveryLocation:"",contact:"",gstNo:"",hasGraphic:true,hasHardware:true,graphicLink:"",tentativeDelivery:"",projectName:"",notes:""});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [files,setFiles]=useState([]); const [items,setItems]=useState([]); const [parsing,setParsing]=useState(false); const [auto,setAuto]=useState(false);
+  const onFile = async (e) => {
+    const list = Array.from(e.target.files||[]); setParsing(true);
+    const stored = await Promise.all(list.map(file=>new Promise(res=>{const r=new FileReader();r.onload=()=>res({name:file.name,data:r.result});r.readAsDataURL(file);})));
+    setFiles(stored);
+    try {
+      const ex = await parseOrderFile(list[0]);
+      if (ex.clientName || ex.items.length) {
+        setF(p=>({...p,clientName:ex.clientName||p.clientName,deliveryLocation:ex.deliveryLocation||p.deliveryLocation,contact:ex.contact||p.contact,gstNo:ex.gstNo||p.gstNo}));
+        setItems(ex.items); setAuto(true);
+      }
+    } catch(err){ console.warn("parse failed",err); }
+    setParsing(false);
+  };
+  return (
+    <div className="fade" style={{maxWidth:760,margin:"0 auto",padding:22}}>
+      <div style={S.card}>
+        <h3 style={{marginTop:0}}>New Sales Order</h3>
+        <div style={{background:"#f4f7fd",border:"1px dashed #b9c6e6",borderRadius:11,padding:14,marginBottom:6}}>
+          <label style={{...S.label,marginTop:0}}>Upload order form (auto-fills details)</label>
+          <input type="file" multiple accept=".xlsx,.xls,.csv,.pdf,image/*" onChange={onFile} style={{fontSize:13}} />
+          {parsing && <div style={{fontSize:12,color:C.brand2,marginTop:6}}>⏳ Reading order form…</div>}
+          {auto && !parsing && <div style={{fontSize:12,color:"#0f7a5a",marginTop:6,fontWeight:600}}>✓ Auto-filled from form{items.length?` · ${items.length} line items detected`:""}. Edit any field below.</div>}
+          {files.length>0 && <div style={{fontSize:12,color:C.sub,marginTop:4}}>{files.length} file(s) attached</div>}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div><label style={S.label}>Client Name *</label><input style={S.input} value={f.clientName} onChange={e=>set("clientName",e.target.value)} /></div>
+          <div><label style={S.label}>Project Name</label><input style={S.input} value={f.projectName} onChange={e=>set("projectName",e.target.value)} /></div>
+          <div style={{gridColumn:"1 / -1"}}><label style={S.label}>Delivery Location *</label><input style={S.input} value={f.deliveryLocation} onChange={e=>set("deliveryLocation",e.target.value)} /></div>
+          <div><label style={S.label}>Contact</label><input style={S.input} value={f.contact} onChange={e=>set("contact",e.target.value)} /></div>
+          <div><label style={S.label}>GST No</label><input style={S.input} value={f.gstNo} onChange={e=>set("gstNo",e.target.value)} /></div>
+          <div><label style={S.label}>Tentative Delivery Date *</label><input type="date" style={S.input} value={f.tentativeDelivery} onChange={e=>set("tentativeDelivery",e.target.value)} /></div>
+        </div>
+        <label style={S.label}>Graphic Link (for printing team) *</label>
+        <input style={S.input} value={f.graphicLink} onChange={e=>set("graphicLink",e.target.value)} placeholder="https://drive.google.com/..." />
+        {items.length>0 && (
+          <div style={{marginTop:14}}>
+            <label style={S.label}>Detected line items</label>
+            <div style={{border:"1px solid "+C.line,borderRadius:10,overflow:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}>
+                <thead><tr><th style={S.th}>Code</th><th style={S.th}>Description</th><th style={{...S.th,textAlign:"right"}}>Qty</th><th style={{...S.th,textAlign:"right"}}>Rate</th><th style={{...S.th,textAlign:"right"}}>Dis%</th><th style={{...S.th,textAlign:"right"}}>Amount</th><th style={{...S.th,textAlign:"right"}}>GST%</th><th style={{...S.th,textAlign:"right"}}>GST Amt</th></tr></thead>
+                <tbody>{items.map((it,i)=>(<tr key={i}><td style={S.td}>{it.code||"—"}</td><td style={S.td}>{it.desc}</td><td style={{...S.td,textAlign:"right"}}>{it.qty||"—"}</td><td style={{...S.td,textAlign:"right"}}>{it.rate?inr(parseFloat(it.rate)):"—"}</td><td style={{...S.td,textAlign:"right"}}>{it.disc?it.disc+"%":"—"}</td><td style={{...S.td,textAlign:"right",fontWeight:600}}>{taxable(it)?inr(taxable(it)):"—"}</td><td style={{...S.td,textAlign:"right"}}>{it.gstRate?it.gstRate+"%":"—"}</td><td style={{...S.td,textAlign:"right"}}>{gstOf(it)?inr(gstOf(it)):"—"}</td></tr>))}</tbody>
+                <tfoot><tr><td colSpan={7} style={{...S.td,textAlign:"right",fontWeight:700,borderTop:"2px solid "+C.line}}>Grand Total (incl. GST)</td><td style={{...S.td,textAlign:"right",fontWeight:800,color:C.brand,borderTop:"2px solid "+C.line}}>{inr(items.reduce((s,it)=>s+lineTotal(it),0))}</td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+        <label style={S.label}>Notes</label>
+        <textarea style={{...S.input,minHeight:60}} value={f.notes} onChange={e=>set("notes",e.target.value)} />
+        <div style={{display:"flex",gap:10,marginTop:20}}>
+          <Btn color={C.brand}
+            onClick={()=>{
+              if(!f.clientName.trim()){alert("Please enter the Client Name.");return;}
+              if(!f.deliveryLocation.trim()){alert("Please enter the Delivery Location.");return;}
+              if(!f.tentativeDelivery){alert("Please select the Tentative Delivery Date.");return;}
+              if(!f.graphicLink.trim()){alert("Please enter the Graphic Link.");return;}
+              onSave({id:uid(),...f,hasGraphic:true,hasHardware:true,attachments:files,items,status:"NEW",createdBy:user.name,orderRecDate:now(),graphicJpegs:[],approval:null,paymentReceived:null,tentativeDispatch:"",shipping:{courier:"",tracking:"",deliveredDate:""},shippedDate:null,history:[{at:now(),by:user.name,text:"Order placed"}]});
+              alert("Order added successfully!");
+            }}>Save Order</Btn>
+          <Btn color="#e4e7ee" text={C.ink} onClick={onCancel}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({k,v}){return <div><div style={{fontSize:10.5,color:"#9098a8",fontWeight:700,textTransform:"uppercase",letterSpacing:.3}}>{k}</div><div style={{marginTop:2}}>{v}</div></div>;}
+
+function OrderDetail({ order, user, onBack, onUpdate, onDelete }) {
+  const perm = ROLES[user.role];
+  const [jpegs,setJpegs]=useState([]); const [preview,setPreview]=useState(null);
+  const [sh,setSh]=useState(order.shipping);
+  const [editing,setEditing]=useState(false);
+  const [ed,setEd]=useState(order);
+  useEffect(()=>{setSh(order.shipping);setEd(order);setEditing(false);},[order.id]);
+  const canModify = perm.canCreate && order.status==="NEW"; // sales/senior, before JPEGs sent for approval
+  const canEdit = canModify;
+  const setE=(k,v)=>setEd(p=>({...p,[k]:v}));
+  const deleteOrder=()=>{
+    if(window.confirm(`Delete order for "${order.clientName}" (${order.id})? This cannot be undone.`)){
+      onDelete(order.id);
+    }
+  };
+  useEffect(()=>{
+    const onKey=(e)=>{
+      if(e.key!=="Escape") return;
+      if(preview) return;            // preview modal closes itself first
+      if(editing){ setEd(order); setEditing(false); return; }  // cancel edit
+      onBack();                       // otherwise return to dashboard
+    };
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[editing,preview,order,onBack]);
+  const saveEdits=()=>{
+    if(!ed.clientName.trim()||!ed.deliveryLocation.trim()){alert("Client name and delivery location are required.");return;}
+    onUpdate({...ed,history:[...order.history,{at:now(),by:user.name,text:"Order details edited"}]});
+    setEditing(false);
+  };
+  const [reparsing,setReparsing]=useState(false);
+  const reparse=async()=>{
+    const att=(order.attachments||[]).find(a=>/\.(xlsx|xls|csv|pdf)$/i.test(a.name)) || (order.attachments||[])[0];
+    if(!att){alert("No order-form attachment found to re-read.");return;}
+    setReparsing(true);
+    try{
+      // reconstruct a File-like object from the stored data URL
+      const res=await fetch(att.data); const blob=await res.blob();
+      const file=new File([blob],att.name,{type:blob.type});
+      const ex=await parseOrderFile(file);
+      if(!ex.items || ex.items.length===0){alert("Could not read line items from the attachment.");setReparsing(false);return;}
+      // keep any stock statuses already set, matched by description
+      const merged=ex.items.map(ni=>{const old=(order.items||[]).find(oi=>oi.desc===ni.desc); return old?{...ni,status:old.status}:ni;});
+      onUpdate({...order, items:merged,
+        clientName: order.clientName||ex.clientName,
+        gstNo: order.gstNo||ex.gstNo,
+        contact: order.contact||ex.contact,
+        history:[...order.history,{at:now(),by:user.name,text:`Re-parsed order form — ${merged.length} line items refreshed`}]});
+    }catch(e){console.error(e);alert("Re-parse failed: "+e.message);}
+    setReparsing(false);
+  };
+  const onJpeg=(e)=>{const list=Array.from(e.target.files||[]);Promise.all(list.map(file=>new Promise(res=>{const r=new FileReader();r.onload=()=>res({name:file.name,data:r.result,at:now()});r.readAsDataURL(file);}))).then(arr=>setJpegs(p=>[...p,...arr]));};
+  const sendForApproval=()=>{onUpdate({...order,graphicJpegs:[...order.graphicJpegs,...jpegs],status:"GRAPHIC_PENDING",history:[...order.history,{at:now(),by:user.name,text:`Sent ${jpegs.length} JPEG(s) for approval`}]});setJpegs([]);alert("Jpeg sent for Approval");onBack();};
+  const removeStagedJpeg=(idx)=>setJpegs(p=>p.filter((_,k)=>k!==idx));
+  const removeSavedJpeg=(idx)=>{if(window.confirm("Remove this uploaded proof?")){const g=order.graphicJpegs.filter((_,k)=>k!==idx);onUpdate({...order,graphicJpegs:g,history:[...order.history,{at:now(),by:user.name,text:"Removed an uploaded JPEG proof"}]});}};
+  // both teams done = graphic approved AND every item has a stock status set
+  const bothTeamsDone=(o)=>{
+    const graphicOk = !o.hasGraphic || !!o.approval;
+    const items = (o.items||[]).filter(it=>!isChargeItem(it)); // charges don't need stock/print status
+    const ty = (it)=> it.type || lineType(it);
+    const storesItems = items.filter(it=>ty(it)==="HW"||ty(it)==="BOTH");
+    const printItems  = items.filter(it=>ty(it)==="PRINT"||ty(it)==="BOTH");
+    const storesOk = storesItems.length===0 ? true : storesItems.every(it=>it.status==="AVAILABLE");
+    const printOk  = printItems.length===0  ? true : printItems.every(it=>it.printStatus==="READY");
+    return graphicOk && storesOk && printOk;
+  };
+  const maybeReady=(o,hist)=>{
+    if(o.status==="WIP" && bothTeamsDone(o)){
+      o.status="READY_PAYMENT";
+      hist.push({at:now(),by:"System",text:"Printing & Stores complete — awaiting payment confirmation"});
+    }
+    return o;
+  };
+  const approve=()=>{const t=now();let o={...order,status:"WIP",approval:{by:user.name,at:t}};const hist=[...order.history,{at:t,by:user.name,text:"Graphic approved → WIP"}];o=maybeReady(o,hist);o.history=hist;onUpdate(o);};
+  const reject=()=>onUpdate({...order,status:"NEW",history:[...order.history,{at:now(),by:user.name,text:"Graphic rejected — needs rework"}]});
+  const setItemStatus=(idx,st)=>{const items=order.items.map((it,i)=>i===idx?{...it,status:st,hwRecBy:st==="ORDERED"?(it.hwRecBy||""):""}:it);let o={...order,items};const hist=[...order.history,{at:now(),by:user.name,text:`Stores: "${order.items[idx].desc.slice(0,30)}" → ${st==="AVAILABLE"?"Ready":"Ordered"}`}];o=maybeReady(o,hist);o.history=hist;onUpdate(o);if(st==="ORDERED"&&!order.items[idx].hwRecBy){setTimeout(()=>alert("Please enter the 'Hardware Rec. up to' date for the ordered item."),50);}};
+  const setHwRecBy=(idx,date)=>{const items=order.items.map((it,i)=>i===idx?{...it,hwRecBy:date}:it);onUpdate({...order,items,history:[...order.history,{at:now(),by:user.name,text:`Stores: "${order.items[idx].desc.slice(0,30)}" hardware rec. by ${date||"—"}`}]});};
+  const setPrintStatus=(idx,st)=>{
+    if(st==="READY" && !order.approval){ alert("Take Approval on Jpeg first!"); return; }
+    const items=order.items.map((it,i)=>i===idx?{...it,printStatus:st}:it);let o={...order,items};const hist=[...order.history,{at:now(),by:user.name,text:`Printing: "${order.items[idx].desc.slice(0,30)}" → ${st==="READY"?"Ready":"Pending"}`}];o=maybeReady(o,hist);o.history=hist;onUpdate(o);};
+  const setLineType=(idx,ty)=>{const items=order.items.map((it,i)=>i===idx?{...it,type:ty}:it);let o={...order,items};const hist=[...order.history,{at:now(),by:user.name,text:`Type set: "${order.items[idx].desc.slice(0,30)}" → ${ty}`}];o=maybeReady(o,hist);o.history=hist;onUpdate(o);};
+  const canSetType = perm.canPrint || perm.canStore || perm.canCreate; // printing, stores, senior
+  const effType = (it) => it.type || lineType(it); // manual override wins
+  const paymentReceived=()=>{const t=now();onUpdate({...order,status:"READY_DISPATCH",paymentReceived:{by:user.name,at:t},history:[...order.history,{at:t,by:user.name,text:"Payment received → Ready for Dispatch"}]});};
+  const saveShipping=(st)=>{const t=now();const patch={...order,shipping:sh};const hist=[...order.history];
+    if(st==="SHIPPED"){if(!sh.courier||!sh.tracking){alert("Enter courier name and tracking number first.");return;}patch.status="SHIPPED";patch.shippedDate=t;if(!patch.tentativeDispatch)patch.tentativeDispatch=t;hist.push({at:t,by:user.name,text:`Shipped via ${sh.courier} (${sh.tracking})`});}
+    if(st==="DELIVERED"){if(!sh.deliveredDate){alert("Enter the delivered date first.");return;}patch.status="DELIVERED";hist.push({at:t,by:user.name,text:"Delivered"});}
+    patch.history=hist;onUpdate(patch);};
+  const saveShippingSmart=()=>{const t=now();const patch={...order,shipping:sh};const hist=[...order.history];let changed=false;
+    // auto: courier + tracking entered -> Shipped (if not already past)
+    if(sh.courier && sh.tracking && order.status==="READY_DISPATCH"){patch.status="SHIPPED";patch.shippedDate=t;if(!patch.tentativeDispatch)patch.tentativeDispatch=t;hist.push({at:t,by:user.name,text:`Shipped via ${sh.courier} (${sh.tracking})`});changed=true;}
+    // auto: delivery date entered -> Delivered
+    if(sh.deliveredDate && (patch.status==="SHIPPED"||order.status==="SHIPPED")){patch.status="DELIVERED";hist.push({at:t,by:user.name,text:"Delivered"});changed=true;}
+    if(!changed) hist.push({at:t,by:user.name,text:"Shipping details updated"});
+    patch.history=hist;onUpdate(patch);};
+  return (
+    <div className="fade" style={{maxWidth:1560,margin:"0 auto",padding:22}}>
+      {preview && <PreviewModal att={preview} onClose={()=>setPreview(null)} />}
+      <Btn color="#e4e7ee" text={C.ink} onClick={onBack}>← Back to dashboard</Btn>
+      <div style={{...S.card,marginTop:14,marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div><h3 style={{margin:0}}>{order.clientName}</h3><div style={{color:C.sub,fontSize:13}}>{order.id} · {order.projectName||"No project name"}</div></div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <Badge status={order.status} role={user.role} />
+            {canEdit && !editing && <button className="btn" style={{...S.btn,padding:"5px 11px",fontSize:12,background:"#eef0f4",color:C.ink}} onClick={()=>{setEd(order);setEditing(true);}}>✏️ Edit</button>}
+            {canModify && !editing && <button className="btn" style={{...S.btn,padding:"5px 11px",fontSize:12,background:"#fbeae2",color:"#a4451f"}} onClick={deleteOrder}>🗑 Delete</button>}
+          </div>
+        </div>
+
+        {!editing ? (
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:14,marginTop:16,fontSize:13}}>
+            <Field k="Order Date" v={fmt(order.orderRecDate)} /><Field k="Delivery Location" v={order.deliveryLocation} /><Field k="Contact" v={order.contact||"—"} />
+            <Field k="GST No" v={order.gstNo||"—"} /><Field k="Tentative Delivery" v={fmtDate(order.tentativeDelivery)} /><Field k="Created By" v={order.createdBy} />
+            <Field k="Tentative Dispatch" v={order.tentativeDispatch?fmtDate(order.tentativeDispatch):"—"} />
+          </div>
+        ) : (
+          <div style={{marginTop:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div><label style={S.label}>Client Name *</label><input style={S.input} value={ed.clientName} onChange={e=>setE("clientName",e.target.value)} /></div>
+              <div><label style={S.label}>Project Name</label><input style={S.input} value={ed.projectName||""} onChange={e=>setE("projectName",e.target.value)} /></div>
+              <div style={{gridColumn:"1 / -1"}}><label style={S.label}>Delivery Location *</label><input style={S.input} value={ed.deliveryLocation} onChange={e=>setE("deliveryLocation",e.target.value)} /></div>
+              <div><label style={S.label}>Contact</label><input style={S.input} value={ed.contact||""} onChange={e=>setE("contact",e.target.value)} /></div>
+              <div><label style={S.label}>GST No</label><input style={S.input} value={ed.gstNo||""} onChange={e=>setE("gstNo",e.target.value)} /></div>
+              <div><label style={S.label}>Tentative Delivery Date</label><input type="date" style={S.input} value={ed.tentativeDelivery||""} onChange={e=>setE("tentativeDelivery",e.target.value)} /></div>
+              <div><label style={S.label}>Graphic Link</label><input style={S.input} value={ed.graphicLink||""} onChange={e=>setE("graphicLink",e.target.value)} /></div>
+            </div>
+            <label style={S.label}>Notes</label>
+            <textarea style={{...S.input,minHeight:54}} value={ed.notes||""} onChange={e=>setE("notes",e.target.value)} />
+            <div style={{display:"flex",gap:10,marginTop:14}}>
+              <Btn color={C.brand} onClick={saveEdits}>💾 Save Changes</Btn>
+              <Btn color="#e4e7ee" text={C.ink} onClick={()=>{setEd(order);setEditing(false);}}>Cancel</Btn>
+            </div>
+          </div>
+        )}
+
+        {!editing && order.graphicLink && <div style={{marginTop:12,fontSize:13}}><b>Graphic Link: </b><a href={order.graphicLink} target="_blank" rel="noreferrer">{order.graphicLink}</a></div>}
+        {!editing && order.notes && <div style={{marginTop:10,fontSize:13,color:"#444"}}><b>Notes:</b> {order.notes}</div>}
+        {order.attachments?.length>0 && (
+          <div style={{marginTop:14}}>
+            <div style={S.label}>Order Form / Attachments</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {order.attachments.map((a,i)=>(
+                <div key={i} style={{display:"flex",gap:6,alignItems:"center",border:"1px solid "+C.line,borderRadius:9,padding:"6px 10px"}}>
+                  <span style={{fontSize:13}}>📄 {a.name}</span>
+                  <button className="btn" style={{...S.btn,padding:"4px 9px",background:C.brand2,color:"#fff",fontSize:12}} onClick={()=>setPreview(a)}>👁 Preview</button>
+                  <a href={a.data} download={a.name} style={{fontSize:12,color:C.sub}}>⬇</a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {perm.canPrint && ["NEW","GRAPHIC_PENDING"].includes(order.status) && order.hasGraphic && (
+        <div style={{...S.card,marginBottom:16}}>
+          <h4 style={{marginTop:0}}>Printing — Upload JPEG proofs</h4>
+          <input type="file" accept="image/*" multiple onChange={onJpeg} style={{fontSize:13}} />
+          <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:12}}>
+            {order.graphicJpegs.map((j,i)=>(
+              <div key={"s"+i} style={{width:92,textAlign:"center",position:"relative"}}>
+                <button title="Remove" onClick={()=>removeSavedJpeg(i)} style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",border:"none",background:"#c0392b",color:"#fff",fontSize:12,cursor:"pointer",lineHeight:1,boxShadow:"0 1px 3px rgba(0,0,0,.3)",zIndex:1}}>✕</button>
+                <img src={j.data} alt={j.name} style={{width:92,height:72,objectFit:"cover",borderRadius:8,border:"1px solid #ddd",cursor:"pointer"}} onClick={()=>setPreview(j)} />
+                <div style={{fontSize:10,color:C.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.name}</div>
+              </div>
+            ))}
+            {jpegs.map((j,i)=>(
+              <div key={"n"+i} style={{width:92,textAlign:"center",position:"relative"}}>
+                <button title="Remove" onClick={()=>removeStagedJpeg(i)} style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",border:"none",background:"#c0392b",color:"#fff",fontSize:12,cursor:"pointer",lineHeight:1,boxShadow:"0 1px 3px rgba(0,0,0,.3)",zIndex:1}}>✕</button>
+                <img src={j.data} alt={j.name} style={{width:92,height:72,objectFit:"cover",borderRadius:8,border:"1px solid #9a6a05",cursor:"pointer"}} onClick={()=>setPreview(j)} />
+                <div style={{fontSize:10,color:"#9a6a05",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.name} <span style={{fontSize:9}}>(new)</span></div>
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:14}}><Btn color="#9a6a05" disabled={jpegs.length===0&&order.graphicJpegs.length===0} onClick={sendForApproval}>Send for Approval</Btn></div>
+        </div>
+      )}
+
+      {perm.canApprove && order.status==="GRAPHIC_PENDING" && (
+        <div style={{...S.card,marginBottom:16,borderColor:"#f0d49a"}}>
+          <h4 style={{marginTop:0}}>Review Graphic Proofs</h4>
+          <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
+            {order.graphicJpegs.map((j,i)=>(<div key={i} style={{width:140,textAlign:"center"}}><img src={j.data} alt={j.name} style={{width:140,height:104,objectFit:"cover",borderRadius:8,border:"1px solid #ddd",cursor:"pointer"}} onClick={()=>setPreview(j)} /><a href={j.data} download={j.name} style={{fontSize:11,display:"block",color:C.sub}}>⬇ Download</a></div>))}
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:14}}><Btn color="#0f7a5a" onClick={approve}>✓ Approve</Btn><Btn color="#b3382f" onClick={reject}>✗ Reject / Rework</Btn></div>
+        </div>
+      )}
+
+      {order.items?.length>0 && (() => {
+        const subTaxable = order.items.reduce((s,it)=>s+taxable(it),0);
+        const subGst = order.items.reduce((s,it)=>s+gstOf(it),0);
+        const grand = subTaxable + subGst;
+        const showStoreSet = perm.canStore;
+        const showPrintSet = perm.canPrint;
+        const setCols = (showStoreSet?1:0)+(showPrintSet?1:0); // trailing Set columns
+        const headerNote = showStoreSet ? "You can update Stock status" : (showPrintSet ? "You can update Print status" : "");
+        return (
+        <div style={{...S.card,marginBottom:16}}>
+          <h4 style={{marginTop:0,display:"flex",justifyContent:"space-between",alignItems:"center"}}>Line Items &amp; Stock Status <span style={{display:"flex",gap:10,alignItems:"center"}}>{headerNote && <span style={{fontSize:11,color:C.sub,fontWeight:500}}>{headerNote}</span>}{canEdit && (order.attachments||[]).length>0 && <button className="btn" style={{...S.btn,padding:"5px 11px",fontSize:12,background:"#eef0f4",color:C.ink}} disabled={reparsing} onClick={reparse}>{reparsing?"Reading…":"🔄 Re-read from form"}</button>}</span></h4>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:1280}}>
+              <thead><tr>
+                <th style={S.th}>#</th><th style={S.th}>Code</th><th style={S.th}>Description</th>
+                <th style={{...S.th,textAlign:"right"}}>Qty</th><th style={{...S.th,textAlign:"right"}}>Rate</th>
+                <th style={{...S.th,textAlign:"right"}}>Dis%</th><th style={{...S.th,textAlign:"right"}}>Amount</th>
+                <th style={{...S.th,textAlign:"right"}}>GST%</th><th style={{...S.th,textAlign:"right"}}>GST Amt</th>
+                <th style={S.th}>Type</th><th style={S.th}>Stock</th><th style={S.th}>Print</th><th style={S.th}>Hardware Rec. up to</th>
+                {showStoreSet && <th style={S.th}>Set Stock</th>}
+                {showPrintSet && <th style={S.th}>Set Print</th>}
+              </tr></thead>
+              <tbody>{order.items.map((it,i)=>{
+                const isCharge = isChargeItem(it);
+                const ty = effType(it);
+                const storeApplies = !isCharge && (ty==="HW" || ty==="BOTH");
+                const printApplies = !isCharge && (ty==="PRINT" || ty==="BOTH");
+                const tyLabel = {PRINT:"Print",HW:"Hardware",BOTH:"HW + Print"}[ty];
+                const tyColor = {PRINT:"#5848bd",HW:"#9a6a05",BOTH:"#0b6ea8"}[ty];
+                return (
+                <tr key={i}>
+                  <td style={S.td}>{i+1}</td><td style={S.td}>{it.code||"—"}</td><td style={S.td}>{it.desc}</td>
+                  <td style={{...S.td,textAlign:"right"}}>{it.qty||"—"}</td>
+                  <td style={{...S.td,textAlign:"right"}}>{it.rate?inr(parseFloat(it.rate)):"—"}</td>
+                  <td style={{...S.td,textAlign:"right"}}>{it.disc?it.disc+"%":"—"}</td>
+                  <td style={{...S.td,textAlign:"right",fontWeight:600}}>{taxable(it)?inr(taxable(it)):"—"}</td>
+                  <td style={{...S.td,textAlign:"right"}}>{it.gstRate?it.gstRate+"%":"—"}</td>
+                  <td style={{...S.td,textAlign:"right"}}>{gstOf(it)?inr(gstOf(it)):"—"}</td>
+                  <td style={S.td}>{isCharge?<span style={{color:"#c0c4cd"}}>—</span>:(
+                    canSetType
+                      ? <select value={ty} onChange={e=>setLineType(i,e.target.value)} style={{...S.input,padding:"3px 6px",fontSize:11.5,width:118}}>
+                          <option value="PRINT">Print</option><option value="HW">Hardware</option><option value="BOTH">HW + Print</option>
+                        </select>
+                      : <span style={{color:tyColor,fontWeight:700,fontSize:11.5}}>{tyLabel}</span>
+                  )}</td>
+                  <td style={S.td}>{storeApplies?<ItemPill st={it.status} />:<span style={{color:"#c0c4cd"}}>—</span>}</td>
+                  <td style={S.td}>{printApplies?<PrintPill st={it.printStatus} />:<span style={{color:"#c0c4cd"}}>—</span>}</td>
+                  <td style={S.td}>{storeApplies && it.status==="ORDERED"?(
+                      showStoreSet
+                        ? <div><input type="date" value={it.hwRecBy||""} onChange={e=>setHwRecBy(i,e.target.value)} style={{...S.input,padding:"4px 7px",fontSize:12,width:150,borderColor:it.hwRecBy?"#d4d9e3":"#e3a008",background:it.hwRecBy?"#fff":"#fffaf0"}} />{!it.hwRecBy && <div style={{fontSize:10,color:"#c0392b",marginTop:2,fontWeight:600}}>Required</div>}</div>
+                        : (it.hwRecBy?fmtDate(it.hwRecBy):<span style={{color:"#c0392b",fontSize:11,fontWeight:600}}>Date required</span>)
+                    ):<span style={{color:"#c0c4cd"}}>—</span>}</td>
+                  {showStoreSet && <td style={S.td}>{storeApplies?<div style={{display:"flex",gap:6}}>
+                    <button className="btn" style={{...S.btn,padding:"4px 9px",fontSize:11,background:"#e2f6ee",color:"#0f7a5a"}} onClick={()=>setItemStatus(i,"AVAILABLE")}>Ready</button>
+                    <button className="btn" style={{...S.btn,padding:"4px 9px",fontSize:11,background:"#fdf2dc",color:"#9a6a05"}} onClick={()=>setItemStatus(i,"ORDERED")}>Ordered</button>
+                  </div>:<span style={{color:"#c0c4cd"}}>—</span>}</td>}
+                  {showPrintSet && <td style={S.td}>{printApplies?<div style={{display:"flex",gap:6}}>
+                    <button className="btn" style={{...S.btn,padding:"4px 9px",fontSize:11,background:"#e2f6ee",color:"#0f7a5a"}} onClick={()=>setPrintStatus(i,"READY")}>Ready</button>
+                    <button className="btn" style={{...S.btn,padding:"4px 9px",fontSize:11,background:"#eef0f4",color:"#6b7384"}} onClick={()=>setPrintStatus(i,"PENDING")}>Pending</button>
+                  </div>:<span style={{color:"#c0c4cd"}}>—</span>}</td>}
+                </tr>
+                );
+              })}</tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={6} style={{...S.td,textAlign:"right",fontWeight:600,borderTop:"2px solid "+C.line}}>Taxable Total</td>
+                  <td style={{...S.td,textAlign:"right",fontWeight:700,borderTop:"2px solid "+C.line}}>{inr(subTaxable)}</td>
+                  <td style={{...S.td,textAlign:"right",fontWeight:600,borderTop:"2px solid "+C.line}}>GST</td>
+                  <td style={{...S.td,textAlign:"right",fontWeight:700,borderTop:"2px solid "+C.line}}>{inr(subGst)}</td>
+                  <td style={{borderTop:"2px solid "+C.line}} colSpan={4+setCols}></td>
+                </tr>
+                <tr>
+                  <td colSpan={8} style={{...S.td,textAlign:"right",fontWeight:800}}>Grand Total (incl. GST)</td>
+                  <td style={{...S.td,textAlign:"right",fontWeight:800,color:C.brand}}>{inr(grand)}</td>
+                  <td colSpan={4+setCols}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div style={{fontSize:11,color:C.sub,marginTop:8}}>Amount = Taxable Value from order form. GST taken from the form's GST Rate &amp; GST Amount columns.</div>
+        </div>
+        );
+      })()}
+
+      {order.approval && order.status!=="GRAPHIC_PENDING" && user.role!=="stores" && (
+        <div style={{...S.card,marginBottom:16,background:"#e2f6ee",borderColor:"#abe2cd"}}>
+          <b style={{color:"#0f7a5a"}}>✓ Graphic Approved</b> by {order.approval.by} · {fmt(order.approval.at)}
+          {order.graphicJpegs.length>0 && <div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:10}}>{order.graphicJpegs.map((j,i)=>(<img key={i} src={j.data} alt={j.name} style={{width:84,height:62,objectFit:"cover",borderRadius:8,border:"1px solid #cce",cursor:"pointer"}} onClick={()=>setPreview(j)} />))}</div>}
+        </div>
+      )}
+
+      {order.status==="READY_PAYMENT" && (
+        <div style={{...S.card,marginBottom:16,background:"#e2f6ee",borderColor:"#abe2cd"}}>
+          <h4 style={{marginTop:0,color:"#0f7a5a"}}>Ready — Awaiting Payment Confirmation</h4>
+          <p style={{fontSize:13,color:C.sub,marginTop:0}}>Printing and Stores have completed their work. {perm.canApprove ? "Confirm once payment is received from the client." : "Waiting for Sales to confirm payment."}</p>
+          {perm.canApprove && <Btn color="#0f7a5a" onClick={paymentReceived}>💰 Payment Received</Btn>}
+        </div>
+      )}
+      {order.paymentReceived && order.status!=="READY_PAYMENT" && (
+        <div style={{fontSize:12.5,color:"#0f7a5a",marginBottom:16,fontWeight:600}}>💰 Payment received · {fmt(order.paymentReceived.at)} by {order.paymentReceived.by}</div>
+      )}
+
+      {perm.canShip && ["READY_DISPATCH","SHIPPED"].includes(order.status) && (() => {
+        const canEditShip = user.role==="logistics_exec";
+        const dInput = canEditShip ? S.input : {...S.input, background:"#f1f3f7", color:"#6b7384", cursor:"not-allowed"};
+        return (
+        <div style={{...S.card,marginBottom:16}}>
+          <h4 style={{marginTop:0}}>Logistics — Shipping Details {!canEditShip && <span style={{fontSize:11,color:C.sub,fontWeight:500}}>(view only — entered by Logistics Executive)</span>}</h4>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div><label style={S.label}>Courier Name</label><input style={dInput} value={sh.courier} disabled={!canEditShip} onChange={e=>setSh({...sh,courier:e.target.value})} /></div>
+            <div><label style={S.label}>Tracking Number</label><input style={dInput} value={sh.tracking} disabled={!canEditShip} onChange={e=>setSh({...sh,tracking:e.target.value})} /></div>
+            <div><label style={S.label}>Dispatch Date</label><input type="date" style={dInput} value={order.tentativeDispatch||""} disabled={!canEditShip} onChange={e=>onUpdate({...order,tentativeDispatch:e.target.value})} /></div>
+            <div><label style={S.label}>Delivered Date</label><input type="date" style={dInput} value={sh.deliveredDate} disabled={!canEditShip} onChange={e=>setSh({...sh,deliveredDate:e.target.value})} /></div>
+          </div>
+          {canEditShip && <div style={{display:"flex",gap:10,marginTop:14,flexWrap:"wrap",alignItems:"center"}}>
+            <Btn color={C.brand} onClick={saveShippingSmart}>💾 Save &amp; Update Status</Btn>
+            {order.status==="READY_DISPATCH" && <span style={{fontSize:12,color:C.sub}}>Enter Courier + Tracking → status becomes <b>Shipped</b></span>}
+            {order.status==="SHIPPED" && <span style={{fontSize:12,color:C.sub}}>Enter Delivered Date → status becomes <b>Delivered</b></span>}
+          </div>}
+        </div>
+        );
+      })()}
+
+      {!["sales","stores","printing","logistics_exec"].includes(user.role) && (
+        <div style={S.card}>
+          <h4 style={{marginTop:0}}>Activity Log</h4>
+          {order.history.slice().reverse().map((h,i)=>(<div key={i} style={{fontSize:12.5,color:C.sub,padding:"6px 0",borderBottom:"1px solid #f1f3f8"}}><b style={{color:C.ink}}>{h.text}</b> — {h.by} · {fmt(h.at)}</div>))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Dashboard({ user, orders, onOpen, onNew }) {
+  const perm=ROLES[user.role];
+  const isSales = user.role==="sales";
+  const [tab,setTab]=useState("pending"); // pending | shipped | delivered
+  const [q,setQ]=useState("");
+
+  const isPending=(o)=>!["SHIPPED","DELIVERED"].includes(o.status);
+  const buckets={
+    all: orders,
+    pending: orders.filter(isPending),
+    shipped: orders.filter(o=>o.status==="SHIPPED"),
+    delivered: orders.filter(o=>o.status==="DELIVERED"),
+  };
+  const tabs=[
+    {key:"all",       label:"All Orders",       n:buckets.all.length,       c:"#1f4e8c", bg:"#eef3fa", bd:"#c5d6ec"},
+    {key:"pending",   label:"Pending Orders",   n:buckets.pending.length,   c:"#9a6a05", bg:"#fdf6e7", bd:"#ecd9a8"},
+    {key:"shipped",   label:"Shipped Orders",   n:buckets.shipped.length,   c:"#9c4a2a", bg:"#fbeee7", bd:"#ecccb9"},
+    {key:"delivered", label:"Delivered Orders", n:buckets.delivered.length, c:"#2f7d4f", bg:"#eaf5ee", bd:"#bfe0cb"},
+  ];
+
+  const matches=(o)=>{
+    if(!q.trim()) return true;
+    const s=q.toLowerCase();
+    return [o.clientName,o.deliveryLocation,o.projectName,o.contact,o.gstNo,o.id,o.shipping?.courier,o.shipping?.tracking]
+      .filter(Boolean).some(v=>v.toString().toLowerCase().includes(s));
+  };
+  const rows = buckets[tab].filter(matches).slice().reverse();
+
+  return (
+    <div className="fade" style={{maxWidth:1320,margin:"0 auto",padding:"24px 24px 40px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:18,flexWrap:"wrap",gap:12}}>
+        <div>
+          <h2 style={{margin:0,fontSize:22,color:C.ink}}>Order Dashboard</h2>
+          <div style={{fontSize:13,color:C.sub,marginTop:3}}>Track graphics &amp; hardware orders across every stage</div>
+        </div>
+        {perm.canCreate && <Btn color={C.brand} style={{...S.btn,padding:"11px 20px",fontSize:14.5,boxShadow:"0 2px 8px rgba(31,78,140,.25)"}} onClick={onNew}>+ New Order</Btn>}
+      </div>
+
+      {/* tab tiles */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:14,marginBottom:18}}>
+        {tabs.map(t=>{
+          const active=tab===t.key;
+          return (
+          <div key={t.key} className="tile" onClick={()=>setTab(t.key)} style={{...S.card,position:"relative",overflow:"hidden",padding:"16px 18px",cursor:"pointer",
+            borderColor:active?t.bd:C.line, background:active?t.bg:"#fff",
+            boxShadow:active?"0 4px 14px rgba(20,30,60,.10)":"0 1px 3px rgba(20,30,60,.05)"}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:4,background:t.c,opacity:active?1:.35}}></div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:30,fontWeight:800,color:t.c,lineHeight:1}}>{t.n}</div>
+              {active && <span style={{fontSize:10,fontWeight:700,color:t.c,background:"#fff",border:"1px solid "+t.bd,padding:"2px 8px",borderRadius:12}}>VIEWING</span>}
+            </div>
+            <div style={{fontSize:12.5,color:active?t.c:C.sub,fontWeight:700,marginTop:6,letterSpacing:".2px"}}>{t.label}</div>
+          </div>
+          );
+        })}
+      </div>
+
+      {/* search */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{position:"relative",flex:1,maxWidth:420}}>
+          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:C.sub,fontSize:14}}>🔍</span>
+          <input style={{...S.input,paddingLeft:34}} placeholder="Search client, location, project, courier, tracking…" value={q} onChange={e=>setQ(e.target.value)} />
+          {q && <button onClick={()=>setQ("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",border:"none",background:"transparent",cursor:"pointer",color:C.sub,fontSize:16}}>✕</button>}
+        </div>
+        <span style={{fontSize:12.5,color:C.sub}}>{rows.length} {rows.length===1?"order":"orders"}{q?" found":""}</span>
+      </div>
+
+      {/* table */}
+      <div style={{...S.card,padding:0,overflow:"hidden"}}>
+        <div style={{overflowX:"auto"}}>
+          {isSales ? (
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:1050}}>
+              <thead><tr>
+                <th style={S.th}>Order Date</th><th style={S.th}>Client Name</th><th style={S.th}>Status</th><th style={S.th}>Payment</th>
+                <th style={S.th}>Tent. Delivery</th><th style={S.th}>Tent. Dispatch</th><th style={S.th}>Shipped Date</th>
+                <th style={S.th}>Courier</th><th style={S.th}>Tracking No.</th><th style={S.th}>Delivered Date</th>
+              </tr></thead>
+              <tbody>
+                {rows.length===0 && <tr><td style={{...S.td,textAlign:"center",color:"#9098a8",padding:34}} colSpan={10}>{q?"No matching orders.":"No orders in this list."}</td></tr>}
+                {rows.map(o=>(
+                  <tr key={o.id} className="rowhover" style={{cursor:"pointer"}} onClick={()=>onOpen(o)}>
+                    <td style={S.td}>{fmtDate(o.orderRecDate)}</td>
+                    <td style={{...S.td,fontWeight:600}}>{o.clientName}</td>
+                    <td style={S.td}><StatusCell o={o} role={user.role} /></td>
+                    <td style={S.td}><PaymentCap o={o} role={user.role} /></td>
+                    <td style={S.td}>{fmtDate(o.tentativeDelivery)}</td>
+                    <td style={S.td}>{o.tentativeDispatch?fmtDate(o.tentativeDispatch):"—"}</td>
+                    <td style={S.td}>{fmtDate(o.shippedDate)}</td>
+                    <td style={S.td}>{o.shipping.courier||"—"}</td>
+                    <td style={S.td}>{o.shipping.tracking||"—"}</td>
+                    <td style={S.td}>{o.shipping.deliveredDate?fmtDate(o.shipping.deliveredDate):"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:1050}}>
+              <thead><tr>
+                <th style={S.th}>Order Date</th><th style={S.th}>Client</th><th style={S.th}>Delivery</th><th style={S.th}>G / H</th>
+                <th style={S.th}>Tent. Delivery</th><th style={S.th}>Tent. Dispatch</th><th style={S.th}>Shipped</th>
+                <th style={S.th}>Courier</th><th style={S.th}>Tracking</th><th style={S.th}>Delivered</th><th style={S.th}>Status</th><th style={S.th}>Payment</th>
+              </tr></thead>
+              <tbody>
+                {rows.length===0 && <tr><td style={{...S.td,textAlign:"center",color:"#9098a8",padding:34}} colSpan={12}>{q?"No matching orders.":"No orders in this list."}</td></tr>}
+                {rows.map(o=>{
+                  return (
+                  <tr key={o.id} className="rowhover" style={{cursor:"pointer"}} onClick={()=>onOpen(o)}>
+                    <td style={S.td}>{fmtDate(o.orderRecDate)}</td>
+                    <td style={{...S.td,fontWeight:600}}>{o.clientName}</td>
+                    <td style={{...S.td,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.deliveryLocation}</td>
+                    <td style={S.td}>{o.hasGraphic?"G":"–"} / {o.hasHardware?"H":"–"}</td>
+                    <td style={S.td}>{fmtDate(o.tentativeDelivery)}</td>
+                    <td style={S.td}>{o.tentativeDispatch?fmtDate(o.tentativeDispatch):"—"}</td>
+                    <td style={S.td}>{fmtDate(o.shippedDate)}</td>
+                    <td style={S.td}>{o.shipping.courier||"—"}</td>
+                    <td style={S.td}>{o.shipping.tracking||"—"}</td>
+                    <td style={S.td}>{o.shipping.deliveredDate?fmtDate(o.shipping.deliveredDate):"—"}</td>
+                    <td style={S.td}><StatusCell o={o} role={user.role} /></td>
+                    <td style={S.td}><PaymentCap o={o} role={user.role} /></td>
+                  </tr>);
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [user,setUser]=useState(null);
+  const [orders,setOrders]=useState([]);
+  const [view,setView]=useState("dash"); const [activeId,setActiveId]=useState(null);
+  useEffect(()=>{setOrders(loadOrders());},[]);
+  const persist=useCallback(next=>{setOrders(next);saveOrders(next);},[]);
+  if(!user) return <Login onLogin={setUser} />;
+  const active=orders.find(o=>o.id===activeId);
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:60,background:"linear-gradient(100deg,#16386b 0%,#1f4e8c 55%,#2563a8 100%)",color:"#fff",boxShadow:"0 2px 12px rgba(16,30,60,.22)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>setView("dash")}>
+          <div style={{width:34,height:34,borderRadius:9,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:"inset 0 0 0 1px rgba(255,255,255,.2)"}}>📦</div>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,letterSpacing:".2px",lineHeight:1}}>Order Manager</div>
+            <div style={{fontSize:10.5,color:"rgba(255,255,255,.7)",letterSpacing:".4px",marginTop:2}}>GRAPHICS &amp; HARDWARE TRACKING</div>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:14,fontSize:13}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,.12)",padding:"6px 12px 6px 9px",borderRadius:20}}>
+            <span style={{width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,.9)",color:C.brand,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12}}>{(user.name||"?").slice(0,1).toUpperCase()}</span>
+            <span style={{lineHeight:1.1}}><b>{user.name}</b><br/><span style={{fontSize:11,color:"rgba(255,255,255,.75)"}}>{ROLES[user.role].label}</span></span>
+          </div>
+          <button className="btn" style={{...S.btn,background:"rgba(255,255,255,.16)",color:"#fff",padding:"7px 14px"}} onClick={()=>{setUser(null);setView("dash");}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.26)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.16)"}>Switch</button>
+        </div>
+      </div>
+      {view==="dash" && <Dashboard user={user} orders={orders} onOpen={o=>{setActiveId(o.id);setView("detail");}} onNew={()=>setView("new")} />}
+      {view==="new" && <NewOrderForm user={user} onSave={o=>{persist([...orders,o]);setView("dash");}} onCancel={()=>setView("dash")} />}
+      {view==="detail" && active && <OrderDetail order={active} user={user} onBack={()=>setView("dash")} onUpdate={upd=>persist(orders.map(o=>o.id===upd.id?upd:o))} onDelete={id=>{persist(orders.filter(o=>o.id!==id));setView("dash");}} />}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

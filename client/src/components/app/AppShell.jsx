@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Archive, Briefcase, Layout, LogOut, Menu, Moon, PenTool, RefreshCw, Sun, Truck, X } from 'lucide-react';
+import { Archive, Briefcase, Layout, LogOut, Menu, Moon, PenTool, RefreshCw, Sun, Truck, X, Users, ClipboardList, Receipt, FileSpreadsheet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -13,6 +13,11 @@ const NAV_ITEMS = [
     { to: '/project-officer', label: 'Project Officer', icon: RefreshCw, key: 'projectOfficer' },
     { to: '/dashboard', label: 'Shipments', icon: Truck, key: 'dashboard' },
     { to: '/storage', label: 'Storage', icon: Archive, key: 'storage' },
+    { to: '/manpower-request', label: 'Manpower Request', icon: Users, key: 'manpowerRequest' },
+    { to: '/domestic-orders', label: 'Domestic Orders', icon: ClipboardList, key: 'domesticOrders' },
+    { to: '/truck-requisition', label: 'Truck Requisition', icon: Truck, key: 'truckRequisition' },
+    { to: '/expense-sheet', label: 'Expense Sheet', icon: Receipt, key: 'expenseSheet' },
+    { to: '/export-fabric-orders', label: 'Export Fabric Orders', icon: FileSpreadsheet, key: 'exportFabricOrders' },
 ];
 
 export default function AppShell({

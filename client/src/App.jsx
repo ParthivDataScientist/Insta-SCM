@@ -12,6 +12,7 @@ import ProjectBoardPremium from './views/ProjectBoardPremium';
 import ManagerTimelinePremium from './views/ManagerTimelinePremium';
 import ShipmentDashboardPremium from './views/ShipmentDashboardPremium';
 import ShipmentBookingPage from './views/ShipmentBookingPage';
+import HtmlPageViewer from './views/HtmlPageViewer';
 import { GlobalDateRangeProvider } from './contexts/GlobalDateRangeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './styles.css';
@@ -68,6 +69,11 @@ export default function App() {
                                 <Route path="/timeline" element={<ProtectedRoute><Navigate to="/project-officer" replace /></ProtectedRoute>} />
                                 <Route path="/dashboard" element={<ProtectedRoute><ShipmentDashboardPremium /></ProtectedRoute>} />
                                 <Route path="/shipments/new" element={<ProtectedRoute><ShipmentBookingPage /></ProtectedRoute>} />
+                                <Route path="/manpower-request" element={<ProtectedRoute><HtmlPageViewer title="Manpower Request" src="/digital-manpower-request.html" navKey="manpowerRequest" /></ProtectedRoute>} />
+                                <Route path="/domestic-orders" element={<ProtectedRoute><HtmlPageViewer title="Domestic Orders" src="/domestic-orders-manager.html" navKey="domesticOrders" /></ProtectedRoute>} />
+                                <Route path="/truck-requisition" element={<ProtectedRoute><HtmlPageViewer title="Truck Requisition" src="/online-truck-requisition.html" navKey="truckRequisition" /></ProtectedRoute>} />
+                                <Route path="/expense-sheet" element={<ProtectedRoute><HtmlPageViewer title="Expense & Allowance Sheet" src="/project-expense-sheet-and-allowance-sheet.html" navKey="expenseSheet" /></ProtectedRoute>} />
+                                <Route path="/export-fabric-orders" element={<ProtectedRoute><HtmlPageViewer title="Export Fabric Orders" src="/real-time-export-fabric-order-list.html" navKey="exportFabricOrders" /></ProtectedRoute>} />
                                 <Route path="/*" element={<Navigate to="/login" replace />} />
                             </Routes>
                         </GlobalDateRangeProvider>
